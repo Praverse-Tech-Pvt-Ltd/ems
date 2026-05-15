@@ -1,6 +1,6 @@
-# NexGen EMS — Employee Management System
+# NexGen EMS - Employee Management System
 
-Full-stack monorepo for NexGen Pharma Solutions EMS.
+Full-stack monorepo for **NexGen Pharma Solutions Pvt Ltd** EMS.
 
 ## Stack
 
@@ -8,149 +8,223 @@ Full-stack monorepo for NexGen Pharma Solutions EMS.
 |---|---|
 | Frontend | Next.js 14, TypeScript, Tailwind CSS |
 | Backend API | NestJS, TypeScript, Prisma |
-| Face Recognition | Python FastAPI + DeepFace / AWS Rekognition |
 | Database | PostgreSQL 16 |
 | Cache | Redis 7 |
-| File Storage | AWS S3 |
-| Real-time | Socket.io |
+| File Storage | Local disk in dev, S3-ready service abstraction |
+| Face Recognition | Python FastAPI + DeepFace / AWS Rekognition integration point |
+| PDF | PDFKit salary slip generation |
 
-## Quick Start (Local — No Docker for App Services)
+## Quick Start
 
-Docker is used **only** for PostgreSQL and Redis. The three application services (frontend, API, face service) run natively on your machine.
+Docker is used for PostgreSQL and Redis. The frontend and API run natively.
 
 ### 1. Prerequisites
 
 | Requirement | Notes |
 |---|---|
 | Node.js 20+ | `node -v` to verify |
-| Docker Desktop | For PostgreSQL + Redis only |
-| Python 3.11 | For face service — **not** 3.12/3.13 (TensorFlow incompatible) |
+| Docker Desktop | PostgreSQL + Redis |
+| Python 3.11 | Needed only for the face service |
 
 ### 2. Environment Files
 
-Two files must exist before starting services:
+Use the actual local env files, not only the examples.
 
-**`apps/api/.env`** — copy from example and fill in secrets:
-```bash
-cp apps/api/.env.example apps/api/.env
+`apps/api/.env`
+
+```env
+DATABASE_URL=postgresql://nexgen:nexgen_dev_pass@localhost:5433/nexgen_ems?schema=public
+DIRECT_URL=postgresql://nexgen:nexgen_dev_pass@localhost:5433/nexgen_ems?schema=public
+REDIS_URL=redis://localhost:6380
+JWT_SECRET=dev_jwt_secret_change_in_production
+JWT_REFRESH_SECRET=dev_refresh_secret_change_in_production
+ENCRYPTION_KEY=dev_aes_key_32chars_change_prod!!
+PORT=3001
+NODE_ENV=development
+FRONTEND_URL=http://localhost:3000
+NEXT_PUBLIC_API_URL=http://localhost:3001
+STORAGE_DRIVER=local
+LOCAL_STORAGE_DIR=uploads
 ```
 
-**`apps/web/.env.local`** — create with:
-```
+`apps/web/.env` and `apps/web/.env.local`
+
+```env
 NEXT_PUBLIC_API_URL=http://localhost:3001
 ```
 
 ### 3. Install Dependencies
 
 ```powershell
-# From the repo root
 npm install
 ```
 
-### 4. Start Infrastructure (PostgreSQL + Redis)
+### 4. Start Infrastructure
 
 ```powershell
 docker compose up postgres redis -d
 ```
 
-### 5. Run Database Migrations and Seed
+### 5. Run Migrations
 
 ```powershell
-cd packages/db
-npx prisma migrate dev --name init
-npx ts-node prisma/seed.ts
-cd ../..
+Get-Content apps\api\.env | ForEach-Object {
+  if ($_ -match '^\s*#' -or $_ -notmatch '=') { return }
+  $name, $value = $_ -split '=', 2
+  if ($name) { Set-Item -Path "Env:$name" -Value $value }
+}
+npm --workspace @nexgen/db exec prisma migrate deploy
+npm --workspace @nexgen/db run db:generate
 ```
 
-### 6. Start the API (NestJS) — open a dedicated terminal
+### 6. Start Services
 
 ```powershell
-cd apps/api
-npm run dev
-# Runs on http://localhost:3001
-# Swagger docs at http://localhost:3001/api/docs
+npm --workspace @nexgen/api run dev
+npm --workspace @nexgen/web run dev
 ```
-
-### 7. Start the Frontend (Next.js) — open a dedicated terminal
-
-```powershell
-cd apps/web
-npm run dev
-# Runs on http://localhost:3000
-```
-
-### 8. Start the Face Service (Python) — open a dedicated terminal
-
-**One-time setup — Windows Long Path must be enabled first:**
-
-1. Open PowerShell as Administrator and run:
-   ```powershell
-   Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem" -Name "LongPathsEnabled" -Value 1
-   ```
-2. Restart your terminal.
-
-**Create a Python 3.11 virtual environment:**
-```powershell
-cd apps/face-service
-py -3.11 -m venv .venv
-.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-```
-
-**Start the service:**
-```powershell
-uvicorn app.main:app --port 8000 --reload
-# Runs on http://localhost:8000
-```
-
-### 9. Default Admin Credentials
-
-| Field | Value |
-|---|---|
-| Email | `admin@nexgen.in` |
-| Password | `Admin@123456` |
-| OTP / 2FA | Not enabled by default — leave the field blank on the login screen |
-
-### 10. Services
 
 | Service | URL |
 |---|---|
 | Web App | http://localhost:3000 |
 | API | http://localhost:3001 |
-| API Docs (Swagger) | http://localhost:3001/api/docs |
-| Face Service | http://localhost:8000 |
+| Swagger Docs | http://localhost:3001/api/docs |
+
+## Default Admin
+
+| Field | Value |
+|---|---|
+| Email | `admin@nexgen.in` |
+| Password | `Admin@123456` |
+| OTP / 2FA | Leave blank unless enabled |
+
+## Major Features
+
+- Face recognition attendance with geo-fencing.
+- Employee onboarding with bank details, Aadhaar, PAN, photograph, and face capture.
+- Local document uploads under `uploads/` in development.
+- Admin document verification and rejection workflow.
+- Salary structure management per employee.
+- Payroll generation with incentives, deductions, approved reimbursements, approval, rejection, and transfer states.
+- Branded salary slip PDF generation.
+- Approval signature asset mapping.
+- Company OS: policies, acknowledgements, holidays, settings, tasks, lifecycle, and organisation chat.
+- Direct and group employee chat with admin monitoring access.
+- Holiday-aware payroll day calculation.
+- Holiday block for attendance punch-in.
+- Working hours setting, defaulting to `09:30 - 18:00 IST`.
+- Audit logging for sensitive changes and key workflows.
+- AES-256-GCM encryption for new bank/PAN updates using `ENCRYPTION_KEY`.
+
+## Branding Assets
+
+Transparent logo assets are stored in:
+
+```text
+apps/web/public/brand/nexgen-logo-full.png
+apps/web/public/brand/nexgen-logo-mark.png
+apps/api/assets/brand/nexgen-logo-full.png
+apps/api/assets/brand/nexgen-logo-mark.png
+```
+
+The salary slip PDF uses:
+
+```text
+NEXGEN PHARMA SOLUTIONS PVT LTD
+```
+
+## Payroll Signatures
+
+Add signature PNGs later at these exact paths:
+
+```text
+apps/api/assets/signatures/ashwani-shrivastav.png
+apps/api/assets/signatures/pratham-shrivastav.png
+```
+
+When salary is approved, the API maps the approver name to the expected signature asset and stores the signature key on the salary slip.
+
+## Local File Storage
+
+Development uploads use:
+
+```text
+STORAGE_DRIVER=local
+LOCAL_STORAGE_DIR=uploads
+```
+
+Uploaded employee documents are stored under:
+
+```text
+uploads/employee-documents/<employee-code>/
+```
+
+Protected file access is exposed through:
+
+```text
+GET /api/v1/files?key=<stored-key>
+```
+
+## Important API Areas
+
+### Payroll
+
+```text
+GET   /api/v1/salary/structures
+POST  /api/v1/salary/structures/:employeeId
+POST  /api/v1/salary/slips/generate
+PATCH /api/v1/salary/slips/:id/approve
+PATCH /api/v1/salary/slips/:id/reject
+PATCH /api/v1/salary/slips/:id/transfer
+GET   /api/v1/salary/slips/:id/pdf
+```
+
+### Employee Onboarding and Documents
+
+```text
+GET   /api/v1/employees/me/onboarding
+PATCH /api/v1/employees/me/bank-details
+POST  /api/v1/employees/me/documents/upload
+GET   /api/v1/employees/documents/review
+PATCH /api/v1/employees/documents/:id/review
+```
+
+### Company OS
+
+```text
+GET   /api/v1/corporate/settings
+POST  /api/v1/corporate/settings/:key
+GET   /api/v1/corporate/holidays
+POST  /api/v1/corporate/holidays
+GET   /api/v1/corporate/policies
+POST  /api/v1/corporate/policies
+POST  /api/v1/corporate/policies/:id/acknowledge
+GET   /api/v1/corporate/tasks/my
+POST  /api/v1/corporate/tasks
+GET   /api/v1/corporate/chat/channels
+POST  /api/v1/corporate/chat/channels
+GET   /api/v1/corporate/chat/channels/:id/messages
+POST  /api/v1/corporate/chat/channels/:id/messages
+GET   /api/v1/corporate/lifecycle
+POST  /api/v1/corporate/lifecycle
+```
 
 ## Project Structure
 
-```
+```text
 nexgen-ems/
-├── apps/
-│   ├── web/              # Next.js 14 frontend
-│   ├── api/              # NestJS REST API
-│   └── face-service/     # Python FastAPI face recognition
-├── packages/
-│   ├── db/               # Prisma schema + migrations
-│   ├── types/            # Shared TypeScript types + Zod schemas
-│   └── config/           # Shared ESLint, tsconfig
-├── infrastructure/       # Docker, Terraform
-└── docker-compose.yml
+  apps/
+    web/              # Next.js frontend
+    api/              # NestJS REST API
+    face-service/     # Python face recognition service
+  packages/
+    db/               # Prisma schema and migrations
+    types/            # Shared TypeScript types and schemas
+  docker-compose.yml
 ```
 
-## Development Phases
+## Notes
 
-- **Phase 1** (Weeks 1–4): Auth, Employee Profiles, Role Management
-- **Phase 2** (Weeks 5–8): Face Enrollment, Punch-in/out, Attendance Dashboard
-- **Phase 3** (Weeks 9–11): Leaves, Requests, Notifications
-- **Phase 4** (Weeks 12–14): Expenses, Invoices, Salary Slips
-- **Phase 5** (Weeks 15–16): Reports, Audit Trail, Security Hardening
-- **Phase 6** (Weeks 17–18): PWA, WhatsApp, Analytics
-
-## Key Features
-
-- Face recognition attendance with GPS geo-fencing
-- Multi-level approval workflows (expenses, leaves, requests)
-- Real-time notifications via Socket.io
-- Role-based access: Employee / Manager / Admin / Super Admin
-- Full audit trail on all state-changing actions
-- JWT auth with refresh token rotation + optional TOTP 2FA
-- AES-256 encryption for sensitive fields (bank account, PAN)
+- Do not commit `.env`, `.env.local`, `uploads/`, `.next/`, `dist/`, or `node_modules/`.
+- `tsconfig.tsbuildinfo` files are local build artifacts and should not be included in feature commits.
+- For production, replace development secrets and configure real SMTP/S3 credentials.
