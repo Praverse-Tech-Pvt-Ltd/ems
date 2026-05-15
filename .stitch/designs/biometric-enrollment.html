@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Biometric Enrollment</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;700;800&amp;family=Inter:wght@400;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+          font-variation-settings:
+          'FILL' 1,
+          'wght' 700,
+          'GRAD' 0,
+          'opsz' 48
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-error-container": "#93000a",
+                        "primary-container": "#ffcc00",
+                        "on-tertiary-container": "#1a1a1a",
+                        "surface-variant": "#e8e3da",
+                        "surface-bright": "#faf7f2",
+                        "primary": "#1a1a1a",
+                        "primary-fixed": "#ffcc00",
+                        "on-surface": "#1a1a1a",
+                        "error-container": "#ffdad6",
+                        "surface-dim": "#d6d1c9",
+                        "surface-container-highest": "#e2ddd4",
+                        "on-secondary": "#1a1a1a",
+                        "surface-container-lowest": "#ffffff",
+                        "on-background": "#1a1a1a",
+                        "tertiary-fixed": "#d6e3ff",
+                        "primary-fixed-dim": "#e6b800",
+                        "on-primary-fixed": "#1a1a1a",
+                        "secondary": "#e63b2e",
+                        "outline": "#1a1a1a",
+                        "on-tertiary-fixed": "#1a1a1a",
+                        "on-secondary-fixed-variant": "#1a1a1a",
+                        "on-primary-container": "#1a1a1a",
+                        "on-tertiary-fixed-variant": "#1a1a1a",
+                        "tertiary": "#0055ff",
+                        "inverse-primary": "#f5f0e8",
+                        "error": "#cc0000",
+                        "tertiary-container": "#d6e3ff",
+                        "on-error": "#ffffff",
+                        "tertiary-fixed-dim": "#a8c6ff",
+                        "on-secondary-fixed": "#1a1a1a",
+                        "on-primary": "#ffffff",
+                        "on-tertiary": "#ffffff",
+                        "surface": "#f5f0e8",
+                        "secondary-fixed-dim": "#ffb3ab",
+                        "on-surface-variant": "#4a4a4a",
+                        "surface-container-high": "#e8e3da",
+                        "on-secondary-container": "#1a1a1a",
+                        "inverse-surface": "#1a1a1a",
+                        "surface-container-low": "#f2ede5",
+                        "outline-variant": "#d0cbc3",
+                        "background": "#f5f0e8",
+                        "surface-tint": "#1a1a1a",
+                        "secondary-container": "#ffdad6",
+                        "secondary-fixed": "#ffdad6",
+                        "on-primary-fixed-variant": "#1a1a1a",
+                        "inverse-on-surface": "#f5f0e8",
+                        "surface-container": "#eee9e0"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "fontFamily": {
+                        "headline": ["Space Grotesk", "sans-serif"],
+                        "display": ["Space Grotesk", "sans-serif"],
+                        "body": ["Inter", "sans-serif"],
+                        "label": ["Space Grotesk", "sans-serif"]
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-surface-variant text-on-surface font-body min-h-screen flex items-center justify-center p-4 selection:bg-primary-container selection:text-primary">
+<!-- Neo-Brutalist Modal Container -->
+<main class="bg-background border-[4px] border-primary shadow-[12px_12px_0px_0px_#1a1a1a] max-w-4xl w-full p-8 md:p-12 flex flex-col gap-10 relative">
+<!-- Header Section -->
+<header class="flex justify-between items-start border-b-[4px] border-primary pb-6">
+<div>
+<h1 class="font-headline text-5xl md:text-7xl font-extrabold uppercase leading-none tracking-tighter text-primary">Biometric<br/>Enrollment</h1>
+<div class="flex items-center gap-3 mt-4">
+<div class="h-4 w-4 bg-secondary border-2 border-primary"></div>
+<p class="font-body text-primary font-bold uppercase tracking-widest text-sm">Status: Awaiting Subject</p>
+</div>
+</div>
+<button aria-label="Abort Process" class="border-[4px] border-primary p-2 bg-surface hover:bg-primary hover:text-primary-container transition-none shadow-[4px_4px_0px_0px_#1a1a1a] active:translate-y-[4px] active:translate-x-[4px] active:shadow-none">
+<span class="material-symbols-outlined text-4xl">close</span>
+</button>
+</header>
+<!-- Main Content Area: Viewport and Controls -->
+<div class="grid md:grid-cols-[1fr_auto] gap-10 items-center">
+<!-- Camera Viewport -->
+<div class="relative w-full aspect-square border-[4px] border-primary bg-primary flex items-center justify-center overflow-hidden shadow-[8px_8px_0px_0px_#1a1a1a] group">
+<!-- Video Feed Placeholder (Greyscale, High Contrast) -->
+<img alt="Camera Feed Placeholder" class="absolute inset-0 w-full h-full object-cover mix-blend-luminosity opacity-70 grayscale contrast-150" data-alt="A stark, high-contrast, black and white portrait of a person's face directly facing the camera. The lighting is intense and geometric, embodying a raw, neo-brutalist aesthetic with deep black shadows and blown-out white highlights. The composition is dead center, severe, and lacks any soft transitions." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDuzkQoWNY6xuex1b3o1LCK7xmGY_qa-UNw6ni1MjKoHuvpUDsO9I97-gfTvmrNVTdXicwyYg87glQFpEw17zUX-qEvi4KDWUpSbMldZGNX9Fgor6oKVcyXISYorUhIoTJH8iDFSLxLs8lrL3NFEJDhSr6IFXt44Htpd07YqaAhV8IZzZOEFKX5J1H10q_3TagxltPyyMxaDIiFU_HNvCzmsUqGZY_mV2QX0o6l6-yvNt_gaJTdUPPlFoHfbi1ZSMJtIRVcrYNkxCIR"/>
+<!-- Primary Colored Scanning Overlay -->
+<div class="absolute inset-0 pointer-events-none flex flex-col justify-between p-6">
+<!-- Corner Brackets (Accent Yellow) -->
+<div class="absolute top-4 left-4 w-12 h-12 border-t-[8px] border-l-[8px] border-primary-container"></div>
+<div class="absolute top-4 right-4 w-12 h-12 border-t-[8px] border-r-[8px] border-primary-container"></div>
+<div class="absolute bottom-4 left-4 w-12 h-12 border-b-[8px] border-l-[8px] border-primary-container"></div>
+<div class="absolute bottom-4 right-4 w-12 h-12 border-b-[8px] border-r-[8px] border-primary-container"></div>
+<!-- Top HUD Indicators -->
+<div class="flex justify-between items-start z-10 w-full">
+<div class="bg-primary text-primary-container border-[3px] border-primary-container px-3 py-1 font-headline font-bold text-xs md:text-sm tracking-[0.2em] uppercase">
+                            Scanning...
+                        </div>
+<div class="bg-primary text-secondary border-[3px] border-secondary px-3 py-1 font-headline font-bold text-xs md:text-sm tracking-[0.2em] uppercase flex items-center gap-2">
+<span class="material-symbols-outlined text-sm">warning</span>
+                            Align Face
+                        </div>
+</div>
+<!-- Center Crosshair -->
+<div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+<div class="w-12 h-[4px] bg-primary-container"></div>
+<div class="absolute h-12 w-[4px] bg-primary-container"></div>
+<!-- Reticle Box -->
+<div class="absolute w-48 h-64 border-[3px] border-primary-container border-dashed opacity-50"></div>
+</div>
+<!-- Bottom HUD -->
+<div class="flex justify-center z-10 mt-auto w-full">
+<div class="bg-primary text-tertiary border-[3px] border-tertiary px-4 py-2 font-headline font-bold text-sm tracking-widest uppercase">
+                            SEQ: 0x99F_ALPHA
+                        </div>
+</div>
+</div>
+<!-- Animated Scanning Line -->
+<div class="absolute top-1/2 left-0 w-full h-[6px] bg-primary-container shadow-[0_0_20px_rgba(255,204,0,1)] z-20"></div>
+</div>
+<!-- Side Controls / Progress -->
+<div class="flex flex-col gap-8 w-full md:w-80">
+<!-- Data Readout -->
+<div class="border-[4px] border-primary p-4 bg-surface-container-high shadow-[6px_6px_0px_0px_#1a1a1a]">
+<h3 class="font-headline font-extrabold uppercase text-xl border-b-[3px] border-primary pb-2 mb-4">Telemetry</h3>
+<ul class="font-body font-bold text-sm uppercase tracking-wider space-y-3">
+<li class="flex justify-between"><span>Lighting:</span> <span class="text-secondary">Sub-Optimal</span></li>
+<li class="flex justify-between"><span>Distance:</span> <span>0.8 Meters</span></li>
+<li class="flex justify-between"><span>Angle:</span> <span>+2° Pitch</span></li>
+</ul>
+</div>
+<!-- Discrete Progress Bar -->
+<div class="flex flex-col gap-3">
+<div class="flex justify-between font-headline font-extrabold uppercase tracking-widest text-lg">
+<span>Capture</span>
+<span>40%</span>
+</div>
+<div class="flex gap-2 h-12 w-full border-[4px] border-primary p-2 bg-surface">
+<div class="h-full flex-1 bg-primary"></div>
+<div class="h-full flex-1 bg-primary"></div>
+<div class="h-full flex-1 bg-primary-container border-[3px] border-primary animate-pulse"></div>
+<div class="h-full flex-1 border-[3px] border-primary border-dashed"></div>
+<div class="h-full flex-1 border-[3px] border-primary border-dashed"></div>
+</div>
+</div>
+</div>
+</div>
+<!-- Primary Action -->
+<div class="mt-4 border-t-[4px] border-primary pt-10">
+<button class="w-full bg-primary-container text-primary border-[4px] border-primary py-6 px-8 font-headline font-extrabold text-3xl md:text-5xl uppercase tracking-tight hover:bg-primary hover:text-primary-container transition-none shadow-[8px_8px_0px_0px_#1a1a1a] active:translate-y-[8px] active:translate-x-[8px] active:shadow-none flex items-center justify-center gap-6 group">
+                Begin Scan
+                <span class="material-symbols-outlined font-bold text-5xl group-hover:scale-125 transition-transform duration-200">fingerprint</span>
+</button>
+</div>
+</main>
+</body></html>

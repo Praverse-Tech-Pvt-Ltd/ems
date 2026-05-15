@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>NexGen Pharma - Attendance</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;700;800&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-error-container": "#93000a",
+                        "primary-container": "#ffcc00",
+                        "on-tertiary-container": "#1a1a1a",
+                        "surface-variant": "#e8e3da",
+                        "surface-bright": "#faf7f2",
+                        "primary": "#1a1a1a",
+                        "primary-fixed": "#ffcc00",
+                        "on-surface": "#1a1a1a",
+                        "error-container": "#ffdad6",
+                        "surface-dim": "#d6d1c9",
+                        "surface-container-highest": "#e2ddd4",
+                        "on-secondary": "#1a1a1a",
+                        "surface-container-lowest": "#ffffff",
+                        "on-background": "#1a1a1a",
+                        "tertiary-fixed": "#d6e3ff",
+                        "primary-fixed-dim": "#e6b800",
+                        "on-primary-fixed": "#1a1a1a",
+                        "secondary": "#e63b2e",
+                        "outline": "#1a1a1a",
+                        "on-tertiary-fixed": "#1a1a1a",
+                        "on-secondary-fixed-variant": "#1a1a1a",
+                        "on-primary-container": "#1a1a1a",
+                        "on-tertiary-fixed-variant": "#1a1a1a",
+                        "tertiary": "#0055ff",
+                        "inverse-primary": "#f5f0e8",
+                        "error": "#cc0000",
+                        "tertiary-container": "#d6e3ff",
+                        "on-error": "#ffffff",
+                        "tertiary-fixed-dim": "#a8c6ff",
+                        "on-secondary-fixed": "#1a1a1a",
+                        "on-primary": "#ffffff",
+                        "on-tertiary": "#ffffff",
+                        "surface": "#f5f0e8",
+                        "secondary-fixed-dim": "#ffb3ab",
+                        "on-surface-variant": "#4a4a4a",
+                        "surface-container-high": "#e8e3da",
+                        "on-secondary-container": "#1a1a1a",
+                        "inverse-surface": "#1a1a1a",
+                        "surface-container-low": "#f2ede5",
+                        "outline-variant": "#d0cbc3",
+                        "background": "#f5f0e8",
+                        "surface-tint": "#1a1a1a",
+                        "secondary-container": "#ffdad6",
+                        "secondary-fixed": "#ffdad6",
+                        "on-primary-fixed-variant": "#1a1a1a",
+                        "inverse-on-surface": "#f5f0e8",
+                        "surface-container": "#eee9e0"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0",
+                        "lg": "0",
+                        "xl": "0",
+                        "full": "0"
+                    },
+                    "fontFamily": {
+                        "headline": ["Space Grotesk", "sans-serif"],
+                        "display": ["Space Grotesk", "sans-serif"],
+                        "body": ["Inter", "sans-serif"],
+                        "label": ["Space Grotesk", "sans-serif"]
+                    },
+                    "boxShadow": {
+                        'brutal': '4px 4px 0px 0px #1a1a1a',
+                        'brutal-lg': '8px 8px 0px 0px #1a1a1a',
+                        'brutal-active': '2px 2px 0px 0px #1a1a1a',
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { background-color: theme('colors.background'); color: theme('colors.on-background'); }
+        /* Override border radius globally for the neo-brutalist feel despite config */
+        * { border-radius: 0 !important; }
+    </style>
+</head>
+<body class="font-body antialiased flex">
+<!-- SideNavBar -->
+<nav class="bg-surface-container-lowest dark:bg-inverse-surface h-full w-64 border-r-4 border-outline fixed left-0 top-0 overflow-y-auto z-40 hidden md:flex flex-col">
+<div class="p-6 border-b-4 border-outline">
+<h1 class="text-headline-md font-headline font-extrabold text-primary uppercase tracking-tighter text-3xl">NexGen Pharma</h1>
+<p class="text-on-surface-variant font-label text-sm mt-2 uppercase border-t-2 border-outline pt-1 inline-block">Clinical Research</p>
+</div>
+<div class="p-6 border-b-4 border-outline bg-primary-container/20">
+<div class="flex items-center gap-3">
+<div class="w-12 h-12 bg-surface border-2 border-outline shadow-brutal overflow-hidden">
+<img alt="Dr. Sarah Jenkins" class="w-full h-full object-cover mix-blend-luminosity grayscale contrast-125" data-alt="A striking portrait of a medical professional in a stark, modern clinical setting. High-key lighting highlights her features against a brutalist architectural background. The overall aesthetic relies on strong geometric composition, utilizing a bold color palette with bright whites, deep blacks, and a vibrant accent color, fitting a modern Bauhaus-inspired clinical UI design." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCBmmahlULtaOb3Y9B50921U0-Xj9w2K8-Q7WnUSH4njwLOY5juDNuxL2LY7Lv3Dwm-NOfhxaoTXCozsBAJ60J8wo0g7LKoFCURAzg9gcf4wKk_02QC8o9_h6Q3_YsXbDvFvFHBBDLus19d-l-knpZaPWHlCKar__KrkJfe2lIr3lMzOYspAhflMImuTUSlbFTlJseoji6YF4nmWH_ewhYtnSq9SRJVvyF8mrVldVimYIgQevZ37neJDMAkdDPOXvLvBVWerZ9mJQXz"/>
+</div>
+<div>
+<p class="font-bold font-headline text-on-surface">Dr. Sarah Jenkins</p>
+<p class="text-xs text-on-surface-variant uppercase font-bold">Research Lead</p>
+</div>
+</div>
+</div>
+<div class="flex-1 overflow-y-auto p-4 space-y-2">
+<a class="flex items-center gap-3 text-on-surface-variant px-4 py-3 border-2 border-transparent hover:border-outline hover:shadow-brutal hover:bg-surface-container-high transition-all font-label uppercase" href="#">
+<span class="material-symbols-outlined font-bold text-xl">dashboard</span>
+<span class="font-bold">Dashboard</span>
+</a>
+<a class="flex items-center gap-3 bg-primary-container text-on-primary-container border-2 border-outline shadow-brutal font-bold px-4 py-3 uppercase" href="#">
+<span class="material-symbols-outlined font-bold text-xl" style="font-variation-settings: 'FILL' 1;">calendar_today</span>
+<span class="font-bold">Attendance</span>
+</a>
+<a class="flex items-center gap-3 text-on-surface-variant px-4 py-3 border-2 border-transparent hover:border-outline hover:shadow-brutal hover:bg-surface-container-high transition-all font-label uppercase" href="#">
+<span class="material-symbols-outlined font-bold text-xl">pending_actions</span>
+<span class="font-bold">Requests</span>
+</a>
+<a class="flex items-center gap-3 text-on-surface-variant px-4 py-3 border-2 border-transparent hover:border-outline hover:shadow-brutal hover:bg-surface-container-high transition-all font-label uppercase" href="#">
+<span class="material-symbols-outlined font-bold text-xl">payments</span>
+<span class="font-bold">Expenses</span>
+</a>
+<a class="flex items-center gap-3 text-on-surface-variant px-4 py-3 border-2 border-transparent hover:border-outline hover:shadow-brutal hover:bg-surface-container-high transition-all font-label uppercase" href="#">
+<span class="material-symbols-outlined font-bold text-xl">receipt_long</span>
+<span class="font-bold">Invoices</span>
+</a>
+<a class="flex items-center gap-3 text-on-surface-variant px-4 py-3 border-2 border-transparent hover:border-outline hover:shadow-brutal hover:bg-surface-container-high transition-all font-label uppercase" href="#">
+<span class="material-symbols-outlined font-bold text-xl">account_balance_wallet</span>
+<span class="font-bold">Payroll</span>
+</a>
+<a class="flex items-center gap-3 text-on-surface-variant px-4 py-3 border-2 border-transparent hover:border-outline hover:shadow-brutal hover:bg-surface-container-high transition-all font-label uppercase" href="#">
+<span class="material-symbols-outlined font-bold text-xl">admin_panel_settings</span>
+<span class="font-bold">Admin Panel</span>
+</a>
+</div>
+</nav>
+<!-- TopNavBar (Mobile only for brutalist layout to maximize canvas) -->
+<nav class="md:hidden bg-surface dark:bg-inverse-surface w-full h-16 border-b-4 border-outline fixed top-0 right-0 z-50 flex justify-between items-center px-4 shadow-brutal">
+<span class="material-symbols-outlined text-3xl font-bold">menu</span>
+<h1 class="text-headline-sm font-headline font-extrabold uppercase">NexGen Pharma</h1>
+<div class="flex gap-4">
+<span class="material-symbols-outlined font-bold">notifications</span>
+</div>
+</nav>
+<!-- Main Canvas -->
+<main class="flex-1 ml-0 md:ml-64 mt-16 md:mt-0 p-4 md:p-8 min-h-screen bg-background">
+<!-- Header Section -->
+<header class="mb-10 border-b-4 border-outline pb-6 flex flex-col md:flex-row md:items-end justify-between gap-6">
+<div>
+<h2 class="text-5xl md:text-7xl font-headline font-extrabold tracking-tighter text-primary uppercase leading-none">Attendance<br/><span class="text-tertiary">Log</span></h2>
+<p class="font-body text-on-surface-variant mt-4 max-w-xl font-medium border-l-4 border-primary-container pl-4">Review daily logs, verify check-in methods, and monitor team presence across all research facilities.</p>
+</div>
+<div class="flex flex-col gap-4">
+<!-- Segmented Control Brutalist -->
+<div class="flex border-4 border-outline bg-surface-container-lowest w-fit shadow-brutal">
+<button class="px-6 py-3 font-headline font-bold uppercase tracking-wider bg-primary text-on-primary">My Logs</button>
+<button class="px-6 py-3 font-headline font-bold uppercase tracking-wider text-on-surface hover:bg-surface-container-high border-l-4 border-outline transition-colors">Team Overview</button>
+</div>
+<button class="bg-primary-container text-on-primary-container border-4 border-outline px-6 py-3 font-headline font-bold uppercase tracking-wider shadow-brutal hover:translate-y-1 hover:translate-x-1 hover:shadow-brutal-active transition-all flex items-center gap-2 justify-center w-full md:w-auto">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">add</span>
+                    Manual Entry
+                </button>
+</div>
+</header>
+<!-- Metrics Grid -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+<div class="bg-surface-container-lowest border-4 border-outline p-6 shadow-brutal relative overflow-hidden group">
+<div class="absolute -right-4 -top-4 w-24 h-24 bg-primary-container border-4 border-outline rounded-full flex items-center justify-center transform group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined text-4xl text-on-primary-container">schedule</span>
+</div>
+<h3 class="font-headline font-bold text-on-surface-variant uppercase text-sm tracking-widest mb-2">Total Hours</h3>
+<p class="font-headline font-extrabold text-5xl text-primary">164<span class="text-2xl text-on-surface-variant">.5</span></p>
+<div class="mt-4 pt-4 border-t-2 border-outline flex items-center gap-2">
+<span class="bg-primary-container px-2 py-1 text-xs font-bold uppercase border-2 border-outline inline-block shadow-[2px_2px_0px_0px_#1a1a1a]">+12%</span>
+<span class="text-sm font-medium">vs last month</span>
+</div>
+</div>
+<div class="bg-tertiary text-on-tertiary border-4 border-outline p-6 shadow-brutal relative overflow-hidden">
+<h3 class="font-headline font-bold uppercase text-sm tracking-widest mb-2 text-on-tertiary/80">Presence Rate</h3>
+<p class="font-headline font-extrabold text-5xl">98%</p>
+<div class="mt-4 pt-4 border-t-2 border-outline/30 flex items-center gap-2">
+<span class="bg-surface text-primary px-2 py-1 text-xs font-bold uppercase border-2 border-outline inline-block shadow-[2px_2px_0px_0px_#1a1a1a]">Target 95%</span>
+</div>
+</div>
+<div class="bg-secondary text-on-error border-4 border-outline p-6 shadow-brutal relative overflow-hidden">
+<div class="absolute -right-4 -top-4 w-24 h-24 bg-primary border-4 border-outline rounded-full flex items-center justify-center transform group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined text-4xl text-on-primary">warning</span>
+</div>
+<h3 class="font-headline font-bold uppercase text-sm tracking-widest mb-2 text-on-error/80">Anomalies</h3>
+<p class="font-headline font-extrabold text-5xl">3</p>
+<div class="mt-4 pt-4 border-t-2 border-outline/30 flex items-center gap-2">
+<span class="bg-surface text-primary px-2 py-1 text-xs font-bold uppercase border-2 border-outline inline-block shadow-[2px_2px_0px_0px_#1a1a1a]">Requires Action</span>
+</div>
+</div>
+</div>
+<!-- Heatmap Section -->
+<section class="mb-10 border-4 border-outline bg-surface-container-lowest shadow-brutal p-6">
+<div class="flex justify-between items-center mb-6 border-b-4 border-outline pb-4">
+<h3 class="text-2xl font-headline font-extrabold uppercase tracking-tighter">October Log Heatmap</h3>
+<div class="flex items-center gap-4 text-sm font-bold uppercase">
+<div class="flex items-center gap-2"><div class="w-4 h-4 border-2 border-outline bg-surface-container-lowest"></div> Absent</div>
+<div class="flex items-center gap-2"><div class="w-4 h-4 border-2 border-outline bg-tertiary"></div> Present</div>
+<div class="flex items-center gap-2"><div class="w-4 h-4 border-2 border-outline bg-primary-container"></div> Late/Partial</div>
+<div class="flex items-center gap-2"><div class="w-4 h-4 border-2 border-outline bg-secondary"></div> Anomaly</div>
+</div>
+</div>
+<div class="overflow-x-auto pb-4">
+<div class="min-w-[800px]">
+<!-- Days Header -->
+<div class="grid grid-cols-[auto_repeat(31,minmax(24px,1fr))] gap-1 mb-2 font-headline font-bold text-xs uppercase">
+<div class="w-16"></div> <!-- Spacer for names -->
+<!-- Generating 31 days -->
+<div class="text-center">1</div><div class="text-center">2</div><div class="text-center">3</div><div class="text-center">4</div><div class="text-center">5</div><div class="text-center">6</div><div class="text-center">7</div><div class="text-center">8</div><div class="text-center">9</div><div class="text-center">10</div>
+<div class="text-center">11</div><div class="text-center">12</div><div class="text-center">13</div><div class="text-center">14</div><div class="text-center">15</div><div class="text-center">16</div><div class="text-center">17</div><div class="text-center">18</div><div class="text-center">19</div><div class="text-center">20</div>
+<div class="text-center">21</div><div class="text-center">22</div><div class="text-center">23</div><div class="text-center">24</div><div class="text-center">25</div><div class="text-center">26</div><div class="text-center">27</div><div class="text-center">28</div><div class="text-center">29</div><div class="text-center">30</div><div class="text-center">31</div>
+</div>
+<!-- Row 1 -->
+<div class="grid grid-cols-[auto_repeat(31,minmax(24px,1fr))] gap-1 mb-1 items-center">
+<div class="w-16 font-bold text-sm truncate pr-2 border-r-2 border-outline h-full flex items-center">Wk 1</div>
+<div class="h-6 border-2 border-outline bg-tertiary hover:scale-125 hover:z-10 transition-transform origin-center cursor-pointer"></div>
+<div class="h-6 border-2 border-outline bg-tertiary hover:scale-125 hover:z-10 transition-transform origin-center cursor-pointer"></div>
+<div class="h-6 border-2 border-outline bg-tertiary hover:scale-125 hover:z-10 transition-transform origin-center cursor-pointer"></div>
+<div class="h-6 border-2 border-outline bg-primary-container hover:scale-125 hover:z-10 transition-transform origin-center cursor-pointer"></div>
+<div class="h-6 border-2 border-outline bg-tertiary hover:scale-125 hover:z-10 transition-transform origin-center cursor-pointer"></div>
+<div class="h-6 border-2 border-outline bg-surface-container-highest cursor-not-allowed"></div>
+<div class="h-6 border-2 border-outline bg-surface-container-highest cursor-not-allowed"></div>
+<!-- ... rest of month -->
+<div class="h-6 border-2 border-outline bg-tertiary hover:scale-125 hover:z-10 transition-transform origin-center cursor-pointer"></div>
+<div class="h-6 border-2 border-outline bg-tertiary hover:scale-125 hover:z-10 transition-transform origin-center cursor-pointer"></div>
+<div class="h-6 border-2 border-outline bg-tertiary hover:scale-125 hover:z-10 transition-transform origin-center cursor-pointer"></div>
+<div class="h-6 border-2 border-outline bg-secondary hover:scale-125 hover:z-10 transition-transform origin-center cursor-pointer"></div>
+<div class="h-6 border-2 border-outline bg-tertiary hover:scale-125 hover:z-10 transition-transform origin-center cursor-pointer"></div>
+<div class="h-6 border-2 border-outline bg-surface-container-highest"></div>
+<div class="h-6 border-2 border-outline bg-surface-container-highest"></div>
+<div class="h-6 border-2 border-outline bg-tertiary"></div><div class="h-6 border-2 border-outline bg-tertiary"></div><div class="h-6 border-2 border-outline bg-tertiary"></div><div class="h-6 border-2 border-outline bg-tertiary"></div><div class="h-6 border-2 border-outline bg-tertiary"></div><div class="h-6 border-2 border-outline bg-surface-container-highest"></div><div class="h-6 border-2 border-outline bg-surface-container-highest"></div>
+<div class="h-6 border-2 border-outline bg-tertiary"></div><div class="h-6 border-2 border-outline bg-tertiary"></div><div class="h-6 border-2 border-outline bg-tertiary"></div><div class="h-6 border-2 border-outline bg-tertiary"></div><div class="h-6 border-2 border-outline bg-primary-container"></div><div class="h-6 border-2 border-outline bg-surface-container-highest"></div><div class="h-6 border-2 border-outline bg-surface-container-highest"></div>
+<div class="h-6 border-2 border-outline bg-surface-container-lowest"></div><div class="h-6 border-2 border-outline bg-tertiary"></div><div class="h-6 border-2 border-outline bg-tertiary"></div>
+</div>
+</div>
+</div>
+</section>
+<!-- Detailed Data Table -->
+<section class="border-4 border-outline bg-surface-container-lowest shadow-brutal">
+<div class="p-6 border-b-4 border-outline flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-primary text-on-primary">
+<h3 class="text-2xl font-headline font-extrabold uppercase tracking-tighter">Detailed Logs</h3>
+<div class="flex gap-2 w-full sm:w-auto">
+<div class="relative w-full sm:w-64 border-2 border-outline bg-surface">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-primary font-bold">search</span>
+<input class="w-full bg-transparent border-none pl-10 pr-4 py-2 font-headline uppercase font-bold text-primary placeholder:text-primary/50 focus:ring-0" placeholder="SEARCH LOGS..." type="text"/>
+</div>
+<button class="bg-primary-container text-primary border-2 border-outline p-2 hover:bg-tertiary hover:text-on-tertiary transition-colors">
+<span class="material-symbols-outlined font-bold">filter_list</span>
+</button>
+</div>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead class="bg-surface-container-high border-b-4 border-outline font-headline uppercase font-extrabold text-sm tracking-wider">
+<tr>
+<th class="p-4 border-r-2 border-outline whitespace-nowrap">Date</th>
+<th class="p-4 border-r-2 border-outline whitespace-nowrap">In</th>
+<th class="p-4 border-r-2 border-outline whitespace-nowrap">Out</th>
+<th class="p-4 border-r-2 border-outline whitespace-nowrap">Duration</th>
+<th class="p-4 border-r-2 border-outline whitespace-nowrap text-center">Method</th>
+<th class="p-4 whitespace-nowrap">Status</th>
+</tr>
+</thead>
+<tbody class="font-body font-medium">
+<!-- Row 1 -->
+<tr class="border-b-2 border-outline hover:bg-primary-container hover:text-primary transition-colors group">
+<td class="p-4 border-r-2 border-outline font-bold">Oct 24, 2023</td>
+<td class="p-4 border-r-2 border-outline">08:55 AM</td>
+<td class="p-4 border-r-2 border-outline">05:15 PM</td>
+<td class="p-4 border-r-2 border-outline font-bold">8h 20m</td>
+<td class="p-4 border-r-2 border-outline text-center">
+<span class="material-symbols-outlined text-2xl group-hover:scale-110 transition-transform" style="font-weight: 700;">fingerprint</span>
+</td>
+<td class="p-4">
+<span class="bg-tertiary text-on-tertiary px-3 py-1 text-xs font-bold uppercase border-2 border-outline inline-block shadow-[2px_2px_0px_0px_#1a1a1a]">Verified</span>
+</td>
+</tr>
+<!-- Row 2 -->
+<tr class="border-b-2 border-outline hover:bg-primary-container hover:text-primary transition-colors group bg-error-container/30">
+<td class="p-4 border-r-2 border-outline font-bold">Oct 23, 2023</td>
+<td class="p-4 border-r-2 border-outline text-secondary font-bold">09:30 AM</td>
+<td class="p-4 border-r-2 border-outline">05:00 PM</td>
+<td class="p-4 border-r-2 border-outline font-bold">7h 30m</td>
+<td class="p-4 border-r-2 border-outline text-center">
+<span class="material-symbols-outlined text-2xl group-hover:scale-110 transition-transform" style="font-weight: 700;">badge</span>
+</td>
+<td class="p-4">
+<span class="bg-secondary text-on-error px-3 py-1 text-xs font-bold uppercase border-2 border-outline inline-block shadow-[2px_2px_0px_0px_#1a1a1a]">Late Entry</span>
+</td>
+</tr>
+<!-- Row 3 -->
+<tr class="border-b-2 border-outline hover:bg-primary-container hover:text-primary transition-colors group">
+<td class="p-4 border-r-2 border-outline font-bold">Oct 20, 2023</td>
+<td class="p-4 border-r-2 border-outline">08:45 AM</td>
+<td class="p-4 border-r-2 border-outline">05:30 PM</td>
+<td class="p-4 border-r-2 border-outline font-bold">8h 45m</td>
+<td class="p-4 border-r-2 border-outline text-center">
+<span class="material-symbols-outlined text-2xl group-hover:scale-110 transition-transform" style="font-weight: 700;">face</span>
+</td>
+<td class="p-4">
+<span class="bg-tertiary text-on-tertiary px-3 py-1 text-xs font-bold uppercase border-2 border-outline inline-block shadow-[2px_2px_0px_0px_#1a1a1a]">Verified</span>
+</td>
+</tr>
+<!-- Row 4 -->
+<tr class="hover:bg-primary-container hover:text-primary transition-colors group">
+<td class="p-4 border-r-2 border-outline font-bold">Oct 19, 2023</td>
+<td class="p-4 border-r-2 border-outline">09:00 AM</td>
+<td class="p-4 border-r-2 border-outline">--:-- --</td>
+<td class="p-4 border-r-2 border-outline font-bold">--</td>
+<td class="p-4 border-r-2 border-outline text-center">
+<span class="material-symbols-outlined text-2xl group-hover:scale-110 transition-transform" style="font-weight: 700;">location_on</span>
+</td>
+<td class="p-4">
+<span class="bg-surface text-primary px-3 py-1 text-xs font-bold uppercase border-2 border-outline inline-block shadow-[2px_2px_0px_0px_#1a1a1a] border-dashed">Missing Out</span>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="p-4 border-t-4 border-outline bg-surface flex justify-between items-center">
+<span class="font-bold uppercase text-sm">Showing 1-4 of 24</span>
+<div class="flex gap-2">
+<button class="w-10 h-10 border-2 border-outline bg-surface-container-lowest flex items-center justify-center hover:bg-primary hover:text-on-primary shadow-[2px_2px_0px_0px_#1a1a1a] hover:translate-y-1 hover:translate-x-1 hover:shadow-none transition-all">
+<span class="material-symbols-outlined font-bold">chevron_left</span>
+</button>
+<button class="w-10 h-10 border-2 border-outline bg-surface-container-lowest flex items-center justify-center hover:bg-primary hover:text-on-primary shadow-[2px_2px_0px_0px_#1a1a1a] hover:translate-y-1 hover:translate-x-1 hover:shadow-none transition-all">
+<span class="material-symbols-outlined font-bold">chevron_right</span>
+</button>
+</div>
+</div>
+</section>
+</main>
+</body></html>

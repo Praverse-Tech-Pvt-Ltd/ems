@@ -1,0 +1,104 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Inter', sans-serif;
+    background-color: #f5f0e8;
+    color: #1a1a1a;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Space Grotesk', sans-serif;
+  }
+}
+
+@keyframes marquee {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-33.333%); }
+}
+@keyframes scan {
+  0%   { top: 8px; }
+  50%  { top: calc(100% - 8px); }
+  100% { top: 8px; }
+}
+@keyframes blink-dot {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.2; }
+}
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.animate-marquee   { animation: marquee 24s linear infinite; }
+.animate-scan      { animation: scan 2.4s ease-in-out infinite; }
+.animate-blink     { animation: blink-dot 1.2s ease-in-out infinite; }
+.animate-fade-up   { animation: fade-up 0.35s ease both; }
+
+.diag {
+  background-image: repeating-linear-gradient(
+    -45deg, transparent 0, transparent 4px, rgba(0,0,0,0.12) 4px, rgba(0,0,0,0.12) 5px
+  );
+}
+
+@layer utilities {
+  .brutal-border   { border: 3px solid #1a1a1a; }
+  .brutal-border-b { border-bottom: 3px solid #1a1a1a; }
+  .brutal-border-r { border-right:  3px solid #1a1a1a; }
+  .brutal-border-l { border-left:   3px solid #1a1a1a; }
+  .brutal-border-t { border-top:    3px solid #1a1a1a; }
+  .brutal-shadow   { box-shadow: 4px 4px 0px 0px #1a1a1a; }
+  .brutal-shadow-lg { box-shadow: 8px 8px 0px 0px #1a1a1a; }
+  .brutal-shadow-sm { box-shadow: 2px 2px 0px 0px #1a1a1a; }
+
+  .brutal-btn-primary {
+    background-color: #ffcc00;
+    border: 3px solid #1a1a1a;
+    color: #1a1a1a;
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 700;
+    text-transform: uppercase;
+    box-shadow: 4px 4px 0px 0px #1a1a1a;
+    transition: all 0.1s ease;
+    letter-spacing: 0.05em;
+  }
+  .brutal-btn-primary:hover {
+    background-color: #1a1a1a;
+    color: #ffcc00;
+  }
+  .brutal-btn-secondary {
+    background-color: transparent;
+    border: 3px solid #1a1a1a;
+    color: #1a1a1a;
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 700;
+    text-transform: uppercase;
+    transition: all 0.1s ease;
+  }
+  .brutal-btn-secondary:hover {
+    background-color: #1a1a1a;
+    color: #f5f0e8;
+  }
+
+  .brutal-pill {
+    border: 2px solid #1a1a1a;
+    padding: 0.25rem 0.875rem;
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 700;
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    transition: all 0.1s ease;
+  }
+  .brutal-pill.active,
+  .brutal-pill[data-active='true'] {
+    background-color: #1a1a1a;
+    color: #f5f0e8;
+  }
+  .brutal-pill:not(.active):not([data-active='true']):hover {
+    background-color: #eee9e0;
+  }
+}

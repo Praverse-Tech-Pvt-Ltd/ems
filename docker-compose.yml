@@ -1,0 +1,110 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: nexgen_db
+    restart: unless-stopped
+    ports:
+      - '5433:5432'
+    environment:
+      POSTGRES_USER: nexgen
+      POSTGRES_PASSWORD: nexgen_dev_pass
+      POSTGRES_DB: nexgen_ems
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U nexgen -d nexgen_ems']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: nexgen_redis
+    restart: unless-stopped
+    ports:
+      - '6380:6379'
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile.dev
+    container_name: nexgen_api
+    restart: unless-stopped
+    ports:
+      - '3001:3001'
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://nexgen:nexgen_dev_pass@postgres:5432/nexgen_ems?schema=public
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: dev_jwt_secret_change_in_production
+      JWT_REFRESH_SECRET: dev_refresh_secret_change_in_production
+      JWT_EXPIRES_IN: 15m
+      JWT_REFRESH_EXPIRES_IN: 7d
+      ENCRYPTION_KEY: dev_aes_key_32chars_change_prod!!
+      FR_SERVICE_URL: http://face-service:8000
+      AWS_REGION: ${AWS_REGION:-auto}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      AWS_ENDPOINT_URL: ${AWS_ENDPOINT_URL:-}
+      S3_BUCKET_NAME: ${S3_BUCKET_NAME:-nexgen-ems-dev}
+      SES_FROM_EMAIL: ${SES_FROM_EMAIL:-noreply@nexgen-ems.in}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      FCM_SERVER_KEY: ${FCM_SERVER_KEY:-}
+      OFFICE_LAT: '28.6139'
+      OFFICE_LNG: '77.2090'
+      OFFICE_RADIUS_METERS: '200'
+      FRONTEND_URL: http://localhost:3000
+    volumes:
+      - ./apps/api/src:/app/src
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  face-service:
+    build:
+      context: ./apps/face-service
+      dockerfile: Dockerfile
+    container_name: nexgen_face_service
+    restart: unless-stopped
+    ports:
+      - '8000:8000'
+    environment:
+      FR_PROVIDER: deepface
+      AWS_REGION: ap-south-1
+      S3_BUCKET_NAME: nexgen-ems-dev
+    volumes:
+      - ./apps/face-service:/app
+
+  web:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile.dev
+    container_name: nexgen_web
+    restart: unless-stopped
+    ports:
+      - '3000:3000'
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:3001
+    volumes:
+      - ./apps/web/src:/app/src
+      - ./apps/web/public:/app/public
+    depends_on:
+      - api
+
+volumes:
+  postgres_data:
+  redis_data:
+

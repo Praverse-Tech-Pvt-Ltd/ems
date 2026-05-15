@@ -1,0 +1,287 @@
+NEXGEN-EMS PROJECT STRUCTURE
+=====================================
+
+Root Level Files:
+  .claude/
+    launch.json
+  .env
+  .env.example
+  .gitignore
+  README.md
+  docker-compose.yml
+  package.json
+  package-lock.json
+  tsconfig.base.json
+  turbo.json
+
+Root-Level Directories:
+  .git/ (Git repository)
+  apps/
+  infrastructure/
+  packages/
+
+=====================================
+APPS DIRECTORY
+=====================================
+
+apps/
+  api/
+    Dockerfile.dev
+    nest-cli.json
+    package.json
+    tsconfig.json
+    src/
+      app.module.ts
+      main.ts
+      common/
+        decorators/
+          current-user.decorator.ts
+          roles.decorator.ts
+        email/
+          email.module.ts
+          email.service.ts
+        filters/ (directory exists but empty)
+        guards/
+          jwt-auth.guard.ts
+          roles.guard.ts
+        interceptors/
+          audit.interceptor.ts
+        pipes/ (directory exists but empty)
+        prisma/
+          prisma.module.ts
+          prisma.service.ts
+        storage/
+          storage.module.ts
+          storage.service.ts
+      modules/
+        attendance/
+          attendance.controller.ts
+          attendance.module.ts
+          attendance.service.ts
+          attendance-cron.service.ts
+          face-recognition.service.ts
+          geo-fence.service.ts
+          dto/
+            punch-in.dto.ts
+            regularize.dto.ts
+        audit/
+          audit.controller.ts
+          audit.module.ts
+        auth/
+          auth.controller.ts
+          auth.module.ts
+          auth.service.ts
+          dto/
+            login.dto.ts
+            refresh.dto.ts
+            setup-2fa.dto.ts
+          strategies/
+            jwt.strategy.ts
+        comments/
+          comments.controller.ts
+          comments.module.ts
+          comments.service.ts
+        employees/
+          employees.controller.ts
+          employees.module.ts
+          employees.service.ts
+          dto/
+            create-employee.dto.ts
+            update-employee.dto.ts
+        expenses/
+          expenses.controller.ts
+          expenses.module.ts
+          expenses.service.ts
+          dto/
+            create-expense.dto.ts
+        invoices/
+          invoices.controller.ts
+          invoices.module.ts
+          invoices.service.ts
+          invoice-cron.service.ts
+        leaves/
+          leaves.controller.ts
+          leaves.module.ts
+          leaves.service.ts
+        notifications/
+          notifications.controller.ts
+          notifications.module.ts
+          notifications.service.ts
+          notifications.gateway.ts
+        reports/
+          reports.controller.ts
+          reports.module.ts
+          reports.service.ts
+        requests/
+          requests.controller.ts
+          requests.module.ts
+          requests.service.ts
+        salary/
+          salary.controller.ts
+          salary.module.ts
+          salary.service.ts
+
+  face-service/
+    Dockerfile
+    requirements.txt
+    app/
+      __init__.py
+      config.py
+      main.py
+      routes/
+        __init__.py
+        enrollment.py
+        verification.py
+      services/
+        __init__.py
+        face_service.py
+
+  web/
+    Dockerfile.dev
+    next-env.d.ts
+    next.config.js
+    package.json
+    postcss.config.js
+    tailwind.config.ts
+    tsconfig.json
+    .env.local
+    public/ (public assets)
+    src/
+      app/
+        (app)/
+          attendance/
+            page.tsx
+          dashboard/
+            page.tsx
+          employees/
+            page.tsx
+          expenses/
+            page.tsx
+          invoices/
+            page.tsx
+          leaves/
+            page.tsx
+          profile/
+            page.tsx
+          requests/
+            page.tsx
+          salary/
+            page.tsx
+          layout.tsx
+        (auth)/
+          login/
+            page.tsx
+        globals.css
+        layout.tsx
+        page.tsx
+        providers.tsx
+      components/
+        layouts/
+          AppSidebar.tsx
+          AppTopNav.tsx
+        ui/ (directory exists, likely contains shadcn/ui components)
+      hooks/ (directory exists)
+      lib/
+        api-client.ts
+      store/
+        auth.store.ts
+      types/ (directory exists)
+
+=====================================
+PACKAGES DIRECTORY
+=====================================
+
+packages/
+  config/
+    (configuration package - minimal content)
+
+  db/
+    .env
+    package.json
+    tsconfig.seed.json
+    prisma/
+      schema.prisma
+      seed.ts
+      migrations/
+        20260515052441_init/
+          migration.sql
+        migration_lock.toml
+
+  types/
+    package.json
+    src/
+      index.ts
+      attendance.ts
+      auth.ts
+      common.ts
+      employee.ts
+      expense.ts
+      invoice.ts
+      leave.ts
+      notification.ts
+      request.ts
+      salary.ts
+
+=====================================
+INFRASTRUCTURE DIRECTORY
+=====================================
+
+infrastructure/
+  docker/ (directory exists, likely contains docker compose files)
+
+=====================================
+SUMMARY OF KEY TECHNOLOGIES
+=====================================
+
+Backend (API):
+  - NestJS (TypeScript)
+  - Prisma ORM
+  - JWT Authentication
+  - Socket.io (WebSockets for notifications)
+  - Cron Jobs
+  - Email Service
+
+Face Recognition Service:
+  - Python FastAPI
+  - Face recognition with enrollment & verification
+
+Frontend (Web):
+  - Next.js 13+ (App Router)
+  - TypeScript/TSX
+  - Tailwind CSS
+  - PostCSS
+  - Zustand (state management)
+  - ShadcN UI Components
+
+Database:
+  - Supports multiple database systems (via Prisma)
+  - Seed data available
+
+Core Features:
+  - User Authentication & Authorization
+  - Employee Management
+  - Attendance Tracking (with facial recognition)
+  - Geo-fencing
+  - Expense Management
+  - Invoice Management
+  - Leave Management
+  - Salary Management
+  - Audit Logging
+  - Comments System
+  - Request Management
+  - Reports
+  - Notifications (Real-time via WebSockets)
+
+=====================================
+MONOREPO SETUP
+=====================================
+
+Type: Turbo monorepo
+Workspaces:
+  - apps/api (NestJS backend)
+  - apps/web (Next.js frontend)
+  - apps/face-service (Python microservice)
+  - packages/db (Prisma schema & migrations)
+  - packages/types (Shared TypeScript types)
+  - packages/config (Configuration)
+

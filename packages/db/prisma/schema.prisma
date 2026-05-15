@@ -1,0 +1,469 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
+
+enum Role {
+  EMPLOYEE
+  MANAGER
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum EmployeeStatus {
+  ACTIVE
+  INACTIVE
+  TERMINATED
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+  HALF_DAY
+  WFH
+  LEAVE
+  HOLIDAY
+  MISSING_PUNCH_OUT
+}
+
+enum ExpenseCategory {
+  TRAVEL
+  FOOD
+  OFFICE
+  CLIENT_VISIT
+  HOTEL
+  STATIONERY
+  MISC
+}
+
+enum PaymentMode {
+  CASH
+  CARD
+  UPI
+  BANK_TRANSFER
+}
+
+enum ExpenseStatus {
+  DRAFT
+  SUBMITTED
+  L1_REVIEW
+  FINANCE_REVIEW
+  APPROVED
+  REJECTED
+  PAID
+}
+
+enum InvoiceType {
+  VENDOR
+  CLIENT
+}
+
+enum InvoiceStatus {
+  PENDING
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  PAID
+  OVERDUE
+}
+
+enum LeaveType {
+  CL
+  SL
+  PL
+  UL
+  CO
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum RequestType {
+  WFH
+  ADVANCE_PAYMENT
+  DOCUMENT_REQUEST
+  ASSET_REQUEST
+  TRAVEL_APPROVAL
+  ATTENDANCE_CORRECTION
+  OTHER
+}
+
+enum RequestStatus {
+  PENDING
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum NotificationType {
+  PUNCH_IN
+  PUNCH_OUT
+  MISSING_PUNCH_OUT
+  EXPENSE_SUBMITTED
+  EXPENSE_APPROVED
+  EXPENSE_REJECTED
+  EXPENSE_PAID
+  LEAVE_SUBMITTED
+  LEAVE_APPROVED
+  LEAVE_REJECTED
+  INVOICE_STATUS
+  REQUEST_STATUS
+  SALARY_SLIP
+  GENERAL
+}
+
+// ─── Core Tables ─────────────────────────────────────────────────────────────
+
+model Department {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  employees   Employee[]
+  headId      String?    @map("head_id")
+
+  @@map("departments")
+}
+
+model OfficeLocation {
+  id            String   @id @default(uuid())
+  name          String
+  latitude      Decimal  @db.Decimal(10, 7)
+  longitude     Decimal  @db.Decimal(10, 7)
+  radiusMeters  Int      @default(200) @map("radius_meters")
+  isActive      Boolean  @default(true) @map("is_active")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@map("office_locations")
+}
+
+model Employee {
+  id               String         @id @default(uuid())
+  employeeCode     String         @unique @map("employee_code")
+  email            String         @unique
+  passwordHash     String         @map("password_hash")
+  firstName        String         @map("first_name")
+  lastName         String         @map("last_name")
+  phone            String?
+  departmentId     String?        @map("department_id")
+  designation      String?
+  role             Role           @default(EMPLOYEE)
+  managerId        String?        @map("manager_id")
+  joiningDate      DateTime       @map("joining_date") @db.Date
+  salaryGrade      String?        @map("salary_grade")
+  grossSalary      Decimal?       @map("gross_salary") @db.Decimal(12, 2)
+  bankAccountEnc   String?        @map("bank_account_enc")
+  panEnc           String?        @map("pan_enc")
+  aadhaarLast4     String?        @map("aadhaar_last4") @db.Char(4)
+  profilePhotoUrl  String?        @map("profile_photo_url")
+  faceEnrolled     Boolean        @default(false) @map("face_enrolled")
+  faceVectorS3Key  String?        @map("face_vector_s3_key")
+  status           EmployeeStatus @default(ACTIVE)
+  totpSecret       String?        @map("totp_secret")
+  totpEnabled      Boolean        @default(false) @map("totp_enabled")
+  address          String?
+  emergencyContact String?        @map("emergency_contact")
+  createdAt        DateTime       @default(now()) @map("created_at")
+  updatedAt        DateTime       @updatedAt @map("updated_at")
+
+  department       Department?       @relation(fields: [departmentId], references: [id])
+  manager          Employee?         @relation("ManagerSubordinates", fields: [managerId], references: [id])
+  subordinates     Employee[]        @relation("ManagerSubordinates")
+
+  attendance             AttendanceRecord[]
+  expensesClaimed        Expense[]          @relation("ExpenseClaimant")
+  expensesL1Approved     Expense[]          @relation("ExpenseL1Approver")
+  expensesFinanceApproved Expense[]         @relation("ExpenseFinanceApprover")
+  invoicesSubmitted      Invoice[]          @relation("InvoiceSubmitter")
+  invoicesApproved       Invoice[]          @relation("InvoiceApprover")
+  leaveRequests          LeaveRequest[]     @relation("LeaveRequester")
+  leavesApproved         LeaveRequest[]     @relation("LeaveApprover")
+  leaveBalances          LeaveBalance[]
+  employeeRequests       EmployeeRequest[]  @relation("RequestSubmitter")
+  requestsReviewed       EmployeeRequest[]  @relation("RequestReviewer")
+  salarySlips            SalarySlip[]       @relation("SlipEmployee")
+  salarySlipsUploaded    SalarySlip[]       @relation("SlipUploader")
+  notifications          Notification[]
+  commentsMade           Comment[]
+  auditLogs              AuditLog[]         @relation("AuditActor")
+  attendanceRegularized  AttendanceRecord[] @relation("AttendanceRegularizer")
+  consentRecords         ConsentRecord[]
+  refreshTokens          RefreshToken[]
+  documents              EmployeeDocument[]
+
+  @@map("employees")
+}
+
+model RefreshToken {
+  id          String   @id @default(uuid())
+  token       String   @unique
+  employeeId  String   @map("employee_id")
+  expiresAt   DateTime @map("expires_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+  isRevoked   Boolean  @default(false) @map("is_revoked")
+
+  employee    Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@map("refresh_tokens")
+}
+
+model AttendanceRecord {
+  id                     String           @id @default(uuid())
+  employeeId             String           @map("employee_id")
+  date                   DateTime         @db.Date
+  punchInTime            DateTime?        @map("punch_in_time") @db.Timestamptz
+  punchOutTime           DateTime?        @map("punch_out_time") @db.Timestamptz
+  punchInLat             Decimal?         @map("punch_in_lat") @db.Decimal(10, 7)
+  punchInLng             Decimal?         @map("punch_in_lng") @db.Decimal(10, 7)
+  punchOutLat            Decimal?         @map("punch_out_lat") @db.Decimal(10, 7)
+  punchOutLng            Decimal?         @map("punch_out_lng") @db.Decimal(10, 7)
+  status                 AttendanceStatus @default(PRESENT)
+  workingHours           Decimal?         @map("working_hours") @db.Decimal(4, 2)
+  isGeoValidIn           Boolean?         @map("is_geo_valid_in")
+  isGeoValidOut          Boolean?         @map("is_geo_valid_out")
+  frConfidenceIn         Decimal?         @map("fr_confidence_in") @db.Decimal(4, 3)
+  frConfidenceOut        Decimal?         @map("fr_confidence_out") @db.Decimal(4, 3)
+  isRegularized          Boolean          @default(false) @map("is_regularized")
+  regularizedBy          String?          @map("regularized_by")
+  regularizationReason   String?          @map("regularization_reason")
+  deviceInfo             Json?            @map("device_info")
+  notes                  String?
+  createdAt              DateTime         @default(now()) @map("created_at")
+  updatedAt              DateTime         @updatedAt @map("updated_at")
+
+  employee   Employee  @relation(fields: [employeeId], references: [id])
+  regularizer Employee? @relation("AttendanceRegularizer", fields: [regularizedBy], references: [id])
+
+  @@unique([employeeId, date])
+  @@map("attendance_records")
+}
+
+model Expense {
+  id                  String        @id @default(uuid())
+  employeeId          String        @map("employee_id")
+  category            ExpenseCategory
+  amount              Decimal       @db.Decimal(10, 2)
+  expenseDate         DateTime      @map("expense_date") @db.Date
+  description         String?
+  paymentMode         PaymentMode?  @map("payment_mode")
+  billS3Key           String?       @map("bill_s3_key")
+  status              ExpenseStatus @default(DRAFT)
+  l1ApproverId        String?       @map("l1_approver_id")
+  l1ApprovedAt        DateTime?     @map("l1_approved_at") @db.Timestamptz
+  financeApproverId   String?       @map("finance_approver_id")
+  financeApprovedAt   DateTime?     @map("finance_approved_at") @db.Timestamptz
+  paidAt              DateTime?     @map("paid_at") @db.Timestamptz
+  paymentRef          String?       @map("payment_ref")
+  rejectionReason     String?       @map("rejection_reason")
+  createdAt           DateTime      @default(now()) @map("created_at")
+  updatedAt           DateTime      @updatedAt @map("updated_at")
+
+  employee         Employee  @relation("ExpenseClaimant", fields: [employeeId], references: [id])
+  l1Approver       Employee? @relation("ExpenseL1Approver", fields: [l1ApproverId], references: [id])
+  financeApprover  Employee? @relation("ExpenseFinanceApprover", fields: [financeApproverId], references: [id])
+  comments         Comment[]
+
+  @@map("expenses")
+}
+
+model Invoice {
+  id            String        @id @default(uuid())
+  invoiceNumber String        @unique @map("invoice_number")
+  type          InvoiceType
+  partyName     String        @map("party_name")
+  amount        Decimal       @db.Decimal(12, 2)
+  gstPercent    Decimal?      @map("gst_percent") @db.Decimal(4, 2)
+  dueDate       DateTime      @map("due_date") @db.Date
+  description   String?
+  fileS3Key     String?       @map("file_s3_key")
+  status        InvoiceStatus @default(PENDING)
+  submittedBy   String        @map("submitted_by")
+  approvedBy    String?       @map("approved_by")
+  paidAt        DateTime?     @map("paid_at") @db.Timestamptz
+  paymentRef    String?       @map("payment_ref")
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+
+  submitter  Employee  @relation("InvoiceSubmitter", fields: [submittedBy], references: [id])
+  approver   Employee? @relation("InvoiceApprover", fields: [approvedBy], references: [id])
+  comments   Comment[]
+
+  @@map("invoices")
+}
+
+model LeaveBalance {
+  id          String    @id @default(uuid())
+  employeeId  String    @map("employee_id")
+  leaveType   LeaveType @map("leave_type")
+  totalDays   Int       @default(0) @map("total_days")
+  usedDays    Int       @default(0) @map("used_days")
+  year        Int
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  employee  Employee @relation(fields: [employeeId], references: [id])
+
+  @@unique([employeeId, leaveType, year])
+  @@map("leave_balances")
+}
+
+model LeaveRequest {
+  id           String      @id @default(uuid())
+  employeeId   String      @map("employee_id")
+  leaveType    LeaveType   @map("leave_type")
+  fromDate     DateTime    @map("from_date") @db.Date
+  toDate       DateTime    @map("to_date") @db.Date
+  totalDays    Int         @map("total_days")
+  reason       String
+  status       LeaveStatus @default(PENDING)
+  approvedBy   String?     @map("approved_by")
+  approvedAt   DateTime?   @map("approved_at") @db.Timestamptz
+  rejectionReason String?  @map("rejection_reason")
+  documentS3Key   String?  @map("document_s3_key")
+  createdAt    DateTime    @default(now()) @map("created_at")
+  updatedAt    DateTime    @updatedAt @map("updated_at")
+
+  employee  Employee  @relation("LeaveRequester", fields: [employeeId], references: [id])
+  approver  Employee? @relation("LeaveApprover", fields: [approvedBy], references: [id])
+  comments  Comment[]
+
+  @@map("leave_requests")
+}
+
+model EmployeeRequest {
+  id            String        @id @default(uuid())
+  employeeId    String        @map("employee_id")
+  requestType   RequestType   @map("request_type")
+  details       Json
+  status        RequestStatus @default(PENDING)
+  reviewedBy    String?       @map("reviewed_by")
+  reviewedAt    DateTime?     @map("reviewed_at") @db.Timestamptz
+  comment       String?
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+
+  employee  Employee  @relation("RequestSubmitter", fields: [employeeId], references: [id])
+  reviewer  Employee? @relation("RequestReviewer", fields: [reviewedBy], references: [id])
+  comments  Comment[]
+
+  @@map("employee_requests")
+}
+
+model SalarySlip {
+  id            String   @id @default(uuid())
+  employeeId    String   @map("employee_id")
+  month         Int
+  year          Int
+  grossSalary   Decimal  @map("gross_salary") @db.Decimal(12, 2)
+  deductions    Decimal  @db.Decimal(12, 2)
+  netPayable    Decimal  @map("net_payable") @db.Decimal(12, 2)
+  lopDays       Int      @default(0) @map("lop_days")
+  daysPresent   Int      @map("days_present")
+  slipPdfS3Key  String   @map("slip_pdf_s3_key")
+  uploadedBy    String   @map("uploaded_by")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  employee  Employee @relation("SlipEmployee", fields: [employeeId], references: [id])
+  uploader  Employee @relation("SlipUploader", fields: [uploadedBy], references: [id])
+
+  @@unique([employeeId, month, year])
+  @@map("salary_slips")
+}
+
+model Notification {
+  id            String           @id @default(uuid())
+  employeeId    String           @map("employee_id")
+  type          NotificationType
+  title         String
+  body          String
+  isRead        Boolean          @default(false) @map("is_read")
+  referenceId   String?          @map("reference_id")
+  referenceType String?          @map("reference_type")
+  createdAt     DateTime         @default(now()) @map("created_at")
+
+  employee  Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+model Comment {
+  id            String   @id @default(uuid())
+  authorId      String   @map("author_id")
+  body          String
+  attachmentS3Key String? @map("attachment_s3_key")
+
+  expenseId     String?          @map("expense_id")
+  invoiceId     String?          @map("invoice_id")
+  leaveRequestId String?         @map("leave_request_id")
+  employeeRequestId String?      @map("employee_request_id")
+
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  author          Employee         @relation(fields: [authorId], references: [id])
+  expense         Expense?         @relation(fields: [expenseId], references: [id])
+  invoice         Invoice?         @relation(fields: [invoiceId], references: [id])
+  leaveRequest    LeaveRequest?    @relation(fields: [leaveRequestId], references: [id])
+  employeeRequest EmployeeRequest? @relation(fields: [employeeRequestId], references: [id])
+
+  @@map("comments")
+}
+
+model AuditLog {
+  id           String   @id @default(uuid())
+  actorId      String   @map("actor_id")
+  action       String
+  resourceType String   @map("resource_type")
+  resourceId   String?  @map("resource_id")
+  oldValue     Json?    @map("old_value")
+  newValue     Json?    @map("new_value")
+  ipAddress    String?  @map("ip_address")
+  userAgent    String?  @map("user_agent")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  actor  Employee @relation("AuditActor", fields: [actorId], references: [id])
+
+  @@map("audit_logs")
+}
+
+model ConsentRecord {
+  id          String   @id @default(uuid())
+  employeeId  String   @map("employee_id")
+  consentType String   @map("consent_type")
+  granted     Boolean
+  ipAddress   String?  @map("ip_address")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  employee  Employee @relation(fields: [employeeId], references: [id])
+
+  @@map("consent_records")
+}
+
+model EmployeeDocument {
+  id           String   @id @default(uuid())
+  employeeId   String   @map("employee_id")
+  docType      String   @map("doc_type")
+  fileS3Key    String   @map("file_s3_key")
+  uploadedBy   String   @map("uploaded_by")
+  expiresAt    DateTime? @map("expires_at") @db.Date
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  employee  Employee @relation(fields: [employeeId], references: [id])
+
+  @@map("employee_documents")
+}
