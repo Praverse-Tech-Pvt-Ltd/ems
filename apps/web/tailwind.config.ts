@@ -8,7 +8,7 @@ const config: Config = {
         // Neo-Brutalist palette
         brutal: {
           ink:      '#1a1a1a',
-          yellow:   '#ffcc00',
+          yellow:   '#ffa23a',
           red:      '#e63b2e',
           blue:     '#0055ff',
           cream:    '#f5f0e8',
@@ -46,7 +46,7 @@ const config: Config = {
         brutal:      '4px 4px 0px 0px #1a1a1a',
         'brutal-lg': '8px 8px 0px 0px #1a1a1a',
         'brutal-sm': '2px 2px 0px 0px #1a1a1a',
-        'brutal-yellow': '4px 4px 0px 0px #ffcc00',
+        'brutal-yellow': '4px 4px 0px 0px #ffa23a',
       },
     },
   },

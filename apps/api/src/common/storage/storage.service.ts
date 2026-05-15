@@ -1,5 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import * as fs from 'fs/promises';
+import * as path from 'path';
 import {
   S3Client,
   PutObjectCommand,
@@ -12,10 +14,14 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 export class StorageService {
   private readonly s3: S3Client;
   private readonly bucket: string;
+  private readonly driver: 's3' | 'local';
+  private readonly localDir: string;
   private readonly logger = new Logger(StorageService.name);
 
   constructor(private config: ConfigService) {
     const endpoint = this.config.get<string>('AWS_ENDPOINT_URL');
+    this.driver = this.config.get<string>('STORAGE_DRIVER') === 'local' ? 'local' : 's3';
+    this.localDir = path.resolve(process.cwd(), '..', '..', this.config.get<string>('LOCAL_STORAGE_DIR') ?? 'uploads');
 
     this.s3 = new S3Client({
       region: this.config.getOrThrow('AWS_REGION'),
@@ -34,6 +40,15 @@ export class StorageService {
     body: Buffer | Uint8Array | string,
     contentType: string,
   ): Promise<string> {
+    if (this.driver === 'local') {
+      const safeKey = key.replace(/\\/g, '/').replace(/\.\./g, '');
+      const filePath = path.join(this.localDir, safeKey);
+      await fs.mkdir(path.dirname(filePath), { recursive: true });
+      await fs.writeFile(filePath, body);
+      this.logger.log(`Stored local file ${safeKey} (${contentType})`);
+      return safeKey;
+    }
+
     await this.s3.send(
       new PutObjectCommand({
         Bucket: this.bucket,
@@ -52,11 +67,18 @@ export class StorageService {
   }
 
   async getSignedUrl(key: string, expiresIn = 3600): Promise<string> {
+    if (this.driver === 'local') {
+      return `/api/v1/files/${encodeURIComponent(key)}`;
+    }
     const command = new GetObjectCommand({ Bucket: this.bucket, Key: key });
     return getSignedUrl(this.s3, command, { expiresIn });
   }
 
   async delete(key: string): Promise<void> {
+    if (this.driver === 'local') {
+      await fs.rm(path.join(this.localDir, key), { force: true });
+      return;
+    }
     await this.s3.send(
       new DeleteObjectCommand({ Bucket: this.bucket, Key: key }),
     );
@@ -68,5 +90,10 @@ export class StorageService {
     contentType: string,
   ): Promise<string> {
     return this.upload(key, buffer, contentType);
+  }
+
+  getLocalPath(key: string): string {
+    const safeKey = key.replace(/\\/g, '/').replace(/\.\./g, '');
+    return path.join(this.localDir, safeKey);
   }
 }

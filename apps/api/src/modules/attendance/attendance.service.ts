@@ -12,7 +12,7 @@ import { RegularizeDto } from './dto/regularize.dto';
 
 const FR_THRESHOLD = 0.85;
 const LATE_THRESHOLD_HOUR = 9;
-const LATE_THRESHOLD_MIN = 15;
+const LATE_THRESHOLD_MIN = 30;
 const HALF_DAY_HOURS = 4;
 
 @Injectable()
@@ -35,6 +35,11 @@ export class AttendanceService {
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+
+    const holiday = await this.prisma.holiday.findFirst({ where: { date: today } });
+    if (holiday) {
+      throw new BadRequestException(`Today is marked as holiday: ${holiday.title}`);
+    }
 
     const existing = await this.prisma.attendanceRecord.findUnique({
       where: { employeeId_date: { employeeId, date: today } },
@@ -70,9 +75,8 @@ export class AttendanceService {
     }
 
     const now = new Date();
-    const isLate =
-      now.getHours() > LATE_THRESHOLD_HOUR ||
-      (now.getHours() === LATE_THRESHOLD_HOUR && now.getMinutes() > LATE_THRESHOLD_MIN);
+    const policy = await this.attendancePolicy();
+    const isLate = this.minutesSinceMidnight(now) > policy.startMinutes + policy.graceMinutes;
 
     const record = await this.prisma.attendanceRecord.upsert({
       where: { employeeId_date: { employeeId, date: today } },
@@ -247,5 +251,19 @@ export class AttendanceService {
       data: { faceEnrolled: true },
     });
     return { message: 'Face enrolled successfully' };
+  }
+
+  private async attendancePolicy() {
+    const setting = await this.prisma.companySetting.findUnique({ where: { key: 'working_hours' } });
+    const value = setting?.value as { start?: string; graceMinutes?: number } | undefined;
+    const [hour, minute] = (value?.start ?? `${String(LATE_THRESHOLD_HOUR).padStart(2, '0')}:${String(LATE_THRESHOLD_MIN).padStart(2, '0')}`).split(':').map(Number);
+    return {
+      startMinutes: (hour ?? LATE_THRESHOLD_HOUR) * 60 + (minute ?? LATE_THRESHOLD_MIN),
+      graceMinutes: Number(value?.graceMinutes ?? 0),
+    };
+  }
+
+  private minutesSinceMidnight(date: Date) {
+    return date.getHours() * 60 + date.getMinutes();
   }
 }

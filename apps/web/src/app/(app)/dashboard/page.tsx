@@ -176,7 +176,7 @@ export default function DashboardPage() {
             </div>
 
             {/* Scanner box */}
-            <div className="relative my-4 mx-auto w-full max-w-[180px] aspect-square bg-brutal-ink brutal-border" style={{ boxShadow: '4px 4px 0 0 #ffcc00' }}>
+            <div className="relative my-4 mx-auto w-full max-w-[180px] aspect-square bg-brutal-ink brutal-border" style={{ boxShadow: '4px 4px 0 0 #ffa23a' }}>
               <Fingerprint size={70} className="absolute inset-0 m-auto text-brutal-yellow/60" />
               {/* Reticle corners */}
               {[

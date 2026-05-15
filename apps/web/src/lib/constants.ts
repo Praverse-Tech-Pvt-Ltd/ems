@@ -2,7 +2,7 @@
 
 export const ATTENDANCE_STATUS_COLORS: Record<string, string> = {
   PRESENT:            'bg-green-100 text-green-700',
-  LATE:               'bg-yellow-100 text-yellow-700',
+  LATE:               'bg-[#ffa23a] text-brutal-ink',
   ABSENT:             'bg-red-100 text-red-700',
   HALF_DAY:           'bg-orange-100 text-orange-700',
   WFH:                'bg-blue-100 text-blue-700',
@@ -14,7 +14,7 @@ export const ATTENDANCE_STATUS_COLORS: Record<string, string> = {
 export const EXPENSE_STATUS_COLORS: Record<string, string> = {
   DRAFT:            'bg-slate-100 text-slate-600',
   SUBMITTED:        'bg-blue-100 text-blue-700',
-  L1_REVIEW:        'bg-yellow-100 text-yellow-700',
+  L1_REVIEW:        'bg-[#ffa23a] text-brutal-ink',
   FINANCE_REVIEW:   'bg-orange-100 text-orange-700',
   APPROVED:         'bg-green-100 text-green-700',
   REJECTED:         'bg-red-100 text-red-700',
@@ -22,7 +22,7 @@ export const EXPENSE_STATUS_COLORS: Record<string, string> = {
 };
 
 export const INVOICE_STATUS_COLORS: Record<string, string> = {
-  PENDING:      'bg-yellow-100 text-yellow-700',
+  PENDING:      'bg-[#ffa23a] text-brutal-ink',
   UNDER_REVIEW: 'bg-blue-100 text-blue-700',
   APPROVED:     'bg-green-100 text-green-700',
   REJECTED:     'bg-red-100 text-red-700',
@@ -31,14 +31,14 @@ export const INVOICE_STATUS_COLORS: Record<string, string> = {
 };
 
 export const LEAVE_STATUS_COLORS: Record<string, string> = {
-  PENDING:   'bg-yellow-100 text-yellow-700',
+  PENDING:   'bg-[#ffa23a] text-brutal-ink',
   APPROVED:  'bg-green-100 text-green-700',
   REJECTED:  'bg-red-100 text-red-700',
   CANCELLED: 'bg-slate-100 text-slate-600',
 };
 
 export const REQUEST_STATUS_COLORS: Record<string, string> = {
-  PENDING:      'bg-yellow-100 text-yellow-700',
+  PENDING:      'bg-[#ffa23a] text-brutal-ink',
   UNDER_REVIEW: 'bg-blue-100 text-blue-700',
   APPROVED:     'bg-green-100 text-green-700',
   REJECTED:     'bg-red-100 text-red-700',

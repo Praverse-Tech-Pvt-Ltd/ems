@@ -54,7 +54,7 @@
   .brutal-shadow-sm { box-shadow: 2px 2px 0px 0px #1a1a1a; }
 
   .brutal-btn-primary {
-    background-color: #ffcc00;
+    background-color: #ffa23a;
     border: 3px solid #1a1a1a;
     color: #1a1a1a;
     font-family: 'Space Grotesk', sans-serif;
@@ -66,7 +66,7 @@
   }
   .brutal-btn-primary:hover {
     background-color: #1a1a1a;
-    color: #ffcc00;
+    color: #ffa23a;
   }
   .brutal-btn-secondary {
     background-color: transparent;
