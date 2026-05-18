@@ -118,6 +118,13 @@ export class EmployeesController {
     return this.service.update(id, dto);
   }
 
+  @Post('admin/seed-leave-balances')
+  @Roles('ADMIN', 'SUPER_ADMIN')
+  @ApiOperation({ summary: 'Backfill leave balances for all existing employees' })
+  async seedAllLeaveBalances() {
+    return this.service.seedAllLeaveBalances();
+  }
+
   @Delete(':id')
   @Roles('SUPER_ADMIN')
   @HttpCode(HttpStatus.NO_CONTENT)

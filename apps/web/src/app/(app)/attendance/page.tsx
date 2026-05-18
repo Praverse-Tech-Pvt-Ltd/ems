@@ -83,8 +83,9 @@ function PunchInModal({ onClose, punchType = 'in' }: { onClose: () => void; punc
     setProgress(0);
     setPhase('verifying');
 
-    // Get geolocation (fall back to 0,0 if denied)
+    // Get geolocation (fall back to 0,0 if denied or unavailable)
     const coords = await new Promise<{ latitude: number; longitude: number }>(resolve => {
+      if (!navigator.geolocation) return resolve({ latitude: 0, longitude: 0 });
       navigator.geolocation.getCurrentPosition(
         p => resolve({ latitude: p.coords.latitude, longitude: p.coords.longitude }),
         () => resolve({ latitude: 0, longitude: 0 }),

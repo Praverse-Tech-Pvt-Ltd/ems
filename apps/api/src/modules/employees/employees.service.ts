@@ -71,7 +71,35 @@ export class EmployeesService {
       tempPassword,
     );
 
+    await this.seedLeaveBalances(employee.id);
+
     return { employee, tempPassword };
+  }
+
+  async seedAllLeaveBalances() {
+    const employees = await this.prisma.employee.findMany({ select: { id: true } });
+    await Promise.all(employees.map(e => this.seedLeaveBalances(e.id)));
+    return { seeded: employees.length };
+  }
+
+  async seedLeaveBalances(employeeId: string) {
+    const year = new Date().getFullYear();
+    const allocations: { leaveType: string; totalDays: number }[] = [
+      { leaveType: 'SL', totalDays: 7 },
+      { leaveType: 'CL', totalDays: 7 },
+      { leaveType: 'PL', totalDays: 14 },
+    ];
+    await Promise.all(
+      allocations.map(a =>
+        this.prisma.leaveBalance.upsert({
+          where: {
+            employeeId_leaveType_year: { employeeId, leaveType: a.leaveType as never, year },
+          },
+          create: { employeeId, leaveType: a.leaveType as never, year, totalDays: a.totalDays, usedDays: 0 },
+          update: { totalDays: a.totalDays },
+        }),
+      ),
+    );
   }
 
   async findAll(query: { search?: string; departmentId?: string; role?: string }) {
