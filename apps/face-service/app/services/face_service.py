@@ -5,15 +5,14 @@ import os
 import tempfile
 from typing import Optional
 
-import boto3
 import numpy as np
+import psycopg2
 from PIL import Image
 
 from app.config import settings
 
 
 def base64_to_image(b64_string: str) -> np.ndarray:
-    """Decode a base64 image string to a numpy array."""
     if "," in b64_string:
         b64_string = b64_string.split(",")[1]
     img_bytes = base64.b64decode(b64_string)
@@ -21,47 +20,37 @@ def base64_to_image(b64_string: str) -> np.ndarray:
     return np.array(img)
 
 
-def get_vector_s3_key(employee_id: str) -> str:
-    return f"employees/{employee_id}/face_vector.json"
+def _get_conn():
+    return psycopg2.connect(settings.database_url)
 
 
-def _s3_client():
-    kwargs = {"region_name": settings.aws_region}
-    if settings.aws_access_key_id:
-        kwargs["aws_access_key_id"] = settings.aws_access_key_id
-    if settings.aws_secret_access_key:
-        kwargs["aws_secret_access_key"] = settings.aws_secret_access_key
-    if settings.aws_endpoint_url:
-        kwargs["endpoint_url"] = settings.aws_endpoint_url
-    return boto3.client("s3", **kwargs)
-
-
-def save_vector_to_s3(employee_id: str, vector: list[float]) -> None:
-    s3 = _s3_client()
-    s3.put_object(
-        Bucket=settings.s3_bucket_name,
-        Key=get_vector_s3_key(employee_id),
-        Body=json.dumps(vector),
-        ContentType="application/json",
-    )
-
-
-def load_vector_from_s3(employee_id: str) -> Optional[list[float]]:
-    s3 = _s3_client()
+def save_embedding(employee_id: str, vector: list[float]) -> None:
+    conn = _get_conn()
     try:
-        res = s3.get_object(
-            Bucket=settings.s3_bucket_name,
-            Key=get_vector_s3_key(employee_id),
-        )
-        return json.loads(res["Body"].read())
-    except s3.exceptions.NoSuchKey:
-        return None
-    except Exception:
-        return None
+        with conn.cursor() as cur:
+            cur.execute(
+                'UPDATE employees SET face_embedding = %s, face_enrolled = TRUE WHERE id = %s',
+                (json.dumps(vector), employee_id),
+            )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def load_embedding(employee_id: str) -> Optional[list[float]]:
+    conn = _get_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute('SELECT face_embedding FROM employees WHERE id = %s', (employee_id,))
+            row = cur.fetchone()
+            if row and row[0] is not None:
+                return row[0] if isinstance(row[0], list) else json.loads(row[0])
+            return None
+    finally:
+        conn.close()
 
 
 def enroll_deepface(employee_id: str, frames: list[str]) -> None:
-    """Generate face embedding from multiple frames and store in S3."""
     try:
         from deepface import DeepFace  # type: ignore
     except ImportError:
@@ -73,7 +62,6 @@ def enroll_deepface(employee_id: str, frames: list[str]) -> None:
         with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as f:
             Image.fromarray(img_array).save(f.name)
             tmp_path = f.name
-
         try:
             result = DeepFace.represent(
                 img_path=tmp_path,
@@ -85,12 +73,11 @@ def enroll_deepface(employee_id: str, frames: list[str]) -> None:
             os.unlink(tmp_path)
 
     mean_vector = np.mean(embeddings, axis=0).tolist()
-    save_vector_to_s3(employee_id, mean_vector)
+    save_embedding(employee_id, mean_vector)
 
 
 def verify_deepface(employee_id: str, face_image_b64: str) -> dict:
-    """Verify a live face against the stored embedding."""
-    stored_vector = load_vector_from_s3(employee_id)
+    stored_vector = load_embedding(employee_id)
     if stored_vector is None:
         return {"verified": False, "confidence": 0.0, "reason": "No enrolled face found"}
 
@@ -118,7 +105,6 @@ def verify_deepface(employee_id: str, face_image_b64: str) -> dict:
     cosine_sim = float(
         np.dot(live_vector, stored) / (np.linalg.norm(live_vector) * np.linalg.norm(stored))
     )
-
     confidence = max(0.0, min(1.0, (cosine_sim + 1) / 2))
     verified = confidence >= settings.fr_threshold
 

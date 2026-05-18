@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api-client';
 import type { AttendanceRecord } from '@/types';
 import {
-  Fingerprint, MapPin, Wifi, ArrowRight, X, Check,
+  Fingerprint, MapPin, Wifi, ArrowRight, X, Check, Camera, AlertTriangle,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -15,32 +15,82 @@ function useClock() {
   return t;
 }
 
-function PunchInModal({ onClose }: { onClose: () => void }) {
-  const [phase, setPhase] = useState<'scanning' | 'verifying' | 'success'>('scanning');
-  const [blink, setBlink] = useState(false);
-  const [count, setCount] = useState(0);
+type PunchType = 'in' | 'out';
+type Phase = 'camera' | 'verifying' | 'success' | 'error' | 'no-camera';
 
+function PunchInModal({ onClose, punchType = 'in' }: { onClose: () => void; punchType?: PunchType }) {
+  const [phase, setPhase] = useState<Phase>('camera');
+  const [progress, setProgress] = useState(0);
+  const [errorMsg, setErrorMsg] = useState('');
+  const [confidence, setConfidence] = useState(0);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+
+  // Start camera on mount
   useEffect(() => {
-    const t1 = setTimeout(() => setBlink(true), 1800);
-    const t2 = setTimeout(() => setBlink(false), 2400);
-    return () => { clearTimeout(t1); clearTimeout(t2); };
+    let active = true;
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: 480, height: 480 } })
+      .then(stream => {
+        if (!active) { stream.getTracks().forEach(t => t.stop()); return; }
+        streamRef.current = stream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          videoRef.current.play();
+        }
+      })
+      .catch(() => { if (active) setPhase('no-camera'); });
+    return () => {
+      active = false;
+      streamRef.current?.getTracks().forEach(t => t.stop());
+    };
   }, []);
 
-  useEffect(() => {
-    if (phase === 'verifying') {
-      const id = setInterval(() => setCount(c => Math.min(c + 7, 100)), 80);
-      const done = setTimeout(() => setPhase('success'), 1400);
-      return () => { clearInterval(id); clearTimeout(done); };
+  const captureFrame = useCallback((): string | null => {
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    if (!video || !canvas) return null;
+    canvas.width = video.videoWidth || 480;
+    canvas.height = video.videoHeight || 480;
+    canvas.getContext('2d')?.drawImage(video, 0, 0);
+    return canvas.toDataURL('image/jpeg', 0.85);
+  }, []);
+
+  const handleVerify = useCallback(async () => {
+    const frame = captureFrame();
+    if (!frame) return;
+    setProgress(0);
+    setPhase('verifying');
+
+    // Animate progress bar while waiting
+    const ticker = setInterval(() => setProgress(p => Math.min(p + 4, 90)), 80);
+
+    try {
+      const endpoint = punchType === 'in' ? '/attendance/punch-in' : '/attendance/punch-out';
+      const res = await apiClient.post(endpoint, { faceImage: frame });
+      clearInterval(ticker);
+      setProgress(100);
+      setConfidence(Math.round((res.data?.frConfidence ?? 0.99) * 100));
+      setPhase('success');
+    } catch (err: unknown) {
+      clearInterval(ticker);
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Verification failed. Please try again.';
+      setErrorMsg(msg);
+      setPhase('error');
     }
-  }, [phase]);
+  }, [captureFrame, punchType]);
+
+  const label = punchType === 'in' ? 'PUNCH-IN' : 'PUNCH-OUT';
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center p-6" style={{ background: 'rgba(15,15,15,0.65)', backdropFilter: 'blur(3px)' }}>
       <div className="relative w-full max-w-[520px] brutal-border brutal-shadow-lg animate-fade-up bg-brutal-cream">
+
+        {/* Header */}
         <div className="flex items-center justify-between px-5 py-3 bg-brutal-ink text-brutal-cream brutal-border-b">
           <div className="flex items-center gap-3">
             <span className="font-display font-bold text-[10px] tracking-[0.2em] bg-brutal-yellow text-brutal-ink px-2 py-0.5">BIOMETRIC</span>
-            <span className="font-display font-bold text-[11px] tracking-[0.22em]">CHECKPOINT · CAM 04</span>
+            <span className="font-display font-bold text-[11px] tracking-[0.22em]">CHECKPOINT · {label}</span>
           </div>
           <button onClick={onClose} className="w-8 h-8 grid place-items-center border-2 border-brutal-cream hover:bg-brutal-red transition">
             <X size={14} />
@@ -48,87 +98,118 @@ function PunchInModal({ onClose }: { onClose: () => void }) {
         </div>
 
         <div className="p-5">
-          <h2 className="text-[28px] leading-[0.95] font-bold tracking-tight">
-            {phase === 'success'
-              ? (<>PUNCH-IN <span className="bg-[#0F8F3A] text-white px-2">CONFIRMED</span>.</>)
-              : (<>VERIFY <span className="bg-brutal-yellow px-2">IT&apos;S YOU</span>.</>)}
+          <h2 className="text-[26px] leading-[0.95] font-bold tracking-tight">
+            {phase === 'success' && <>{label} <span className="bg-[#0F8F3A] text-white px-2">CONFIRMED</span>.</>}
+            {phase === 'error'   && <>VERIFICATION <span className="bg-brutal-red text-white px-2">FAILED</span>.</>}
+            {phase === 'no-camera' && <>CAMERA <span className="bg-brutal-red text-white px-2">UNAVAILABLE</span>.</>}
+            {(phase === 'camera' || phase === 'verifying') && <>VERIFY <span className="bg-brutal-yellow px-2">IT&apos;S YOU</span>.</>}
           </h2>
-          <div className="mt-2 font-display font-bold text-[11px] tracking-[0.16em] text-brutal-ink/60 uppercase">
-            {phase === 'scanning'  && 'Perform liveness check — please blink.'}
-            {phase === 'verifying' && `Matching against secure template · ${count}%`}
-            {phase === 'success'   && 'Welcome in. Have a good shift.'}
+          <div className="mt-1 font-display font-bold text-[11px] tracking-[0.16em] text-brutal-ink/60 uppercase">
+            {phase === 'camera'    && 'Position your face in the frame, then click verify.'}
+            {phase === 'verifying' && `Matching against secure template · ${progress}%`}
+            {phase === 'success'   && `Welcome. Confidence ${confidence}%. Have a good shift.`}
+            {phase === 'error'     && errorMsg}
+            {phase === 'no-camera' && 'Camera permission denied or no camera found.'}
           </div>
 
-          {/* Viewport */}
+          {/* Camera viewport */}
           <div className="mt-5 relative aspect-square brutal-border bg-brutal-ink overflow-hidden">
-            <div className="absolute inset-0 dotgrid opacity-25" />
-            <svg viewBox="0 0 200 200" className="absolute inset-0 w-full h-full p-12 text-brutal-cream/40">
-              <ellipse cx="100" cy="78" rx="38" ry="46" fill="currentColor" />
-              <path d="M30 200c10-40 40-58 70-58s60 18 70 58Z" fill="currentColor" />
-              <circle cx="84" cy="74" r={blink ? 0.5 : 3.5} fill="#1a1a1a" className="transition-all" />
-              <circle cx="116" cy="74" r={blink ? 0.5 : 3.5} fill="#1a1a1a" className="transition-all" />
-            </svg>
-            {/* Reticle */}
-            <div className="absolute inset-5 border-2 border-brutal-yellow">
-              {['top-[-2px] left-[-2px] border-t-[3px] border-l-[3px]','top-[-2px] right-[-2px] border-t-[3px] border-r-[3px]','bottom-[-2px] left-[-2px] border-b-[3px] border-l-[3px]','bottom-[-2px] right-[-2px] border-b-[3px] border-r-[3px]'].map((p,i) => (
-                <span key={i} className={`absolute w-6 h-6 border-brutal-yellow ${p}`} />
-              ))}
-            </div>
-            {phase !== 'success' && (
-              <div className="absolute inset-x-5 top-5 bottom-5 overflow-hidden">
+            {/* Live video */}
+            <video
+              ref={videoRef}
+              muted
+              playsInline
+              className={`absolute inset-0 w-full h-full object-cover scale-x-[-1] ${phase === 'success' || phase === 'error' ? 'opacity-30' : 'opacity-100'}`}
+            />
+            <canvas ref={canvasRef} className="hidden" />
+
+            {/* No-camera fallback */}
+            {phase === 'no-camera' && (
+              <div className="absolute inset-0 grid place-items-center">
+                <div className="text-center text-brutal-cream/60">
+                  <Camera size={48} className="mx-auto mb-2" />
+                  <p className="font-display font-bold text-[11px] tracking-[0.16em]">NO CAMERA ACCESS</p>
+                </div>
+              </div>
+            )}
+
+            {/* Reticle overlay */}
+            {(phase === 'camera' || phase === 'verifying') && (
+              <div className="absolute inset-5 border-2 border-brutal-yellow pointer-events-none">
+                {['top-[-2px] left-[-2px] border-t-[3px] border-l-[3px]','top-[-2px] right-[-2px] border-t-[3px] border-r-[3px]','bottom-[-2px] left-[-2px] border-b-[3px] border-l-[3px]','bottom-[-2px] right-[-2px] border-b-[3px] border-r-[3px]'].map((p,i) => (
+                  <span key={i} className={`absolute w-6 h-6 border-brutal-yellow ${p}`} />
+                ))}
+              </div>
+            )}
+
+            {/* Scan line */}
+            {phase === 'verifying' && (
+              <div className="absolute inset-x-5 top-5 bottom-5 overflow-hidden pointer-events-none">
                 <div className="absolute inset-x-0 h-[3px] bg-brutal-yellow animate-scan" />
               </div>
             )}
-            <div className="absolute top-3 left-3 font-display font-bold text-[10px] tracking-[0.2em] bg-brutal-cream/95 text-brutal-ink px-2 py-1 border-2 border-brutal-cream">
-              <span className={`inline-block w-2 h-2 mr-1.5 align-middle ${phase === 'success' ? 'bg-[#0F8F3A]' : 'bg-brutal-red animate-blink'}`} />
-              {phase === 'success' ? 'MATCH 99.8%' : phase === 'verifying' ? 'MATCHING' : 'LIVENESS'}
-            </div>
+
+            {/* Status badge */}
+            {phase !== 'no-camera' && (
+              <div className="absolute top-3 left-3 font-display font-bold text-[10px] tracking-[0.2em] bg-brutal-cream/95 text-brutal-ink px-2 py-1 border-2 border-brutal-cream">
+                <span className={`inline-block w-2 h-2 mr-1.5 align-middle ${
+                  phase === 'success' ? 'bg-[#0F8F3A]' :
+                  phase === 'error'   ? 'bg-brutal-red' :
+                  'bg-brutal-red animate-blink'
+                }`} />
+                {phase === 'camera' ? 'LIVE' : phase === 'verifying' ? 'MATCHING' : phase === 'success' ? `MATCH ${confidence}%` : 'FAILED'}
+              </div>
+            )}
+
+            {/* Success overlay */}
             {phase === 'success' && (
-              <div className="absolute inset-0 grid place-items-center bg-[#0F8F3A]/85">
+              <div className="absolute inset-0 grid place-items-center bg-[#0F8F3A]/80 pointer-events-none">
                 <div className="w-20 h-20 grid place-items-center bg-brutal-yellow brutal-border brutal-shadow">
                   <Check size={36} className="text-brutal-ink" strokeWidth={3} />
                 </div>
               </div>
             )}
+
+            {/* Error overlay */}
+            {phase === 'error' && (
+              <div className="absolute inset-0 grid place-items-center bg-brutal-red/80 pointer-events-none">
+                <div className="w-20 h-20 grid place-items-center bg-brutal-cream brutal-border brutal-shadow">
+                  <AlertTriangle size={36} className="text-brutal-red" strokeWidth={3} />
+                </div>
+              </div>
+            )}
           </div>
 
+          {/* Progress bar */}
           {phase === 'verifying' && (
             <div className="mt-4 border-2 border-brutal-ink h-3">
-              <div className="h-full bg-brutal-blue" style={{ width: `${count}%` }} />
+              <div className="h-full bg-brutal-blue transition-all duration-75" style={{ width: `${progress}%` }} />
             </div>
           )}
 
-          {/* Checklist */}
-          <ul className="mt-5 space-y-2">
-            {[
-              { ok: true,               label: 'FACE DETECTED · CENTRED' },
-              { ok: true,               label: 'OFFICE NETWORK · GEOFENCE' },
-              { ok: phase !== 'scanning',label: 'LIVENESS · BLINK DETECTED' },
-              { ok: phase === 'success', label: 'TEMPLATE MATCH ≥ 99%' },
-            ].map((c, i) => (
-              <li key={i} className="flex items-center gap-3">
-                <span className={`w-5 h-5 grid place-items-center border-[3px] border-brutal-ink ${c.ok ? 'bg-[#0F8F3A]' : 'bg-brutal-surface'}`}>
-                  {c.ok && <Check size={11} className="text-white" strokeWidth={3} />}
-                </span>
-                <span className="font-display font-bold text-[11px] tracking-[0.16em]">{c.label}</span>
-              </li>
-            ))}
-          </ul>
-
+          {/* Actions */}
           <div className="mt-6 flex items-center justify-end gap-3">
-            {phase !== 'success' ? (
+            {phase === 'success' ? (
+              <button onClick={onClose} className="brutal-btn-primary px-5 py-3 text-[13px] flex items-center gap-2 bg-brutal-blue text-white border-brutal-ink">
+                <Check size={15} /> DONE
+              </button>
+            ) : phase === 'error' ? (
               <>
                 <button onClick={onClose} className="brutal-btn-secondary px-5 py-3 text-[13px]">CANCEL</button>
-                <button onClick={() => { setCount(0); setPhase('verifying'); }}
-                  disabled={phase === 'verifying'}
+                <button onClick={() => setPhase('camera')} className="brutal-btn-primary px-5 py-3 text-[13px] flex items-center gap-2">
+                  <Camera size={15} /> TRY AGAIN
+                </button>
+              </>
+            ) : phase === 'no-camera' ? (
+              <button onClick={onClose} className="brutal-btn-secondary px-5 py-3 text-[13px]">CLOSE</button>
+            ) : (
+              <>
+                <button onClick={onClose} className="brutal-btn-secondary px-5 py-3 text-[13px]">CANCEL</button>
+                <button onClick={handleVerify} disabled={phase === 'verifying'}
                   className="brutal-btn-primary px-5 py-3 text-[13px] flex items-center gap-2 disabled:opacity-60">
                   <Fingerprint size={15} /> {phase === 'verifying' ? 'MATCHING…' : 'VERIFY BIOMETRICS'}
                 </button>
               </>
-            ) : (
-              <button onClick={onClose} className="brutal-btn-primary px-5 py-3 text-[13px] flex items-center gap-2 bg-brutal-blue text-white border-brutal-ink">
-                <Check size={15} /> DONE
-              </button>
             )}
           </div>
         </div>
@@ -140,6 +221,7 @@ function PunchInModal({ onClose }: { onClose: () => void }) {
 export default function AttendancePage() {
   const clock = useClock();
   const [showModal, setShowModal] = useState(false);
+  const [punchType, setPunchType] = useState<'in' | 'out'>('in');
   const date = clock ? clock.toLocaleDateString('en-GB', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' }).toUpperCase() : 'LOADING...';
 
   const { data: todayRecord } = useQuery<AttendanceRecord | null>({
@@ -178,9 +260,14 @@ export default function AttendancePage() {
             </span>
           </div>
           <div className="mt-7 flex items-end gap-4 flex-wrap">
-            <button onClick={() => setShowModal(true)} className="brutal-btn-primary px-6 py-4 text-[13px] flex items-center gap-2">
-              <Fingerprint size={18} /> INITIALIZE FACE PUNCH-IN <ArrowRight size={16} />
+            <button onClick={() => { setPunchType('in'); setShowModal(true); }} className="brutal-btn-primary px-6 py-4 text-[13px] flex items-center gap-2">
+              <Fingerprint size={18} /> PUNCH IN <ArrowRight size={16} />
             </button>
+            {todayRecord?.punchInTime && !todayRecord?.punchOutTime && (
+              <button onClick={() => { setPunchType('out'); setShowModal(true); }} className="brutal-btn-secondary px-6 py-4 text-[13px] flex items-center gap-2">
+                <Fingerprint size={18} /> PUNCH OUT <ArrowRight size={16} />
+              </button>
+            )}
             {todayRecord?.punchInTime && (
               <div className="border-l-[3px] border-brutal-ink pl-4 font-display font-bold text-[11px] tracking-[0.14em]">
                 <div className="text-brutal-ink/60">TODAY PUNCHED IN</div>
@@ -256,7 +343,7 @@ export default function AttendancePage() {
         )}
       </div>
 
-      {showModal && <PunchInModal onClose={() => setShowModal(false)} />}
+      {showModal && <PunchInModal onClose={() => setShowModal(false)} punchType={punchType} />}
     </div>
   );
 }
