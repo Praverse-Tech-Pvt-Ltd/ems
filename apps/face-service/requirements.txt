@@ -2,11 +2,12 @@ fastapi==0.115.5
 uvicorn[standard]==0.32.1
 python-multipart==0.0.12
 pydantic==2.10.2
+pydantic-core==2.27.1
 pydantic-settings==2.6.1
 deepface==0.0.93
 opencv-python-headless==4.11.0.86
-numpy==2.2.5
+numpy==1.26.4
 boto3==1.35.68
 pillow==11.0.0
 httpx==0.28.0
-tf-keras
+tf-keras==2.18.0
