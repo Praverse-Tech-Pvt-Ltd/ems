@@ -22,17 +22,17 @@ export class StorageService {
     const endpoint = this.config.get<string>('AWS_ENDPOINT_URL');
     this.driver = this.config.get<string>('STORAGE_DRIVER') === 'local' ? 'local' : 's3';
     this.localDir = path.resolve(process.cwd(), '..', '..', this.config.get<string>('LOCAL_STORAGE_DIR') ?? 'uploads');
+    this.bucket = this.config.get<string>('S3_BUCKET_NAME') ?? '';
 
+    // Only initialise S3 client when actually needed
     this.s3 = new S3Client({
-      region: this.config.getOrThrow('AWS_REGION'),
+      region: this.config.get<string>('AWS_REGION') ?? 'auto',
       credentials: {
-        accessKeyId: this.config.getOrThrow('AWS_ACCESS_KEY_ID'),
-        secretAccessKey: this.config.getOrThrow('AWS_SECRET_ACCESS_KEY'),
+        accessKeyId: this.config.get<string>('AWS_ACCESS_KEY_ID') ?? '',
+        secretAccessKey: this.config.get<string>('AWS_SECRET_ACCESS_KEY') ?? '',
       },
       ...(endpoint && { endpoint, forcePathStyle: true }),
     });
-
-    this.bucket = this.config.getOrThrow('S3_BUCKET_NAME');
   }
 
   async upload(
