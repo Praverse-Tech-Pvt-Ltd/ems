@@ -88,6 +88,28 @@ export class EmailService {
     });
   }
 
+  async sendSalarySlipStatus(
+    to: string,
+    name: string,
+    status: 'GENERATED' | 'APPROVED' | 'TRANSFERRED' | 'REJECTED',
+    period: string,
+    netPayable: number,
+    details?: { paymentRef?: string; signatureName?: string },
+  ) {
+    const statusLabel = status.charAt(0) + status.slice(1).toLowerCase();
+    await this.send({
+      to,
+      subject: `NexGen EMS — Salary Slip ${statusLabel}`,
+      html: `
+        <h2>Hello, ${name}</h2>
+        <p>Your salary slip for <strong>${period}</strong> has been <strong>${statusLabel.toLowerCase()}</strong>.</p>
+        <p><strong>Net payable:</strong> ₹${netPayable.toFixed(2)}</p>
+        ${details?.paymentRef ? `<p><strong>Payment reference:</strong> ${details.paymentRef}</p>` : ''}
+        ${details?.signatureName ? `<p><strong>Approved by:</strong> ${details.signatureName}</p>` : ''}
+      `,
+    });
+  }
+
   private async send(opts: { to: string; subject: string; html: string }) {
     try {
       await this.transporter.sendMail({

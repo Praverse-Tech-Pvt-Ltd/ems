@@ -6,6 +6,9 @@ export const apiClient = axios.create({
 });
 
 apiClient.interceptors.request.use((config) => {
+  if (typeof FormData !== 'undefined' && config.data instanceof FormData) {
+    delete config.headers['Content-Type'];
+  }
   if (typeof window !== 'undefined') {
     const stored = localStorage.getItem('nexgen-auth');
     if (stored) {

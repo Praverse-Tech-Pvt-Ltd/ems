@@ -25,6 +25,11 @@ export class AttendanceController {
     return this.service.punchOut(user.id, dto);
   }
 
+  @Post('face/enroll')
+  enrollFace(@CurrentUser() user: { id: string }, @Body() body: { frames?: string[] }) {
+    return this.service.enrollFace(user.id, body.frames ?? []);
+  }
+
   @Get('today')
   getToday(@CurrentUser() user: { id: string }) {
     return this.service.getToday(user.id);

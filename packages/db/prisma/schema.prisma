@@ -125,6 +125,38 @@ enum NotificationType {
   GENERAL
 }
 
+enum PayrollStatus {
+  DRAFT
+  APPROVED
+  REJECTED
+  TRANSFERRED
+}
+
+enum PolicyStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum TaskStatus {
+  OPEN
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum ChatChannelType {
+  GENERAL
+  GROUP
+  DIRECT
+}
+
+enum DocumentReviewStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
 // ─── Core Tables ─────────────────────────────────────────────────────────────
 
 model Department {
@@ -198,6 +230,9 @@ model Employee {
   requestsReviewed       EmployeeRequest[]  @relation("RequestReviewer")
   salarySlips            SalarySlip[]       @relation("SlipEmployee")
   salarySlipsUploaded    SalarySlip[]       @relation("SlipUploader")
+  salaryStructures       SalaryStructure[]  @relation("StructureEmployee")
+  salaryStructuresApproved SalaryStructure[] @relation("StructureApprover")
+  salarySlipsApproved    SalarySlip[]       @relation("SlipApprover")
   notifications          Notification[]
   commentsMade           Comment[]
   auditLogs              AuditLog[]         @relation("AuditActor")
@@ -205,6 +240,13 @@ model Employee {
   consentRecords         ConsentRecord[]
   refreshTokens          RefreshToken[]
   documents              EmployeeDocument[]
+  tasksCreated           Task[]             @relation("TaskCreator")
+  taskAssignments        TaskAssignment[]
+  chatMemberships        ChatChannelMember[]
+  chatMessages           ChatMessage[]
+  policyAcknowledgements PolicyAcknowledgement[]
+  lifecycleEvents        EmployeeLifecycleEvent[] @relation("LifecycleEmployee")
+  lifecycleEventsCreated EmployeeLifecycleEvent[] @relation("LifecycleCreator")
 
   @@map("employees")
 }
@@ -369,20 +411,61 @@ model SalarySlip {
   employeeId    String   @map("employee_id")
   month         Int
   year          Int
+  baseSalary    Decimal? @map("base_salary") @db.Decimal(12, 2)
+  incentives    Decimal  @default(0) @db.Decimal(12, 2)
+  reimbursements Decimal @default(0) @db.Decimal(12, 2)
   grossSalary   Decimal  @map("gross_salary") @db.Decimal(12, 2)
   deductions    Decimal  @db.Decimal(12, 2)
   netPayable    Decimal  @map("net_payable") @db.Decimal(12, 2)
   lopDays       Int      @default(0) @map("lop_days")
   daysPresent   Int      @map("days_present")
-  slipPdfS3Key  String   @map("slip_pdf_s3_key")
+  status        PayrollStatus @default(DRAFT)
+  slipPdfS3Key  String?  @map("slip_pdf_s3_key")
+  signatureName String?  @map("signature_name")
+  signatureTitle String? @map("signature_title")
+  signatureAssetKey String? @map("signature_asset_key")
+  approvedBy    String?  @map("approved_by")
+  approvedAt    DateTime? @map("approved_at") @db.Timestamptz
+  transferredAt DateTime? @map("transferred_at") @db.Timestamptz
+  paymentRef    String?  @map("payment_ref")
+  emailSentAt   DateTime? @map("email_sent_at") @db.Timestamptz
+  notes         String?
   uploadedBy    String   @map("uploaded_by")
   createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
 
   employee  Employee @relation("SlipEmployee", fields: [employeeId], references: [id])
   uploader  Employee @relation("SlipUploader", fields: [uploadedBy], references: [id])
+  approver  Employee? @relation("SlipApprover", fields: [approvedBy], references: [id])
 
   @@unique([employeeId, month, year])
   @@map("salary_slips")
+}
+
+model SalaryStructure {
+  id              String   @id @default(uuid())
+  employeeId      String   @map("employee_id")
+  basic           Decimal  @db.Decimal(12, 2)
+  hra             Decimal  @default(0) @db.Decimal(12, 2)
+  allowances      Decimal  @default(0) @db.Decimal(12, 2)
+  pfDeduction     Decimal  @default(0) @map("pf_deduction") @db.Decimal(12, 2)
+  professionalTax Decimal  @default(0) @map("professional_tax") @db.Decimal(12, 2)
+  tds             Decimal  @default(0) @db.Decimal(12, 2)
+  effectiveFrom   DateTime @map("effective_from") @db.Date
+  approvedBy      String?  @map("approved_by")
+  approvedAt      DateTime? @map("approved_at") @db.Timestamptz
+  signatureName   String?  @map("signature_name")
+  signatureTitle  String?  @map("signature_title")
+  notes           String?
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  employee Employee @relation("StructureEmployee", fields: [employeeId], references: [id])
+  approver Employee? @relation("StructureApprover", fields: [approvedBy], references: [id])
+
+  @@unique([employeeId, effectiveFrom])
+  @@index([employeeId])
+  @@map("salary_structures")
 }
 
 model Notification {
@@ -460,10 +543,158 @@ model EmployeeDocument {
   docType      String   @map("doc_type")
   fileS3Key    String   @map("file_s3_key")
   uploadedBy   String   @map("uploaded_by")
+  status       DocumentReviewStatus @default(PENDING)
+  reviewedBy   String?  @map("reviewed_by")
+  reviewedAt   DateTime? @map("reviewed_at") @db.Timestamptz
+  rejectionReason String? @map("rejection_reason")
   expiresAt    DateTime? @map("expires_at") @db.Date
   createdAt    DateTime @default(now()) @map("created_at")
 
   employee  Employee @relation(fields: [employeeId], references: [id])
 
   @@map("employee_documents")
+}
+
+model CompanySetting {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     Json
+  updatedBy String?  @map("updated_by")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("company_settings")
+}
+
+model Holiday {
+  id          String   @id @default(uuid())
+  date        DateTime @db.Date
+  title       String
+  description String?
+  isPaid      Boolean  @default(true) @map("is_paid")
+  createdBy   String   @map("created_by")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@unique([date, title])
+  @@map("holidays")
+}
+
+model Policy {
+  id        String       @id @default(uuid())
+  title     String
+  category  String
+  body      String
+  status    PolicyStatus @default(DRAFT)
+  version   String       @default("1.0")
+  createdBy String       @map("created_by")
+  publishedAt DateTime?  @map("published_at") @db.Timestamptz
+  createdAt DateTime     @default(now()) @map("created_at")
+  updatedAt DateTime     @updatedAt @map("updated_at")
+
+  acknowledgements PolicyAcknowledgement[]
+
+  @@map("policies")
+}
+
+model PolicyAcknowledgement {
+  id         String   @id @default(uuid())
+  policyId   String   @map("policy_id")
+  employeeId String   @map("employee_id")
+  acknowledgedAt DateTime @default(now()) @map("acknowledged_at")
+
+  policy   Policy   @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@unique([policyId, employeeId])
+  @@map("policy_acknowledgements")
+}
+
+model Task {
+  id          String   @id @default(uuid())
+  title       String
+  description String?
+  dueAt       DateTime? @map("due_at") @db.Timestamptz
+  priority    String    @default("NORMAL")
+  createdBy   String    @map("created_by")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  creator     Employee @relation("TaskCreator", fields: [createdBy], references: [id])
+  assignments TaskAssignment[]
+
+  @@map("tasks")
+}
+
+model TaskAssignment {
+  id          String     @id @default(uuid())
+  taskId      String     @map("task_id")
+  employeeId  String     @map("employee_id")
+  status      TaskStatus @default(OPEN)
+  completedAt DateTime?  @map("completed_at") @db.Timestamptz
+  createdAt   DateTime   @default(now()) @map("created_at")
+
+  task     Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, employeeId])
+  @@map("task_assignments")
+}
+
+model ChatChannel {
+  id        String          @id @default(uuid())
+  name      String
+  type      ChatChannelType @default(GENERAL)
+  createdBy String?         @map("created_by")
+  createdAt DateTime        @default(now()) @map("created_at")
+
+  messages ChatMessage[]
+  members  ChatChannelMember[]
+
+  @@map("chat_channels")
+}
+
+model ChatChannelMember {
+  id         String   @id @default(uuid())
+  channelId  String   @map("channel_id")
+  employeeId String   @map("employee_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  channel  ChatChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  employee Employee    @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@unique([channelId, employeeId])
+  @@map("chat_channel_members")
+}
+
+model ChatMessage {
+  id        String   @id @default(uuid())
+  channelId String   @map("channel_id")
+  authorId  String   @map("author_id")
+  body      String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  channel ChatChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  author  Employee    @relation(fields: [authorId], references: [id])
+
+  @@index([channelId, createdAt])
+  @@map("chat_messages")
+}
+
+model EmployeeLifecycleEvent {
+  id          String   @id @default(uuid())
+  employeeId  String   @map("employee_id")
+  eventType   String   @map("event_type")
+  title       String
+  description String?
+  status      String   @default("OPEN")
+  dueAt       DateTime? @map("due_at") @db.Timestamptz
+  createdBy   String   @map("created_by")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  employee Employee @relation("LifecycleEmployee", fields: [employeeId], references: [id], onDelete: Cascade)
+  creator  Employee @relation("LifecycleCreator", fields: [createdBy], references: [id])
+
+  @@map("employee_lifecycle_events")
 }

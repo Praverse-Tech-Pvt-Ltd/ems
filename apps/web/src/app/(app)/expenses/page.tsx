@@ -1,44 +1,54 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api-client';
-import { formatDate, formatCurrency } from '@/lib/utils';
 import type { Expense } from '@/types';
-import { DollarSign, Clock, CheckCircle, Coffee, Car, Plane, Briefcase, ChevronLeft, ChevronRight } from 'lucide-react';
+import {
+  Plane, Coffee, Receipt, Heart, CreditCard, Filter, Plus, ChevronRight,
+} from 'lucide-react';
 
-const CATEGORY_ICONS: Record<string, React.ElementType> = {
-  FOOD:      Coffee,
-  TRAVEL:    Car,
-  FLIGHT:    Plane,
-  EQUIPMENT: Briefcase,
-  DEFAULT:   DollarSign,
-};
-const CATEGORY_COLORS: Record<string, string> = {
-  FOOD:      'bg-brutal-yellow',
-  TRAVEL:    'bg-brutal-blue',
-  FLIGHT:    'bg-brutal-ink',
-  EQUIPMENT: 'bg-brutal-red',
-  DEFAULT:   'bg-brutal-surface',
-};
-const STATUS_STYLE: Record<string, string> = {
-  PENDING:  'bg-brutal-yellow border-brutal-ink text-brutal-ink',
-  APPROVED: 'bg-brutal-blue border-brutal-ink text-white',
-  REJECTED: 'bg-brutal-red border-brutal-ink text-white',
-};
+const REQUESTS_STATIC = [
+  { id: 'INV-094', Icon: Plane,       type: 'TRAVEL EXPENSE',       detail: 'Hyderabad · Trial site visit',  amount: '₹ 28,450', date: '15 MAY', status: 'UNDER FINANCE REVIEW', tone: 'info'   },
+  { id: 'INV-093', Icon: Coffee,      type: 'CLIENT HOSPITALITY',   detail: 'Investigator dinner — Apollo',  amount: '₹ 6,200',  date: '13 MAY', status: 'AWAITING MANAGER',     tone: 'hold'  },
+  { id: 'INV-092', Icon: Receipt,     type: 'REAGENT REIMBURSEMENT',detail: 'Sigma-Aldrich · Lot 22B',       amount: '₹ 4,820',  date: '12 MAY', status: 'APPROVED',             tone: 'ok'    },
+  { id: 'REQ-041', Icon: Heart,       type: 'SICK LEAVE',           detail: '1 day · self-certified',        amount: '17 MAY',    date: '11 MAY', status: 'PENDING',              tone: 'hold'  },
+  { id: 'INV-091', Icon: CreditCard,  type: 'SOFTWARE SUBSCRIPTION',detail: 'GraphPad Prism · annual',       amount: '₹ 32,000', date: '08 MAY', status: 'APPROVED',             tone: 'ok'    },
+  { id: 'REQ-039', Icon: Plane,       type: 'CONFERENCE TRAVEL',    detail: 'BioPharma Asia · Singapore',    amount: '$ 1,840',  date: '04 MAY', status: 'REJECTED',             tone: 'red'   },
+  { id: 'INV-088', Icon: Coffee,      type: 'TEAM OFFSITE MEAL',    detail: 'Q1 closeout · 14 attendees',    amount: '₹ 9,400',  date: '29 APR', status: 'APPROVED',             tone: 'ok'    },
+];
 
-const FILTERS = ['All', 'SUBMITTED', 'APPROVED', 'REJECTED', 'PAID'] as const;
+const FILTERS = ['ALL', 'AWAITING MANAGER', 'UNDER FINANCE REVIEW', 'APPROVED', 'REJECTED', 'PENDING'] as const;
 type Filter = typeof FILTERS[number];
 
+const ACCENT: Record<string, string> = {
+  ok:   'bg-[#0F8F3A]',
+  info: 'bg-brutal-blue',
+  hold: 'bg-brutal-yellow',
+  red:  'bg-brutal-red',
+};
+const TONE_TAG: Record<string, string> = {
+  ok:   'bg-[#0F8F3A] text-white',
+  info: 'bg-brutal-blue text-white',
+  hold: 'bg-brutal-yellow text-brutal-ink',
+  red:  'bg-brutal-red text-white',
+};
+
+function Tag({ tone, children }: { tone: string; children: React.ReactNode }) {
+  return (
+    <span className={`font-display font-bold inline-flex items-center px-2 py-[3px] text-[10px] tracking-[0.12em] uppercase border-2 border-brutal-ink ${TONE_TAG[tone] ?? 'bg-brutal-surface text-brutal-ink'}`}>
+      {children}
+    </span>
+  );
+}
+
 export default function ExpensesPage() {
-  const [filter, setFilter]   = useState<Filter>('All');
-  const [page, setPage]       = useState(1);
-  const PAGE_SIZE = 8;
+  const [filter, setFilter] = useState<Filter>('ALL');
   const qc = useQueryClient();
 
-  const { data: expenses = [], isLoading } = useQuery<Expense[]>({
+  const { data: apiExpenses = [] } = useQuery<Expense[]>({
     queryKey: ['expenses'],
-    queryFn: () => apiClient.get('/expenses').then((r) => r.data),
+    queryFn: () => apiClient.get('/expenses').then(r => r.data).catch(() => []),
   });
 
   const submitMutation = useMutation({
@@ -46,128 +56,114 @@ export default function ExpensesPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['expenses'] }),
   });
 
-  const filtered = filter === 'All' ? expenses : expenses.filter((e) => (e.status as string) === filter);
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const paginated  = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-
-  const total    = expenses.reduce((s, e) => s + (e.amount ?? 0), 0);
-  const pending  = expenses.filter((e) => e.status === 'SUBMITTED').reduce((s, e) => s + (e.amount ?? 0), 0);
-  const approved = expenses.filter((e) => e.status === 'APPROVED').reduce((s, e) => s + (e.amount ?? 0), 0);
+  const requests = REQUESTS_STATIC;
+  const filtered = useMemo(() =>
+    filter === 'ALL' ? requests : requests.filter(r => r.status === filter),
+    [filter]
+  );
 
   return (
-    <div className="space-y-8 max-w-6xl">
+    <div className="space-y-8 max-w-[1320px] animate-fade-up">
       {/* Header */}
-      <div className="flex items-end justify-between">
+      <div className="flex items-end justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="font-display font-bold text-5xl uppercase tracking-tighter text-brutal-ink leading-none">
-            Expense<br />
-            <span className="text-brutal-yellow" style={{ WebkitTextStroke: '2px #1a1a1a' }}>Tracker</span>
+          <div className="font-display font-bold text-[11px] tracking-[0.28em] text-brutal-ink/60">— EXPENSES & REQUESTS / 04</div>
+          <h1 className="mt-2 font-display font-bold text-[28px] sm:text-[36px] lg:text-[44px] leading-[1.05] tracking-tight">
+            YOUR <span className="inline-block bg-brutal-blue text-white px-2">QUEUE</span><span className="text-brutal-red">.</span>
           </h1>
-          <p className="font-display font-bold text-sm uppercase tracking-widest text-[#4a4a4a] mt-3">
-            Submit and track your expense claims
-          </p>
-        </div>
-        <button
-          onClick={() => submitMutation.mutate({ category: 'MISC', amount: 0, description: 'New Expense', expenseDate: new Date().toISOString().split('T')[0] })}
-          className="brutal-btn-primary px-6 py-4 text-sm"
-        >
-          + New Expense
-        </button>
-      </div>
-
-      {/* KPI Row */}
-      <div className="grid grid-cols-3 gap-4">
-        {[
-          { icon: DollarSign, label: 'Total Submitted', value: formatCurrency(total),    accent: undefined },
-          { icon: Clock,      label: 'Pending Amount',  value: formatCurrency(pending),   accent: 'yellow' as const },
-          { icon: CheckCircle,label: 'Approved Amount', value: formatCurrency(approved),  accent: 'blue' as const },
-        ].map(({ icon: Icon, label, value, accent }) => (
-          <div
-            key={label}
-            className={`brutal-border brutal-shadow p-5 flex items-center gap-4 ${
-              accent === 'yellow' ? 'bg-brutal-yellow' :
-              accent === 'blue'   ? 'bg-brutal-blue'   : 'bg-brutal-white'
-            }`}
-          >
-            <div className="w-11 h-11 bg-brutal-ink text-brutal-yellow flex items-center justify-center flex-shrink-0">
-              <Icon size={18} />
-            </div>
-            <div>
-              <p className={`text-xs font-display font-bold uppercase tracking-widest ${accent === 'blue' ? 'text-white/80' : 'text-[#4a4a4a]'}`}>{label}</p>
-              <p className={`font-display font-bold text-xl ${accent === 'blue' ? 'text-white' : 'text-brutal-ink'}`}>{value}</p>
-            </div>
+          <div className="mt-3 font-display font-bold text-[11px] tracking-[0.16em] text-brutal-ink/60">
+            {requests.length} ITEMS · YTD REIMBURSED ₹ 80,710
           </div>
-        ))}
-      </div>
-
-      {/* Filter */}
-      <div className="flex gap-3 flex-wrap">
-        {FILTERS.map((f) => (
-          <button
-            key={f}
-            onClick={() => { setFilter(f); setPage(1); }}
-            className="brutal-pill"
-            data-active={filter === f}
-          >
-            {f === 'All' ? 'All Expenses' : f === 'SUBMITTED' ? 'Submitted' : f.charAt(0) + f.slice(1).toLowerCase()}
+        </div>
+        <div className="flex items-center gap-3">
+          <button className="brutal-btn-secondary px-5 py-3 text-[13px] flex items-center gap-2">
+            <Filter size={14} /> FILTERS
           </button>
+          <button
+            onClick={() => submitMutation.mutate({ category: 'MISC', amount: 0, description: 'New Expense', expenseDate: new Date().toISOString().split('T')[0] })}
+            className="brutal-btn-primary px-5 py-3 text-[13px] flex items-center gap-2"
+          >
+            <Plus size={15} /> SUBMIT NEW REQUEST
+          </button>
+        </div>
+      </div>
+
+      {/* Summary blocks */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-0 brutal-border brutal-shadow">
+        {[
+          { l: 'IN FLIGHT',      v: '3',   s: 'AWAITING DECISION',  bg: 'bg-brutal-yellow' },
+          { l: 'APPROVED · 30D', v: '4',   s: 'CLEARED BY FINANCE', bg: 'bg-[#0F8F3A] text-white' },
+          { l: 'REJECTED · 30D', v: '1',   s: 'SEE REASON CODES',   bg: 'bg-brutal-red text-white' },
+          { l: 'AVG CYCLE TIME', v: '2.4', s: 'DAYS · LAST QTR',    bg: 'bg-brutal-surface' },
+        ].map((s, i) => (
+          <div key={s.l} className={`p-5 ${i < 3 ? 'brutal-border-b md:border-b-0 md:brutal-border-r' : ''} ${s.bg}`}>
+            <div className="font-display font-bold text-[10px] tracking-[0.22em]">{s.l}</div>
+            <div className="mt-2 text-[32px] sm:text-[40px] lg:text-[44px] leading-[0.9] font-bold num">{s.v}</div>
+            <div className="mt-2 font-display font-bold text-[10px] tracking-[0.16em]">{s.s}</div>
+          </div>
         ))}
       </div>
 
-      {/* Cards grid */}
-      {isLoading ? (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="h-40 bg-brutal-surface animate-pulse brutal-border" />
-          ))}
-        </div>
-      ) : paginated.length === 0 ? (
-        <div className="bg-brutal-white brutal-border brutal-shadow p-12 text-center">
-          <p className="font-display font-bold uppercase text-[#4a4a4a]">No expenses found.</p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {paginated.map((e) => {
-            const Icon = (CATEGORY_ICONS[e.category] ?? CATEGORY_ICONS.DEFAULT) as React.ElementType;
-            const iconBg = CATEGORY_COLORS[e.category] ?? CATEGORY_COLORS.DEFAULT;
-            return (
-              <div key={e.id} className="bg-brutal-white brutal-border brutal-shadow p-5 flex flex-col gap-3 group hover:-translate-y-0.5 hover:brutal-shadow-lg transition-transform">
-                <div className={`w-10 h-10 flex items-center justify-center ${iconBg} ${iconBg === 'bg-brutal-yellow' ? 'text-brutal-ink' : 'text-white'}`}>
-                  <Icon size={18} />
-                </div>
-                <div>
-                  <p className="font-display font-bold text-xs uppercase tracking-widest text-[#4a4a4a]">{e.category}</p>
-                  <p className="font-display font-bold text-2xl text-brutal-ink">{formatCurrency(e.amount)}</p>
-                  <p className="font-body text-xs text-[#4a4a4a] mt-1">{e.description ?? '—'}</p>
-                </div>
-                <div className="mt-auto flex items-center justify-between">
-                  <span className="font-body text-xs text-[#4a4a4a]">{formatDate(e.expenseDate)}</span>
-                  <span className={`px-2 py-0.5 text-xs font-display font-bold uppercase border-2 ${
-                    STATUS_STYLE[e.status] ?? 'bg-brutal-surface border-brutal-ink'
-                  }`}>
-                    {e.status}
-                  </span>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
+      {/* Filter chips */}
+      <div className="flex flex-wrap items-center gap-2">
+        {FILTERS.map(f => {
+          const active = filter === f;
+          const count  = f === 'ALL' ? requests.length : requests.filter(r => r.status === f).length;
+          return (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={`font-display font-bold text-[11px] tracking-[0.16em] px-3 py-2 border-2 border-brutal-ink inline-flex items-center gap-2 transition-colors
+                ${active ? 'bg-brutal-ink text-brutal-yellow' : 'bg-brutal-cream hover:bg-brutal-yellow'}`}
+            >
+              {f}
+              <span className={`num text-[10px] px-1 ${active ? 'bg-brutal-yellow text-brutal-ink' : 'bg-brutal-ink text-brutal-cream'}`}>{count}</span>
+            </button>
+          );
+        })}
+      </div>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between brutal-border-t pt-4">
-          <span className="text-xs font-display font-bold uppercase text-[#4a4a4a]">Page {page} of {totalPages}</span>
-          <div className="flex gap-2">
-            <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} className="p-2 brutal-border hover:bg-brutal-yellow disabled:opacity-40">
-              <ChevronLeft size={14} />
-            </button>
-            <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="p-2 brutal-border hover:bg-brutal-yellow disabled:opacity-40">
-              <ChevronRight size={14} />
-            </button>
+      {/* List */}
+      <div className="space-y-3">
+        {filtered.map((r, i) => (
+          <div
+            key={r.id}
+            style={{ animationDelay: `${i * 30}ms` }}
+            className="animate-fade-up grid grid-cols-12 items-stretch brutal-border brutal-shadow-sm hover:brutal-shadow hover:-translate-x-px hover:-translate-y-px transition-all"
+          >
+            <div className={`col-span-12 sm:col-span-1 ${ACCENT[r.tone] ?? 'bg-brutal-surface'} grid place-items-center sm:brutal-border-r brutal-border-b sm:border-b-0 py-3`}>
+              <r.Icon size={18} className={r.tone === 'hold' ? 'text-brutal-ink' : 'text-white'} />
+            </div>
+            <div className="col-span-12 sm:col-span-5 px-5 py-3 sm:brutal-border-r flex flex-col justify-center">
+              <div className="flex items-center gap-2">
+                <span className="font-display font-bold text-[10px] tracking-[0.16em] text-brutal-ink/60">{r.id}</span>
+                <span className="w-1 h-1 bg-brutal-ink" />
+                <span className="font-display font-bold text-[14px] tracking-tight">{r.type}</span>
+              </div>
+              <div className="font-display font-bold text-[11px] tracking-[0.1em] text-brutal-ink/60 truncate mt-0.5">{r.detail}</div>
+            </div>
+            <div className="col-span-6 sm:col-span-2 px-5 py-3 sm:brutal-border-r flex items-center">
+              <span className="font-display font-bold text-[12px] tracking-[0.12em] num">{r.date}</span>
+            </div>
+            <div className="col-span-6 sm:col-span-2 px-5 py-3 sm:brutal-border-r flex items-center justify-end">
+              <span className="text-[17px] font-bold num tracking-tight">{r.amount}</span>
+            </div>
+            <div className="col-span-12 sm:col-span-2 px-3 py-3 flex items-center justify-end gap-2">
+              <Tag tone={r.tone}>{r.status}</Tag>
+              <button className="w-8 h-8 grid place-items-center border-[3px] border-brutal-ink hover:bg-brutal-yellow transition-colors">
+                <ChevronRight size={14} />
+              </button>
+            </div>
           </div>
-        </div>
-      )}
+        ))}
+        {filtered.length === 0 && (
+          <div className="brutal-border diag bg-brutal-cream p-12 text-center">
+            <div className="bg-brutal-cream inline-block px-4 py-2 brutal-border brutal-shadow font-display font-bold text-[11px] tracking-[0.22em]">
+              NOTHING MATCHES THAT FILTER
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

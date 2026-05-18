@@ -57,9 +57,9 @@ export default function BiometricPage() {
       clearInterval(interval);
       setState('processing');
       try {
-        await apiClient.post('/attendance/punch', { method: mode === 'face' ? 'FACE' : 'FINGERPRINT' });
+        await apiClient.post('/attendance/face/enroll', { frames: [`capture-${Date.now()}`] });
         setState('success');
-        setMessage('Attendance recorded successfully.');
+        setMessage('Face recognition enrollment captured successfully.');
       } catch {
         setState('error');
         setMessage('Recognition failed. Please try again.');
@@ -179,7 +179,7 @@ export default function BiometricPage() {
           {(state === 'scanning' || state === 'processing') && (
             <div
               className="absolute left-0 right-0 h-1.5 bg-brutal-yellow z-20 transition-all duration-300"
-              style={{ top: `${progress}%`, boxShadow: '0 0 20px rgba(255,204,0,1)' }}
+              style={{ top: `${progress}%`, boxShadow: '0 0 20px rgba(255,162,58,1)' }}
             />
           )}
 

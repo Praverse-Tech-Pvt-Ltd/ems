@@ -14,8 +14,9 @@ import {
 import Link from 'next/link';
 
 function useClock() {
-  const [t, setT] = useState(new Date());
+  const [t, setT] = useState<Date | null>(null);
   useEffect(() => {
+    setT(new Date());
     const id = setInterval(() => setT(new Date()), 1000);
     return () => clearInterval(id);
   }, []);
@@ -69,11 +70,11 @@ const TONE_CLASS: Record<string, string> = {
 export default function DashboardPage() {
   const user  = useAuthStore((s) => s.user);
   const clock = useClock();
-  const time  = clock.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-  const secs  = String(clock.getSeconds()).padStart(2, '0');
-  const date  = clock.toLocaleDateString('en-GB', {
+  const time  = clock ? clock.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '--:--';
+  const secs  = clock ? String(clock.getSeconds()).padStart(2, '0') : '00';
+  const date  = clock ? clock.toLocaleDateString('en-GB', {
     weekday: 'long', day: '2-digit', month: 'long', year: 'numeric',
-  }).toUpperCase();
+  }).toUpperCase() : 'LOADING...';
 
   const { data: stats } = useQuery<DashboardStats>({
     queryKey: ['dashboard-stats'],
@@ -176,7 +177,7 @@ export default function DashboardPage() {
             </div>
 
             {/* Scanner box */}
-            <div className="relative my-4 mx-auto w-full max-w-[180px] aspect-square bg-brutal-ink brutal-border" style={{ boxShadow: '4px 4px 0 0 #ffcc00' }}>
+            <div className="relative my-4 mx-auto w-full max-w-[180px] aspect-square bg-brutal-ink brutal-border" style={{ boxShadow: '4px 4px 0 0 #ffa23a' }}>
               <Fingerprint size={70} className="absolute inset-0 m-auto text-brutal-yellow/60" />
               {/* Reticle corners */}
               {[

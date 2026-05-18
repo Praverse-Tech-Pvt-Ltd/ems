@@ -42,6 +42,11 @@
     -45deg, transparent 0, transparent 4px, rgba(0,0,0,0.12) 4px, rgba(0,0,0,0.12) 5px
   );
 }
+.dotgrid {
+  background-image: radial-gradient(#1a1a1a 1px, transparent 1.4px);
+  background-size: 16px 16px;
+}
+.num { font-variant-numeric: tabular-nums; }
 
 @layer utilities {
   .brutal-border   { border: 3px solid #1a1a1a; }
@@ -54,7 +59,7 @@
   .brutal-shadow-sm { box-shadow: 2px 2px 0px 0px #1a1a1a; }
 
   .brutal-btn-primary {
-    background-color: #ffcc00;
+    background-color: #ffa23a;
     border: 3px solid #1a1a1a;
     color: #1a1a1a;
     font-family: 'Space Grotesk', sans-serif;
@@ -66,7 +71,7 @@
   }
   .brutal-btn-primary:hover {
     background-color: #1a1a1a;
-    color: #ffcc00;
+    color: #ffa23a;
   }
   .brutal-btn-secondary {
     background-color: transparent;
