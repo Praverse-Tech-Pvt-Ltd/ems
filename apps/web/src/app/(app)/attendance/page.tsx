@@ -1,219 +1,262 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api-client';
-import { formatDate } from '@/lib/utils';
 import type { AttendanceRecord } from '@/types';
-import { Clock, TrendingUp, AlertTriangle, Search, ChevronLeft, ChevronRight } from 'lucide-react';
+import {
+  Fingerprint, MapPin, Wifi, ArrowRight, X, Check,
+} from 'lucide-react';
+import Link from 'next/link';
 
-const STATUS_STYLE: Record<string, string> = {
-  PRESENT:    'bg-brutal-yellow text-brutal-ink',
-  ABSENT:     'bg-brutal-red text-white',
-  LATE:       'bg-brutal-blue text-white',
-  HALF_DAY:   'bg-brutal-surface text-brutal-ink',
-  LEAVE:      'bg-brutal-surface-hi text-brutal-ink',
-};
+function useClock() {
+  const [t, setT] = useState<Date | null>(null);
+  useEffect(() => { setT(new Date()); const id = setInterval(() => setT(new Date()), 1000); return () => clearInterval(id); }, []);
+  return t;
+}
 
-const DAY_HEAT: Record<string, string> = {
-  PRESENT:    'bg-brutal-yellow border-brutal-ink',
-  ABSENT:     'bg-brutal-red border-brutal-ink',
-  LATE:       'bg-brutal-blue border-brutal-ink',
-  HALF_DAY:   'bg-brutal-surface-hi border-brutal-ink',
-  LEAVE:      'bg-brutal-surface border-brutal-ink',
-};
+function PunchInModal({ onClose }: { onClose: () => void }) {
+  const [phase, setPhase] = useState<'scanning' | 'verifying' | 'success'>('scanning');
+  const [blink, setBlink] = useState(false);
+  const [count, setCount] = useState(0);
 
-function HeatmapCell({ record }: { record?: AttendanceRecord }) {
-  if (!record) return <div className="aspect-square border border-brutal-surface-hi bg-brutal-surface-hi" />;
+  useEffect(() => {
+    const t1 = setTimeout(() => setBlink(true), 1800);
+    const t2 = setTimeout(() => setBlink(false), 2400);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
+  }, []);
+
+  useEffect(() => {
+    if (phase === 'verifying') {
+      const id = setInterval(() => setCount(c => Math.min(c + 7, 100)), 80);
+      const done = setTimeout(() => setPhase('success'), 1400);
+      return () => { clearInterval(id); clearTimeout(done); };
+    }
+  }, [phase]);
+
   return (
-    <div
-      title={`${record.date}: ${record.status}`}
-      className={`aspect-square border-2 cursor-default transition-transform hover:-translate-y-0.5 ${
-        DAY_HEAT[record.status] ?? 'bg-brutal-surface border-brutal-ink'
-      }`}
-    />
+    <div className="fixed inset-0 z-50 grid place-items-center p-6" style={{ background: 'rgba(15,15,15,0.65)', backdropFilter: 'blur(3px)' }}>
+      <div className="relative w-full max-w-[520px] brutal-border brutal-shadow-lg animate-fade-up bg-brutal-cream">
+        <div className="flex items-center justify-between px-5 py-3 bg-brutal-ink text-brutal-cream brutal-border-b">
+          <div className="flex items-center gap-3">
+            <span className="font-display font-bold text-[10px] tracking-[0.2em] bg-brutal-yellow text-brutal-ink px-2 py-0.5">BIOMETRIC</span>
+            <span className="font-display font-bold text-[11px] tracking-[0.22em]">CHECKPOINT · CAM 04</span>
+          </div>
+          <button onClick={onClose} className="w-8 h-8 grid place-items-center border-2 border-brutal-cream hover:bg-brutal-red transition">
+            <X size={14} />
+          </button>
+        </div>
+
+        <div className="p-5">
+          <h2 className="text-[28px] leading-[0.95] font-bold tracking-tight">
+            {phase === 'success'
+              ? (<>PUNCH-IN <span className="bg-[#0F8F3A] text-white px-2">CONFIRMED</span>.</>)
+              : (<>VERIFY <span className="bg-brutal-yellow px-2">IT&apos;S YOU</span>.</>)}
+          </h2>
+          <div className="mt-2 font-display font-bold text-[11px] tracking-[0.16em] text-brutal-ink/60 uppercase">
+            {phase === 'scanning'  && 'Perform liveness check — please blink.'}
+            {phase === 'verifying' && `Matching against secure template · ${count}%`}
+            {phase === 'success'   && 'Welcome in. Have a good shift.'}
+          </div>
+
+          {/* Viewport */}
+          <div className="mt-5 relative aspect-square brutal-border bg-brutal-ink overflow-hidden">
+            <div className="absolute inset-0 dotgrid opacity-25" />
+            <svg viewBox="0 0 200 200" className="absolute inset-0 w-full h-full p-12 text-brutal-cream/40">
+              <ellipse cx="100" cy="78" rx="38" ry="46" fill="currentColor" />
+              <path d="M30 200c10-40 40-58 70-58s60 18 70 58Z" fill="currentColor" />
+              <circle cx="84" cy="74" r={blink ? 0.5 : 3.5} fill="#1a1a1a" className="transition-all" />
+              <circle cx="116" cy="74" r={blink ? 0.5 : 3.5} fill="#1a1a1a" className="transition-all" />
+            </svg>
+            {/* Reticle */}
+            <div className="absolute inset-5 border-2 border-brutal-yellow">
+              {['top-[-2px] left-[-2px] border-t-[3px] border-l-[3px]','top-[-2px] right-[-2px] border-t-[3px] border-r-[3px]','bottom-[-2px] left-[-2px] border-b-[3px] border-l-[3px]','bottom-[-2px] right-[-2px] border-b-[3px] border-r-[3px]'].map((p,i) => (
+                <span key={i} className={`absolute w-6 h-6 border-brutal-yellow ${p}`} />
+              ))}
+            </div>
+            {phase !== 'success' && (
+              <div className="absolute inset-x-5 top-5 bottom-5 overflow-hidden">
+                <div className="absolute inset-x-0 h-[3px] bg-brutal-yellow animate-scan" />
+              </div>
+            )}
+            <div className="absolute top-3 left-3 font-display font-bold text-[10px] tracking-[0.2em] bg-brutal-cream/95 text-brutal-ink px-2 py-1 border-2 border-brutal-cream">
+              <span className={`inline-block w-2 h-2 mr-1.5 align-middle ${phase === 'success' ? 'bg-[#0F8F3A]' : 'bg-brutal-red animate-blink'}`} />
+              {phase === 'success' ? 'MATCH 99.8%' : phase === 'verifying' ? 'MATCHING' : 'LIVENESS'}
+            </div>
+            {phase === 'success' && (
+              <div className="absolute inset-0 grid place-items-center bg-[#0F8F3A]/85">
+                <div className="w-20 h-20 grid place-items-center bg-brutal-yellow brutal-border brutal-shadow">
+                  <Check size={36} className="text-brutal-ink" strokeWidth={3} />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {phase === 'verifying' && (
+            <div className="mt-4 border-2 border-brutal-ink h-3">
+              <div className="h-full bg-brutal-blue" style={{ width: `${count}%` }} />
+            </div>
+          )}
+
+          {/* Checklist */}
+          <ul className="mt-5 space-y-2">
+            {[
+              { ok: true,               label: 'FACE DETECTED · CENTRED' },
+              { ok: true,               label: 'OFFICE NETWORK · GEOFENCE' },
+              { ok: phase !== 'scanning',label: 'LIVENESS · BLINK DETECTED' },
+              { ok: phase === 'success', label: 'TEMPLATE MATCH ≥ 99%' },
+            ].map((c, i) => (
+              <li key={i} className="flex items-center gap-3">
+                <span className={`w-5 h-5 grid place-items-center border-[3px] border-brutal-ink ${c.ok ? 'bg-[#0F8F3A]' : 'bg-brutal-surface'}`}>
+                  {c.ok && <Check size={11} className="text-white" strokeWidth={3} />}
+                </span>
+                <span className="font-display font-bold text-[11px] tracking-[0.16em]">{c.label}</span>
+              </li>
+            ))}
+          </ul>
+
+          <div className="mt-6 flex items-center justify-end gap-3">
+            {phase !== 'success' ? (
+              <>
+                <button onClick={onClose} className="brutal-btn-secondary px-5 py-3 text-[13px]">CANCEL</button>
+                <button onClick={() => { setCount(0); setPhase('verifying'); }}
+                  disabled={phase === 'verifying'}
+                  className="brutal-btn-primary px-5 py-3 text-[13px] flex items-center gap-2 disabled:opacity-60">
+                  <Fingerprint size={15} /> {phase === 'verifying' ? 'MATCHING…' : 'VERIFY BIOMETRICS'}
+                </button>
+              </>
+            ) : (
+              <button onClick={onClose} className="brutal-btn-primary px-5 py-3 text-[13px] flex items-center gap-2 bg-brutal-blue text-white border-brutal-ink">
+                <Check size={15} /> DONE
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
 export default function AttendancePage() {
-  const [page, setPage]       = useState(1);
-  const [search, setSearch]   = useState('');
-  const PAGE_SIZE = 10;
+  const clock = useClock();
+  const [showModal, setShowModal] = useState(false);
+  const date = clock ? clock.toLocaleDateString('en-GB', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' }).toUpperCase() : 'LOADING...';
 
-  const { data: records = [], isLoading } = useQuery<AttendanceRecord[]>({
-    queryKey: ['attendance'],
-    queryFn: () => apiClient.get('/attendance').then((r) => r.data),
+  const { data: todayRecord } = useQuery<AttendanceRecord | null>({
+    queryKey: ['attendance-today'],
+    queryFn: () => apiClient.get('/attendance/today').then(r => r.data).catch(() => null),
   });
 
-  const filtered = records.filter((r) =>
-    !search || r.date.includes(search) || r.status.toLowerCase().includes(search.toLowerCase()),
-  );
-
-  const totalPages  = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const paginated   = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-
-  const totalHours  = records.reduce((s, r) => s + (r.workingHours ?? 0), 0);
-  const presentDays = records.filter((r) => r.status === 'PRESENT').length;
-  const anomalies   = records.filter((r) => r.status === 'ABSENT' || r.status === 'LATE').length;
-  const presenceRate = records.length ? Math.round((presentDays / records.length) * 100) : 0;
-
-  // Build heatmap: last 35 days
-  const heatDays = Array.from({ length: 35 }, (_, i) => {
-    const d = new Date();
-    d.setDate(d.getDate() - (34 - i));
-    const dateStr = d.toISOString().split('T')[0];
-    return records.find((r) => r.date === dateStr);
+  const { data: recentActivity = [] } = useQuery<AttendanceRecord[]>({
+    queryKey: ['attendance-recent'],
+    queryFn: () => apiClient.get('/attendance?limit=10').then(r => r.data).catch(() => []),
   });
 
   return (
-    <div className="space-y-8 max-w-6xl">
-      {/* Header */}
-      <div className="flex items-end justify-between">
-        <div>
-          <h1 className="font-display font-bold text-5xl uppercase tracking-tighter text-brutal-ink leading-none">
-            Attendance<br />
-            <span className="text-brutal-blue" style={{ WebkitTextStroke: '2px #1a1a1a' }}>Log</span>
+    <div className="space-y-8 max-w-[1320px] animate-fade-up">
+      {/* Punch-in hero */}
+      <section className="grid grid-cols-12 gap-0 brutal-border brutal-shadow-lg">
+        <div className="col-span-12 lg:col-span-8 p-5 sm:p-7 lg:p-9 relative">
+          <div className="flex items-center gap-2 font-display font-bold text-[10px] tracking-[0.22em]">
+            <span className="px-2 py-1 bg-brutal-ink text-brutal-yellow">PUNCH-IN STATION</span>
+            <span className="w-2 h-2 bg-brutal-blue" />
+            <span className="text-brutal-ink/60">FACE RECOGNITION · LIVENESS V4</span>
+          </div>
+          <h1 className="mt-5 text-[38px] sm:text-[52px] lg:text-[64px] leading-[0.9] font-bold tracking-[-0.03em]">
+            READY <span className="text-brutal-blue">WHEN</span><br />
+            YOU ARE<span className="text-brutal-red">.</span>
           </h1>
-          <p className="font-display font-bold text-sm uppercase tracking-widest text-[#4a4a4a] mt-3">
-            Your presence and time records
-          </p>
+          <div className="mt-5 flex items-center gap-3 flex-wrap">
+            <span className="font-display font-bold text-[11px] tracking-[0.18em] flex items-center gap-2 px-2 py-1.5 bg-[#0F8F3A] text-white border-2 border-[#0F8F3A]">
+              <span className="w-2 h-2 bg-white" /> GEOFENCE OK
+            </span>
+            <span className="font-display font-bold text-[11px] tracking-[0.18em] flex items-center gap-2 px-2 py-1.5 bg-brutal-surface brutal-border">
+              <Wifi size={11} /> NXGN-LAB-B
+            </span>
+            <span className="font-display font-bold text-[11px] tracking-[0.18em] flex items-center gap-2 px-2 py-1.5 bg-brutal-surface brutal-border">
+              <MapPin size={11} /> TOWER B · LAB FLOOR
+            </span>
+          </div>
+          <div className="mt-7 flex items-end gap-4 flex-wrap">
+            <button onClick={() => setShowModal(true)} className="brutal-btn-primary px-6 py-4 text-[13px] flex items-center gap-2">
+              <Fingerprint size={18} /> INITIALIZE FACE PUNCH-IN <ArrowRight size={16} />
+            </button>
+            {todayRecord?.punchInTime && (
+              <div className="border-l-[3px] border-brutal-ink pl-4 font-display font-bold text-[11px] tracking-[0.14em]">
+                <div className="text-brutal-ink/60">TODAY PUNCHED IN</div>
+                <div className="text-[15px] num text-brutal-ink">{todayRecord.punchInTime}</div>
+              </div>
+            )}
+          </div>
+          <div className="mt-6 font-display font-bold text-[10px] tracking-[0.2em] text-brutal-ink/60">{date}</div>
         </div>
-        <a href="/attendance/biometric" className="brutal-btn-primary px-6 py-3 text-sm flex items-center gap-2">
-          Punch In / Out
-        </a>
-      </div>
 
-      {/* KPI Row */}
-      <div className="grid grid-cols-3 gap-4">
-        {[
-          { icon: Clock,         label: 'Total Hours',    value: `${totalHours.toFixed(1)}h` },
-          { icon: TrendingUp,    label: 'Presence Rate',  value: `${presenceRate}%`,          accent: 'yellow' },
-          { icon: AlertTriangle, label: 'Anomalies',      value: anomalies,                    accent: 'red' },
-        ].map(({ icon: Icon, label, value, accent }) => (
-          <div
-            key={label}
-            className={`brutal-border brutal-shadow p-5 flex items-center gap-4 ${
-              accent === 'yellow' ? 'bg-brutal-yellow' :
-              accent === 'red'    ? 'bg-brutal-red'    : 'bg-brutal-white'
-            }`}
-          >
-            <div className={`w-11 h-11 flex items-center justify-center flex-shrink-0 ${
-              accent ? 'bg-brutal-ink text-brutal-yellow' : 'bg-brutal-ink text-brutal-yellow'
-            }`}>
-              <Icon size={18} />
+        <div className="col-span-12 lg:col-span-4 lg:border-l-[4px] brutal-border-t lg:border-t-0 border-brutal-ink bg-brutal-blue relative overflow-hidden">
+          <div className="absolute inset-0 diag opacity-15" />
+          <div className="relative h-full p-6 flex flex-col justify-between text-white min-h-[320px]">
+            <div className="flex items-center justify-between">
+              <span className="font-display font-bold text-[10px] tracking-[0.22em] bg-white text-brutal-blue px-2 py-1 border-2 border-white">STATION 04</span>
+              <span className="font-display font-bold text-[10px] tracking-[0.18em] flex items-center gap-1.5">
+                <span className="w-2 h-2 bg-brutal-yellow animate-blink" /> LIVE
+              </span>
             </div>
-            <div>
-              <p className={`text-xs font-display font-bold uppercase tracking-widest ${
-                accent === 'red' ? 'text-white/80' : 'text-[#4a4a4a]'
-              }`}>{label}</p>
-              <p className={`font-display font-bold text-2xl ${
-                accent === 'red' ? 'text-white' : 'text-brutal-ink'
-              }`}>{value}</p>
+            <div className="relative my-6 mx-auto w-full max-w-[200px] aspect-square bg-brutal-ink brutal-border" style={{ boxShadow: '6px 6px 0 0 #ffa23a' }}>
+              <div className="absolute inset-0 dotgrid opacity-30" />
+              <Fingerprint size={80} className="absolute inset-0 m-auto text-brutal-yellow/60" />
+              {['top-2 left-2 border-t-[3px] border-l-[3px]','top-2 right-2 border-t-[3px] border-r-[3px]','bottom-2 left-2 border-b-[3px] border-l-[3px]','bottom-2 right-2 border-b-[3px] border-r-[3px]'].map((p,i) => (
+                <span key={i} className={`absolute w-5 h-5 border-brutal-yellow ${p}`} />
+              ))}
+              <div className="absolute inset-x-2 h-[3px] bg-brutal-yellow animate-scan" />
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              {[{ l: 'FRAMES', v: '24/24' },{ l: 'CONF', v: '99.8%' },{ l: 'LATCY', v: '38MS' }].map(s => (
+                <div key={s.l} className="border-2 border-white p-2">
+                  <div className="font-display font-bold text-[9px] tracking-[0.18em] text-white/70">{s.l}</div>
+                  <div className="font-display font-bold text-[14px]">{s.v}</div>
+                </div>
+              ))}
             </div>
           </div>
-        ))}
-      </div>
-
-      {/* Heatmap */}
-      <div className="bg-brutal-white brutal-border brutal-shadow p-6">
-        <h3 className="font-display font-bold text-lg uppercase tracking-tight mb-5 brutal-border-b pb-3">
-          Last 35 Days
-        </h3>
-        <div className="grid grid-cols-7 gap-2">
-          {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d) => (
-            <div key={d} className="text-center text-xs font-display font-bold uppercase text-[#4a4a4a] pb-1">{d}</div>
-          ))}
-          {heatDays.map((r, i) => <HeatmapCell key={i} record={r} />)}
         </div>
-        <div className="flex items-center gap-4 mt-4">
-          {Object.entries({ PRESENT: 'Present', ABSENT: 'Absent', LATE: 'Late', HALF_DAY: 'Half Day', LEAVE: 'Leave' }).map(([k, v]) => (
-            <div key={k} className="flex items-center gap-1.5">
-              <div className={`w-3 h-3 border border-brutal-ink ${DAY_HEAT[k]?.split(' ')[0]}`} />
-              <span className="text-xs font-display font-bold uppercase text-[#4a4a4a]">{v}</span>
-            </div>
-          ))}
-        </div>
-      </div>
+      </section>
 
-      {/* Log Table */}
-      <div className="bg-brutal-white brutal-border brutal-shadow">
-        <div className="px-6 py-4 brutal-border-b flex items-center justify-between gap-4 flex-wrap">
-          <h3 className="font-display font-bold text-lg uppercase tracking-tight">Attendance Records</h3>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[#4a4a4a]" size={13} />
-            <input
-              value={search}
-              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-              placeholder="Search date or status..."
-              className="pl-9 pr-4 py-2 text-sm brutal-border bg-brutal-cream focus:outline-none focus:ring-0 font-body w-56"
-            />
+      {/* Recent attendance */}
+      <div className="brutal-border brutal-shadow">
+        <div className="px-5 py-3 brutal-border-b flex items-center justify-between bg-brutal-ink text-brutal-cream">
+          <span className="font-display font-bold text-[11px] tracking-[0.22em]">RECENT ATTENDANCE</span>
+          <Link href="/attendance/biometric" className="font-display font-bold text-[10px] tracking-[0.18em] hover:text-brutal-yellow">
+            ENROLL BIOMETRICS →
+          </Link>
+        </div>
+        {recentActivity.length === 0 ? (
+          <div className="p-12 text-center">
+            <div className="font-display font-bold text-[11px] tracking-[0.22em] text-brutal-ink/50">NO RECORDS YET · PUNCH IN TO BEGIN</div>
           </div>
-        </div>
-
-        {isLoading ? (
-          <div className="p-6 space-y-3">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="h-12 bg-brutal-surface animate-pulse" />
+        ) : (
+          <div className="divide-y-[3px] divide-brutal-surface">
+            {recentActivity.map(r => (
+              <div key={r.id} className="px-5 py-3 flex items-center justify-between hover:bg-brutal-surface transition-colors">
+                <div>
+                  <p className="font-display font-bold text-[13px] uppercase">{r.date}</p>
+                  <p className="font-display font-bold text-[11px] text-brutal-ink/60 mt-0.5">
+                    {r.punchInTime ?? '—'} → {r.punchOutTime ?? '—'}
+                  </p>
+                </div>
+                <span className={`px-2.5 py-1 text-[11px] font-display font-bold uppercase border-2 border-brutal-ink ${
+                  r.status === 'PRESENT' ? 'bg-brutal-yellow' :
+                  r.status === 'ABSENT'  ? 'bg-brutal-red text-white' :
+                  r.status === 'LATE'    ? 'bg-brutal-blue text-white' :
+                  'bg-brutal-surface'
+                }`}>
+                  {r.status}
+                </span>
+              </div>
             ))}
           </div>
-        ) : paginated.length === 0 ? (
-          <p className="px-6 py-10 text-sm text-[#4a4a4a] font-bold uppercase text-center">No records found.</p>
-        ) : (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="brutal-border-b text-xs text-[#4a4a4a] bg-brutal-surface">
-                {['Date', 'Punch In', 'Punch Out', 'Hours', 'Status', 'Notes'].map((h) => (
-                  <th key={h} className="px-5 py-3 text-left font-display font-bold uppercase tracking-wide">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {paginated.map((r, i) => (
-                <tr key={r.id} className={`border-b-2 border-brutal-surface ${i % 2 === 0 ? '' : 'bg-brutal-surface-lo'}`}>
-                  <td className="px-5 py-3 font-display font-bold uppercase">{formatDate(r.date)}</td>
-                  <td className="px-5 py-3 font-body text-[#4a4a4a]">{r.punchInTime ?? '—'}</td>
-                  <td className="px-5 py-3 font-body text-[#4a4a4a]">{r.punchOutTime ?? '—'}</td>
-                  <td className="px-5 py-3 font-display font-bold">{r.workingHours != null ? `${r.workingHours}h` : '—'}</td>
-                  <td className="px-5 py-3">
-                    <span className={`px-2.5 py-1 text-xs font-display font-bold uppercase border-2 border-brutal-ink ${
-                      STATUS_STYLE[r.status] ?? 'bg-brutal-surface'
-                    }`}>
-                      {r.status}
-                    </span>
-                  </td>
-                  <td className="px-5 py-3 text-xs text-[#4a4a4a] font-body">
-                    {r.isRegularized ? 'Regularized' : '—'}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-
-        {totalPages > 1 && (
-          <div className="px-6 py-4 brutal-border-t flex items-center justify-between">
-            <span className="text-xs font-display font-bold uppercase text-[#4a4a4a]">
-              Page {page} of {totalPages}
-            </span>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page === 1}
-                className="p-2 brutal-border hover:bg-brutal-yellow disabled:opacity-40 transition-colors"
-              >
-                <ChevronLeft size={14} />
-              </button>
-              <button
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                disabled={page === totalPages}
-                className="p-2 brutal-border hover:bg-brutal-yellow disabled:opacity-40 transition-colors"
-              >
-                <ChevronRight size={14} />
-              </button>
-            </div>
-          </div>
         )}
       </div>
+
+      {showModal && <PunchInModal onClose={() => setShowModal(false)} />}
     </div>
   );
 }

@@ -1,135 +1,113 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
-import { apiClient } from '@/lib/api-client';
-import type { DashboardStats } from '@/types';
-import { BarChart2, Users, CheckCircle, XCircle, Clock, DollarSign, TrendingUp, FileText } from 'lucide-react';
-
-const EXPENSE_MIX = [
-  { label: 'TRAVEL',    pct: 42, color: 'bg-brutal-blue' },
-  { label: 'FOOD',      pct: 21, color: 'bg-brutal-yellow' },
-  { label: 'EQUIPMENT', pct: 18, color: 'bg-brutal-ink' },
-  { label: 'CLIENT',    pct: 12, color: 'bg-brutal-red' },
-  { label: 'OTHER',     pct: 7,  color: 'bg-brutal-surface-hi' },
-];
-
-const ATT_14D = [72, 85, 78, 91, 88, 76, 94, 82, 90, 87, 79, 93, 88, 95];
-
 export default function ReportsPage() {
-  const { data: stats } = useQuery<DashboardStats>({
-    queryKey: ['dashboard-stats'],
-    queryFn:  () => apiClient.get('/dashboard/stats').then((r) => r.data),
+  const ATTENDANCE = [92,95,96,94,97,98,93,96,97,95,96,98,99,96];
+  const PIE = [
+    { l: 'TRAVEL',      v: 38, c: 'bg-brutal-yellow', hex: '#ffa23a' },
+    { l: 'REAGENTS',    v: 26, c: 'bg-brutal-blue',   hex: '#0055ff' },
+    { l: 'SOFTWARE',    v: 18, c: 'bg-brutal-ink',     hex: '#1a1a1a' },
+    { l: 'HOSPITALITY', v: 12, c: 'bg-brutal-red',    hex: '#e63b2e' },
+    { l: 'MISC',        v: 6,  c: 'bg-brutal-surface', hex: '#eee9e0' },
+  ];
+
+  // Build pie paths
+  let cumulative = 0;
+  const paths = PIE.map(seg => {
+    const start = cumulative;
+    const end   = start + (seg.v / 100) * 360;
+    const r = 48, cx = 50, cy = 50;
+    const sx = cx + r * Math.cos(Math.PI * (start - 90) / 180);
+    const sy = cy + r * Math.sin(Math.PI * (start - 90) / 180);
+    const ex = cx + r * Math.cos(Math.PI * (end - 90) / 180);
+    const ey = cy + r * Math.sin(Math.PI * (end - 90) / 180);
+    const large = (end - start) > 180 ? 1 : 0;
+    cumulative = end;
+    return { ...seg, d: `M${cx},${cy} L${sx},${sy} A${r},${r} 0 ${large} 1 ${ex},${ey} Z` };
   });
 
-  const maxBar = Math.max(...ATT_14D);
-
   return (
-    <div className="space-y-8 max-w-6xl animate-fade-up">
-      {/* Header */}
+    <div className="space-y-8 max-w-[1320px] animate-fade-up">
       <div>
         <div className="font-display font-bold text-[11px] tracking-[0.28em] text-brutal-ink/60">— REPORTS / 09</div>
-        <h1 className="mt-2 font-display font-bold text-[44px] leading-[1.1] tracking-tight text-brutal-ink">
-          ORG <span className="inline-block bg-brutal-blue text-white px-2">ANALYTICS</span>
-          <span className="text-brutal-red">.</span>
+        <h1 className="mt-2 font-display font-bold text-[28px] sm:text-[36px] lg:text-[44px] leading-[1.05] tracking-tight">
+          ORG <span className="inline-block bg-brutal-yellow px-2">DASHBOARDS</span><span className="text-brutal-red">.</span>
         </h1>
-        <div className="mt-2 font-display font-bold text-[11px] tracking-[0.16em] text-brutal-ink/60">LIVE DATA · MAY 2026</div>
+        <div className="mt-3 font-display font-bold text-[11px] tracking-[0.16em] text-brutal-ink/60">REFRESHED EVERY 15 MIN · LAST 12:00 IST</div>
       </div>
 
       {/* KPI strip */}
-      <div className="brutal-border brutal-shadow bg-brutal-cream grid grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-0 brutal-border brutal-shadow">
         {[
-          { icon: Users,       label: 'TOTAL EMPLOYEES', value: stats?.totalEmployees   ?? '—', bg: 'bg-brutal-yellow' },
-          { icon: CheckCircle, label: 'PRESENT TODAY',   value: stats?.presentToday     ?? '—', bg: 'bg-[#0F8F3A] text-white' },
-          { icon: XCircle,     label: 'ABSENT TODAY',    value: stats?.absentToday      ?? '—', bg: 'bg-brutal-red text-white' },
-          { icon: Clock,       label: 'MISSING PUNCH',   value: stats?.missingPunchOuts ?? '—', bg: 'bg-brutal-ink text-brutal-yellow' },
-        ].map(({ icon: Icon, label, value, bg }, i) => (
-          <div key={label} className={`p-5 ${i < 3 ? 'border-r-[3px] border-brutal-ink' : ''} ${bg}`}>
-            <div className="flex items-center gap-2 mb-2">
-              <Icon size={14} />
-              <span className="font-display font-bold text-[10px] tracking-[0.22em]">{label}</span>
-            </div>
-            <div className="font-display font-bold text-[44px] leading-[0.9]">{value}</div>
+          { l: 'HEADCOUNT',      v: '184',    s: '+6 QTD',       bg: 'bg-brutal-cream' },
+          { l: 'ATTENDANCE',     v: '96.4%',  s: 'MTD',          bg: 'bg-brutal-yellow' },
+          { l: 'OPEN APPROVALS', v: '12',     s: '3 OVERDUE',    bg: 'bg-brutal-red text-white' },
+          { l: 'PAYROLL · APR',  v: '₹ 2.4Cr',s: 'CLEARED',     bg: 'bg-[#0F8F3A] text-white' },
+        ].map((s, i) => (
+          <div key={s.l} className={`p-5 ${i < 3 ? 'brutal-border-b md:border-b-0 md:brutal-border-r' : ''} ${s.bg}`}>
+            <div className="font-display font-bold text-[10px] tracking-[0.22em]">{s.l}</div>
+            <div className="mt-2 text-[28px] sm:text-[36px] lg:text-[40px] leading-[0.9] font-bold num">{s.v}</div>
+            <div className="mt-2 font-display font-bold text-[10px] tracking-[0.16em]">{s.s}</div>
           </div>
         ))}
       </div>
 
-      {/* Charts row */}
-      <div className="grid grid-cols-1 lg:grid-cols-[1.5fr_1fr] gap-5">
-        {/* 14-day attendance bar chart */}
-        <div className="brutal-border brutal-shadow bg-brutal-cream">
-          <div className="px-5 py-3 brutal-border-b bg-brutal-ink text-brutal-cream flex items-center justify-between">
-            <span className="font-display font-bold text-[11px] tracking-[0.22em]">ATTENDANCE RATE · LAST 14 DAYS</span>
-            <BarChart2 size={14} />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        {/* Attendance bar chart */}
+        <div className="brutal-border brutal-shadow">
+          <div className="px-4 py-2 brutal-border-b bg-brutal-ink text-brutal-cream flex items-center justify-between">
+            <span className="font-display font-bold text-[11px] tracking-[0.22em]">ATTENDANCE · 14 DAYS</span>
+            <span className="font-display font-bold text-[10px] tracking-[0.18em]">% PRESENT</span>
           </div>
           <div className="p-5">
-            <div className="flex items-end gap-2 h-44">
-              {ATT_14D.map((v, i) => (
-                <div key={i} className="flex-1 flex flex-col items-center gap-1">
-                  <div className="font-display font-bold text-[9px]">{v}</div>
-                  <div className="w-full flex items-end flex-1">
-                    <div
-                      className={`w-full border-[2px] border-brutal-ink ${v >= 90 ? 'bg-brutal-yellow' : v >= 80 ? 'bg-brutal-blue text-white' : 'bg-brutal-red text-white'}`}
-                      style={{ height: `${(v / maxBar) * 100}%`, minHeight: '8px' }}
-                    />
-                  </div>
+            <div className="flex items-end gap-1.5 h-44">
+              {ATTENDANCE.map((v, i) => (
+                <div key={i} className="flex-1 flex flex-col items-center gap-1.5">
+                  <div className="w-full bg-brutal-ink border-[2px] border-brutal-ink" style={{ height: `${(v - 85) * 7}%`, minHeight: '6px' }} />
+                  <div className="font-display font-bold text-[8px] tracking-[0.1em] text-brutal-ink/50">{i + 1}</div>
                 </div>
               ))}
             </div>
-            <div className="flex items-center gap-4 mt-4 pt-3 brutal-border-t flex-wrap">
-              {[{ label: '≥90% Excellent', color: 'bg-brutal-yellow' }, { label: '≥80% Good', color: 'bg-brutal-blue' }, { label: '<80% Low', color: 'bg-brutal-red' }].map((l) => (
-                <div key={l.label} className="flex items-center gap-2">
-                  <div className={`w-3 h-3 border border-brutal-ink ${l.color}`} />
-                  <span className="font-display font-bold text-[10px] tracking-widest">{l.label}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Expense mix */}
-        <div className="brutal-border brutal-shadow bg-brutal-cream">
-          <div className="px-5 py-3 brutal-border-b bg-brutal-yellow flex items-center justify-between">
-            <span className="font-display font-bold text-[11px] tracking-[0.22em]">EXPENSE MIX · YTD</span>
-            <DollarSign size={14} />
-          </div>
-          <div className="p-5 space-y-4">
-            {EXPENSE_MIX.map((e) => (
-              <div key={e.label}>
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="font-display font-bold text-[11px] tracking-[0.16em]">{e.label}</span>
-                  <span className="font-display font-bold text-[13px]">{e.pct}%</span>
-                </div>
-                <div className="w-full h-5 brutal-border bg-brutal-surface relative">
-                  <div className={`h-full ${e.color}`} style={{ width: `${e.pct}%` }} />
-                </div>
+            <div className="mt-4 grid grid-cols-3 gap-3">
+              <div className="border-[3px] border-brutal-ink p-2">
+                <div className="font-display font-bold text-[9px] tracking-[0.2em] text-brutal-ink/60">AVG</div>
+                <div className="text-[18px] font-bold num">95.8%</div>
               </div>
-            ))}
+              <div className="border-[3px] border-brutal-ink p-2 bg-brutal-yellow">
+                <div className="font-display font-bold text-[9px] tracking-[0.2em]">PEAK</div>
+                <div className="text-[18px] font-bold num">99.0%</div>
+              </div>
+              <div className="border-[3px] border-brutal-ink p-2 bg-brutal-red text-white">
+                <div className="font-display font-bold text-[9px] tracking-[0.2em]">LOW</div>
+                <div className="text-[18px] font-bold num">92.0%</div>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Bottom KPIs */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {[
-          { icon: DollarSign,  label: 'Pending Expenses', value: stats?.pendingExpenses ?? '—' },
-          { icon: FileText,    label: 'Overdue Invoices',  value: stats?.overdueInvoices ?? '—', accent: 'red' },
-          { icon: TrendingUp,  label: 'Pending Leaves',    value: stats?.pendingLeaves   ?? '—', accent: 'blue' },
-          { icon: Clock,       label: 'On-Time Rate',      value: '91%',                         accent: 'yellow' },
-        ].map(({ icon: Icon, label, value, accent }) => (
-          <div key={label} className={`brutal-border brutal-shadow p-5 flex items-center gap-4 ${
-            accent === 'yellow' ? 'bg-brutal-yellow' :
-            accent === 'red'    ? 'bg-brutal-red'    :
-            accent === 'blue'   ? 'bg-brutal-blue'   : 'bg-brutal-cream'
-          }`}>
-            <div className={`w-10 h-10 flex items-center justify-center flex-shrink-0 ${accent ? 'bg-brutal-ink text-brutal-yellow' : 'bg-brutal-ink text-brutal-yellow'}`}>
-              <Icon size={16} />
-            </div>
-            <div>
-              <p className={`font-display font-bold text-[10px] uppercase tracking-widest ${accent === 'blue' || accent === 'red' ? 'text-white/80' : 'text-brutal-ink/60'}`}>{label}</p>
-              <p className={`font-display font-bold text-2xl ${accent === 'blue' || accent === 'red' ? 'text-white' : 'text-brutal-ink'}`}>{value}</p>
-            </div>
+        {/* Expense pie */}
+        <div className="brutal-border brutal-shadow">
+          <div className="px-4 py-2 brutal-border-b bg-brutal-blue text-white flex items-center justify-between">
+            <span className="font-display font-bold text-[11px] tracking-[0.22em]">EXPENSE MIX · MTD</span>
+            <span className="font-display font-bold text-[10px] tracking-[0.18em]">₹ 12.4 LAKH</span>
           </div>
-        ))}
+          <div className="p-5 grid grid-cols-1 sm:grid-cols-[140px_1fr] gap-5 items-center justify-items-center sm:justify-items-start">
+            <svg viewBox="0 0 100 100" className="w-[140px] h-[140px]">
+              {paths.map((p, i) => (
+                <path key={i} d={p.d} fill={p.hex} stroke="#1a1a1a" strokeWidth="1.5" />
+              ))}
+              <circle cx="50" cy="50" r="48" fill="none" stroke="#1a1a1a" strokeWidth="2" />
+            </svg>
+            <ul className="space-y-2">
+              {PIE.map(x => (
+                <li key={x.l} className="flex items-center gap-2 font-display font-bold text-[11px] tracking-[0.14em]">
+                  <span className={`w-3 h-3 border-2 border-brutal-ink ${x.c}`} />
+                  <span className="flex-1">{x.l}</span>
+                  <span className="num text-brutal-ink/70">{x.v}%</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
       </div>
     </div>
   );

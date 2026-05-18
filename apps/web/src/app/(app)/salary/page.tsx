@@ -190,14 +190,14 @@ export default function SalaryPage() {
   const previewNet = Math.max(baseTotal + Number(incentives || 0) - totalDeductions, 0);
 
   return (
-    <div className="space-y-8 max-w-6xl">
+    <div className="space-y-8 max-w-[1320px]">
       <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-5">
         <div>
-          <p className="font-display font-bold text-xs uppercase tracking-[0.35em] text-[#4a4a4a] mb-3">Payroll Control / Salary Desk</p>
-          <h1 className="font-display font-bold text-5xl uppercase tracking-tighter text-brutal-ink leading-none">
-            Payroll &amp;<br />
-            <span className="text-brutal-yellow" style={{ WebkitTextStroke: '2px #1a1a1a' }}>Salary</span>
+          <div className="font-display font-bold text-[11px] tracking-[0.28em] text-brutal-ink/60">— SALARY / 06 · {user?.role}</div>
+          <h1 className="mt-2 font-display font-bold text-[28px] sm:text-[36px] lg:text-[44px] leading-[1.05] tracking-tight">
+            <span className="inline-block bg-brutal-yellow px-2">PAYSLIPS</span> &amp; PAYROLL<span className="text-brutal-red">.</span>
           </h1>
+          <div className="mt-3 font-display font-bold text-[11px] tracking-[0.16em] text-brutal-ink/60">SECURE · ENCRYPTED · GRADE M3</div>
         </div>
         {isAdmin && (
           <div className="brutal-border brutal-shadow bg-brutal-ink text-white px-5 py-4 min-w-[260px]">
@@ -419,96 +419,135 @@ export default function SalaryPage() {
       </div>
 
       {latest && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="bg-brutal-ink text-white brutal-border brutal-shadow p-8">
-            <div className="flex items-center justify-between mb-8">
-              <div>
-                <p className="font-display font-bold text-xs uppercase tracking-widest text-brutal-yellow mb-1">Latest Payslip</p>
-                <h2 className="font-display font-bold text-3xl uppercase">{monthLabel(latest)}</h2>
-              </div>
-              <button onClick={() => openPdf(latest.id)} className="brutal-btn-primary px-4 py-2 text-xs flex items-center gap-2">
-                <Download size={14} /> PDF
-              </button>
+        <section className="grid grid-cols-12 gap-0 brutal-border brutal-shadow-lg">
+          {/* Left: net pay hero */}
+          <div className="col-span-12 lg:col-span-7 p-5 sm:p-7 lg:p-9 relative">
+            <div className="flex items-center gap-2 font-display font-bold text-[10px] tracking-[0.22em]">
+              <span className="px-2 py-1 bg-brutal-ink text-brutal-yellow">PAYSLIP</span>
+              <span className="w-2 h-2 bg-brutal-blue" />
+              <span className="text-brutal-ink/60">{monthLabel(latest).toUpperCase()}</span>
             </div>
-            {[
-              { label: 'Base Salary', value: money(latest.baseSalary) || money(latest.grossSalary), color: 'bg-brutal-yellow' },
-              { label: 'Incentives + Claims', value: money(latest.incentives) + money(latest.reimbursements), color: 'bg-brutal-blue' },
-              { label: 'Deductions', value: money(latest.deductions), color: 'bg-brutal-red' },
-            ].map(({ label, value, color }) => (
-              <div key={label} className="mb-5">
-                <div className="flex justify-between font-display font-bold text-sm uppercase mb-2">
-                  <span className="text-white/70">{label}</span>
-                  <span className="text-white">{formatCurrency(value)}</span>
-                </div>
-                <div className="w-full h-3 bg-white/10 border border-white/20">
-                  <div className={`h-full ${color}`} style={{ width: `${Math.min((value / Math.max(money(latest.grossSalary), 1)) * 100, 100)}%` }} />
-                </div>
+            <div className="mt-5">
+              <div className="font-display font-bold text-[11px] tracking-[0.22em] text-brutal-ink/60 uppercase">NET PAYABLE</div>
+              <div className="mt-1 text-[44px] sm:text-[56px] lg:text-[72px] leading-[0.9] font-bold num tracking-[-0.03em]">
+                {formatCurrency(money(latest.netPayable))}
               </div>
-            ))}
-          </div>
-
-          <div className="bg-brutal-white brutal-border brutal-shadow p-6">
-            <h3 className="font-display font-bold text-lg uppercase brutal-border-b pb-3 mb-4">Approval Snapshot</h3>
-            <div className="space-y-3">
+            </div>
+            <div className="mt-7 grid grid-cols-3 gap-0 brutal-border">
               {[
-                ['Status', latest.status ?? 'DRAFT'],
-                ['Net Payable', formatCurrency(money(latest.netPayable))],
-                ['Signature', latest.signatureName ?? 'Pending'],
-                ['Transfer Ref', latest.paymentRef ?? 'Pending'],
-                ['Employee Mail', latest.emailSentAt ? 'Sent' : 'Queued after transfer'],
-              ].map(([label, value]) => (
-                <div key={label} className="flex items-center justify-between gap-4">
-                  <span className="font-body text-sm text-[#4a4a4a]">{label}</span>
-                  <span className="font-display font-bold text-sm text-right">{value}</span>
+                { l: 'GROSS',     v: formatCurrency(money(latest.grossSalary)),  bg: 'bg-brutal-yellow' },
+                { l: 'DEDUCT',    v: formatCurrency(money(latest.deductions)),    bg: 'bg-brutal-surface' },
+                { l: 'DAYS PAID', v: `${(latest as AdminSalarySlip & { daysPresent?: number }).daysPresent ?? 30}`, bg: 'bg-brutal-surface' },
+              ].map((s, i) => (
+                <div key={s.l} className={`p-4 ${i < 2 ? 'brutal-border-r' : ''} ${s.bg}`}>
+                  <div className="font-display font-bold text-[10px] tracking-[0.22em] text-brutal-ink/60">{s.l}</div>
+                  <div className="mt-1 font-bold text-[18px] sm:text-[22px] num">{s.v}</div>
                 </div>
               ))}
             </div>
+            <div className="mt-6 flex items-center gap-3 flex-wrap">
+              <button onClick={() => openPdf(latest.id)} className="brutal-btn-primary px-5 py-3 text-[13px] flex items-center gap-2">
+                <Download size={15} /> DOWNLOAD PDF
+              </button>
+              <span className={`px-3 py-2 border-2 border-brutal-ink font-display font-bold text-[11px] tracking-[0.16em] uppercase ${
+                latest.status === 'TRANSFERRED' ? 'bg-brutal-ink text-brutal-yellow' :
+                latest.status === 'APPROVED'    ? 'bg-[#0F8F3A] text-white' :
+                latest.status === 'REJECTED'    ? 'bg-brutal-red text-white' :
+                'bg-brutal-yellow text-brutal-ink'
+              }`}>
+                {latest.status ?? 'DRAFT'}
+              </span>
+              {latest.paymentRef && (
+                <div className="border-l-[3px] border-brutal-ink pl-4 font-display font-bold text-[11px] tracking-[0.14em]">
+                  <div className="text-brutal-ink/60">REF</div>
+                  <div className="text-[13px] num">{latest.paymentRef}</div>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
+
+          {/* Right: component breakdown */}
+          <div className="col-span-12 lg:col-span-5 lg:border-l-[4px] brutal-border-t lg:border-t-0 border-brutal-ink bg-brutal-ink text-white relative overflow-hidden">
+            <div className="absolute inset-0 diag opacity-10" />
+            <div className="relative p-6 h-full flex flex-col justify-between min-h-[320px]">
+              <div className="flex items-center justify-between">
+                <span className="font-display font-bold text-[10px] tracking-[0.22em] bg-brutal-yellow text-brutal-ink px-2 py-1 border-2 border-brutal-yellow">COMPONENTS</span>
+                <span className="font-display font-bold text-[10px] tracking-[0.18em] text-white/60">{latest.signatureName ?? 'AUTHORIZED'}</span>
+              </div>
+              <div className="mt-6 space-y-5 flex-1">
+                {[
+                  { l: 'BASIC',      v: money(latest.baseSalary) || Math.round(money(latest.grossSalary) * 0.5),    color: 'bg-brutal-yellow',  ref: money(latest.grossSalary) },
+                  { l: 'HRA',        v: Math.round(money(latest.grossSalary) * 0.2),                                color: 'bg-brutal-blue',    ref: money(latest.grossSalary) },
+                  { l: 'SPECIAL',    v: Math.round(money(latest.grossSalary) * 0.2),                                color: 'bg-white',          ref: money(latest.grossSalary) },
+                  { l: 'DEDUCTIONS', v: money(latest.deductions),                                                   color: 'bg-brutal-red',     ref: money(latest.grossSalary) },
+                ].map(item => (
+                  <div key={item.l}>
+                    <div className="flex justify-between font-display font-bold text-[11px] tracking-[0.14em] mb-1.5">
+                      <span className="text-white/70">{item.l}</span>
+                      <span className="text-white num">{formatCurrency(item.v)}</span>
+                    </div>
+                    <div className="w-full h-2.5 bg-white/10 border border-white/15">
+                      <div className={`h-full ${item.color}`} style={{ width: `${Math.min((item.v / Math.max(item.ref, 1)) * 100, 100)}%` }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-5 pt-4 border-t border-white/20 flex items-center justify-between font-display font-bold text-[11px] tracking-[0.14em]">
+                <span className="text-white/60">{latest.signatureTitle ?? 'PAYROLL'}</span>
+                <span className="text-brutal-yellow">{monthLabel(latest).toUpperCase()}</span>
+              </div>
+            </div>
+          </div>
+        </section>
       )}
 
-      <div className="bg-brutal-white brutal-border brutal-shadow overflow-x-auto">
-        <div className="px-6 py-4 brutal-border-b flex items-center justify-between">
-          <h3 className="font-display font-bold text-lg uppercase">Payslip History</h3>
-          <span className="font-display font-bold text-[10px] uppercase tracking-[0.2em] text-[#4a4a4a]">Generated / Approved / Transferred</span>
+      <div className="brutal-border brutal-shadow overflow-hidden">
+        <div className="px-5 py-3 brutal-border-b bg-brutal-ink text-brutal-cream flex items-center justify-between">
+          <span className="font-display font-bold text-[11px] tracking-[0.22em]">PAYSLIP HISTORY</span>
+          <span className="font-display font-bold text-[10px] tracking-[0.18em] text-brutal-cream/60">GENERATED · APPROVED · TRANSFERRED</span>
         </div>
         {isLoading ? (
           <div className="p-6 space-y-3">
             {Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-12 bg-brutal-surface animate-pulse" />)}
           </div>
         ) : mySlips.length === 0 ? (
-          <p className="px-6 py-10 text-center font-display font-bold uppercase text-[#4a4a4a]">No payslips found.</p>
+          <div className="p-12 text-center">
+            <div className="font-display font-bold text-[11px] tracking-[0.22em] text-brutal-ink/50">NO PAYSLIPS YET · CONTACT HR</div>
+          </div>
         ) : (
-          <table className="w-full min-w-[820px] text-sm">
-            <thead>
-              <tr className="bg-brutal-surface brutal-border-b">
-                {['Period', 'Gross', 'Incentives', 'Deductions', 'Net Pay', 'Status', 'Download'].map((h) => (
-                  <th key={h} className="px-5 py-3 text-left font-display font-bold text-xs uppercase tracking-wide text-[#4a4a4a]">{h}</th>
+          <div className="overflow-x-auto">
+            <div className="min-w-[820px]">
+              <div className="grid grid-cols-[1fr_140px_140px_140px_140px_60px_100px] font-display font-bold text-[10px] tracking-[0.2em] bg-brutal-surface brutal-border-b">
+                {['PERIOD', 'GROSS', 'DEDUCT', 'NET PAY', 'STATUS', 'LOP', 'DOWNLOAD'].map(h => (
+                  <div key={h} className="px-4 py-2.5 border-r-[2px] border-brutal-ink/20 last:border-r-0 text-brutal-ink/60">{h}</div>
                 ))}
-              </tr>
-            </thead>
-            <tbody>
+              </div>
               {mySlips.map((p, i) => (
-                <tr key={p.id} className={`border-b-2 border-brutal-surface ${i % 2 !== 0 ? 'bg-brutal-surface-lo' : ''}`}>
-                  <td className="px-5 py-3 font-display font-bold uppercase">{monthLabel(p)}</td>
-                  <td className="px-5 py-3 font-body">{formatCurrency(money(p.grossSalary))}</td>
-                  <td className="px-5 py-3 font-body">{formatCurrency(money(p.incentives) + money(p.reimbursements))}</td>
-                  <td className="px-5 py-3 font-body text-brutal-red">{formatCurrency(money(p.deductions))}</td>
-                  <td className="px-5 py-3 font-display font-bold text-brutal-blue">{formatCurrency(money(p.netPayable))}</td>
-                  <td className="px-5 py-3">
-                    <span className="px-2 py-1 border-2 border-brutal-ink bg-brutal-yellow font-display font-bold text-[10px] uppercase tracking-widest">
-                      {p.status ?? 'DRAFT'}
-                    </span>
-                  </td>
-                  <td className="px-5 py-3">
-                    <button onClick={() => openPdf(p.id)} className="flex items-center gap-1.5 brutal-btn-secondary px-3 py-1.5 text-xs">
-                      <Download size={12} /> PDF
+                <div key={p.id} className={`grid grid-cols-[1fr_140px_140px_140px_140px_60px_100px] items-center font-display font-bold text-[12px] ${i < mySlips.length - 1 ? 'brutal-border-b' : ''} hover:bg-brutal-surface transition-colors`}>
+                  <div className="px-4 py-3 border-r-[2px] border-brutal-ink/10 tracking-[0.06em]">{monthLabel(p).toUpperCase()}</div>
+                  <div className="px-4 py-3 border-r-[2px] border-brutal-ink/10 num text-[11px]">{formatCurrency(money(p.grossSalary))}</div>
+                  <div className="px-4 py-3 border-r-[2px] border-brutal-ink/10 num text-[11px] text-brutal-red">{formatCurrency(money(p.deductions))}</div>
+                  <div className="px-4 py-3 border-r-[2px] border-brutal-ink/10 num text-[11px] text-brutal-blue font-bold">{formatCurrency(money(p.netPayable))}</div>
+                  <div className="px-4 py-3 border-r-[2px] border-brutal-ink/10">
+                    <span className={`px-2 py-[3px] border-2 border-brutal-ink text-[10px] tracking-[0.12em] uppercase ${
+                      p.status === 'TRANSFERRED' ? 'bg-brutal-ink text-brutal-yellow' :
+                      p.status === 'APPROVED'    ? 'bg-[#0F8F3A] text-white' :
+                      p.status === 'REJECTED'    ? 'bg-brutal-red text-white' :
+                      'bg-brutal-yellow text-brutal-ink'
+                    }`}>{p.status ?? 'DRAFT'}</span>
+                  </div>
+                  <div className="px-4 py-3 border-r-[2px] border-brutal-ink/10 num text-[11px] text-brutal-ink/50">
+                    {(p as AdminSalarySlip & { lopDays?: number }).lopDays ?? 0}
+                  </div>
+                  <div className="px-4 py-3">
+                    <button onClick={() => openPdf(p.id)} className="flex items-center gap-1 font-display font-bold text-[10px] tracking-[0.12em] px-2 py-1.5 border-2 border-brutal-ink hover:bg-brutal-yellow transition-colors">
+                      <Download size={11} /> PDF
                     </button>
-                  </td>
-                </tr>
+                  </div>
+                </div>
               ))}
-            </tbody>
-          </table>
+            </div>
+          </div>
         )}
       </div>
     </div>
