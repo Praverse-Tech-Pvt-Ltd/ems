@@ -14,8 +14,8 @@ export class CorporateService {
   async upsertSetting(userId: string, key: string, value: JsonBody) {
     const setting = await this.prisma.companySetting.upsert({
       where: { key },
-      update: { value, updatedBy: userId },
-      create: { key, value, updatedBy: userId },
+      update: { value: value as any, updatedBy: userId },
+      create: { key, value: value as any, updatedBy: userId },
     });
     await this.prisma.auditLog.create({
       data: {
