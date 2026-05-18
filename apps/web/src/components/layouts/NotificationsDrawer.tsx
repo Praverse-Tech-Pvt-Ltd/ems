@@ -1,15 +1,9 @@
 'use client';
 
 import { X } from 'lucide-react';
-
-const NOTIFICATIONS = [
-  { id: 'N-188', kind: 'EXPENSE',  unread: true,  title: 'INV-092 approved by Finance',          meta: 'Cleared · disbursement in 24h',       time: '08:14', tone: 'ok'   },
-  { id: 'N-187', kind: 'PUNCH',    unread: true,  title: 'Face punch-in successful',             meta: 'Tower B · 09:00 IST · liveness OK',   time: '09:00', tone: 'info' },
-  { id: 'N-186', kind: 'LEAVE',    unread: true,  title: 'L. Park requested decision on LV-041', meta: 'Sick leave · 17 May',                  time: '07:42', tone: 'hold' },
-  { id: 'N-184', kind: 'POLICY',   unread: false, title: "Travel cap revised — Memo 14-B",       meta: 'Effective 20 May · review required',   time: 'Y\'DAY', tone: 'red'  },
-  { id: 'N-181', kind: 'SALARY',   unread: false, title: 'April salary slip available',          meta: '₹ 1,58,320 net · UPI · HDFC',          time: '01 MAY', tone: 'mute' },
-  { id: 'N-176', kind: 'COMMENT',  unread: false, title: 'P. Saxena commented on INV-094',       meta: '"Need GST breakdown"',                 time: '13 MAY', tone: 'mute' },
-];
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { apiClient } from '@/lib/api-client';
+import type { Notification } from '@/types';
 
 const TONE: Record<string, string> = {
   ok:   'bg-[#0F8F3A] text-white',
@@ -19,9 +13,49 @@ const TONE: Record<string, string> = {
   mute: 'bg-brutal-surface text-brutal-ink',
 };
 
+function deriveTone(type: string, isRead: boolean): string {
+  if (isRead) return 'mute';
+  const t = type.toUpperCase();
+  if (t.includes('APPROV') || t.includes('PAID') || t.includes('SUCCESS')) return 'ok';
+  if (t.includes('PUNCH') || t.includes('SALARY') || t.includes('SLIP'))   return 'info';
+  if (t.includes('LEAVE') || t.includes('REQUEST') || t.includes('PENDING')) return 'hold';
+  if (t.includes('REJECT') || t.includes('POLICY') || t.includes('OVERDUE')) return 'red';
+  return 'mute';
+}
+
+function deriveKind(type: string): string {
+  const t = type.toUpperCase();
+  if (t.includes('EXPENSE') || t.includes('INVOICE')) return 'EXPNS';
+  if (t.includes('PUNCH') || t.includes('ATTEND'))    return 'PUNCH';
+  if (t.includes('LEAVE'))                             return 'LEAVE';
+  if (t.includes('POLICY') || t.includes('SYSTEM'))   return 'SYS';
+  if (t.includes('SALARY') || t.includes('PAYROLL'))  return 'PAY';
+  return 'INFO';
+}
+
 interface Props { open: boolean; onClose: () => void; }
 
 export function NotificationsDrawer({ open, onClose }: Props) {
+  const qc = useQueryClient();
+
+  const { data: notifications = [] } = useQuery<Notification[]>({
+    queryKey: ['notifications'],
+    queryFn: () => apiClient.get('/notifications').then(r => r.data).catch(() => []),
+    enabled: open,
+  });
+
+  const markAllMutation = useMutation({
+    mutationFn: () => apiClient.patch('/notifications/read-all'),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['notifications', 'notifications-unread'] }),
+  });
+
+  const markOneMutation = useMutation({
+    mutationFn: (id: string) => apiClient.patch(`/notifications/${id}/read`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['notifications', 'notifications-unread'] }),
+  });
+
+  const unread = notifications.filter(n => !n.isRead);
+
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-40">
@@ -41,38 +75,55 @@ export function NotificationsDrawer({ open, onClose }: Props) {
         {/* Tabs */}
         <div className="flex items-stretch brutal-border-b">
           <button className="flex-1 py-2.5 bg-brutal-yellow font-display font-bold text-[11px] tracking-[0.18em] brutal-border-r">
-            UNREAD · {NOTIFICATIONS.filter(n => n.unread).length}
+            UNREAD · {unread.length}
           </button>
           <button className="flex-1 py-2.5 font-display font-bold text-[11px] tracking-[0.18em] hover:bg-brutal-surface transition-colors">
-            ALL · {NOTIFICATIONS.length}
+            ALL · {notifications.length}
           </button>
         </div>
 
         {/* List */}
         <ul className="flex-1 overflow-y-auto">
-          {NOTIFICATIONS.map((n, idx) => (
-            <li
-              key={n.id}
-              className={`flex items-stretch ${idx !== NOTIFICATIONS.length - 1 ? 'brutal-border-b' : ''} ${n.unread ? 'bg-brutal-cream' : 'bg-brutal-surface'}`}
-            >
-              <div className={`w-14 shrink-0 grid place-items-center brutal-border-r font-display font-bold text-[9px] tracking-[0.16em] ${TONE[n.tone] ?? TONE.mute}`}>
-                {n.kind}
-              </div>
-              <div className="flex-1 px-4 py-3">
-                <div className="flex items-start gap-2">
-                  <div className="font-display font-bold text-[13px] tracking-tight flex-1">{n.title}</div>
-                  {n.unread && <span className="w-2 h-2 bg-brutal-red mt-1.5 flex-shrink-0" />}
-                </div>
-                <div className="font-display font-bold text-[10px] tracking-[0.12em] text-brutal-ink/60 mt-1 uppercase">{n.meta}</div>
-                <div className="font-display font-bold text-[10px] tracking-[0.16em] text-brutal-ink/50 mt-1">{n.id} · {n.time}</div>
-              </div>
+          {notifications.length === 0 && (
+            <li className="px-6 py-10 text-center font-display font-bold text-[11px] tracking-[0.2em] text-brutal-ink/40">
+              NO NOTIFICATIONS
             </li>
-          ))}
+          )}
+          {notifications.map((n, idx) => {
+            const tone = deriveTone(n.type, n.isRead);
+            const kind = deriveKind(n.type);
+            const time = new Date(n.createdAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+            return (
+              <li
+                key={n.id}
+                onClick={() => !n.isRead && markOneMutation.mutate(n.id)}
+                className={`flex items-stretch cursor-pointer ${idx !== notifications.length - 1 ? 'brutal-border-b' : ''} ${n.isRead ? 'bg-brutal-surface' : 'bg-brutal-cream'}`}
+              >
+                <div className={`w-14 shrink-0 grid place-items-center brutal-border-r font-display font-bold text-[9px] tracking-[0.16em] ${TONE[tone] ?? TONE.mute}`}>
+                  {kind}
+                </div>
+                <div className="flex-1 px-4 py-3">
+                  <div className="flex items-start gap-2">
+                    <div className="font-display font-bold text-[13px] tracking-tight flex-1">{n.title}</div>
+                    {!n.isRead && <span className="w-2 h-2 bg-brutal-red mt-1.5 flex-shrink-0" />}
+                  </div>
+                  <div className="font-display font-bold text-[10px] tracking-[0.12em] text-brutal-ink/60 mt-1 uppercase">{n.body}</div>
+                  <div className="font-display font-bold text-[10px] tracking-[0.16em] text-brutal-ink/50 mt-1">{time}</div>
+                </div>
+              </li>
+            );
+          })}
         </ul>
 
         {/* Footer */}
         <div className="p-3 brutal-border-t bg-brutal-surface flex items-center gap-2">
-          <button className="flex-1 brutal-btn-secondary py-2 text-[11px]">MARK ALL READ</button>
+          <button
+            onClick={() => markAllMutation.mutate()}
+            disabled={markAllMutation.isPending || unread.length === 0}
+            className="flex-1 brutal-btn-secondary py-2 text-[11px] disabled:opacity-50"
+          >
+            MARK ALL READ
+          </button>
           <button className="flex-1 brutal-btn-primary py-2 text-[11px]">SETTINGS</button>
         </div>
       </aside>

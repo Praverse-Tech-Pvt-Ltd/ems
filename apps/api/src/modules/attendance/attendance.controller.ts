@@ -1,6 +1,7 @@
 import { Controller, Post, Get, Patch, Body, Param, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { AttendanceService } from './attendance.service';
+import { FaceRecognitionService } from './face-recognition.service';
 import { PunchInDto } from './dto/punch-in.dto';
 import { RegularizeDto } from './dto/regularize.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -13,7 +14,10 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('attendance')
 export class AttendanceController {
-  constructor(private service: AttendanceService) {}
+  constructor(
+    private service: AttendanceService,
+    private fr: FaceRecognitionService,
+  ) {}
 
   @Post('punch-in')
   punchIn(@CurrentUser() user: { id: string }, @Body() dto: PunchInDto) {
@@ -23,6 +27,16 @@ export class AttendanceController {
   @Post('punch-out')
   punchOut(@CurrentUser() user: { id: string }, @Body() dto: PunchInDto) {
     return this.service.punchOut(user.id, dto);
+  }
+
+  @Get('face/health')
+  async faceHealth() {
+    try {
+      await this.fr.ping();
+      return { status: 'ok' };
+    } catch {
+      return { status: 'unavailable' };
+    }
   }
 
   @Post('face/enroll')
@@ -40,8 +54,9 @@ export class AttendanceController {
     @CurrentUser() user: { id: string },
     @Query('from') from?: string,
     @Query('to') to?: string,
+    @Query('limit') limit?: string,
   ) {
-    return this.service.getByEmployee(user.id, from, to);
+    return this.service.getByEmployee(user.id, from, to, limit ? Number(limit) : undefined);
   }
 
   @Get('employee/:id')

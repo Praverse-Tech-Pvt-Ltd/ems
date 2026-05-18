@@ -1,17 +1,15 @@
 'use client';
 
 import { useState, useRef, useCallback } from 'react';
-import { Camera, Fingerprint, CheckCircle, AlertCircle, ArrowLeft, Sun, Move, RotateCcw } from 'lucide-react';
+import { Camera, CheckCircle, AlertCircle, ArrowLeft, Sun, Move, RotateCcw } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 import Link from 'next/link';
 
-type Mode  = 'face' | 'fingerprint';
 type State = 'idle' | 'scanning' | 'processing' | 'success' | 'error';
 
 interface Telemetry { lighting: string; distance: string; angle: string; ok: boolean }
 
 export default function BiometricPage() {
-  const [mode, setMode]       = useState<Mode>('face');
   const [state, setState]     = useState<State>('idle');
   const [message, setMessage] = useState('');
   const [progress, setProgress] = useState(0);
@@ -38,7 +36,7 @@ export default function BiometricPage() {
   }, []);
 
   const beginScan = async () => {
-    if (mode === 'face') await startCamera();
+    await startCamera();
     setState('scanning');
     setProgress(0);
 
@@ -115,33 +113,17 @@ export default function BiometricPage() {
         </Link>
       </div>
 
-      {/* Mode toggle */}
+      {/* Mode badge */}
       <div className="flex gap-0 brutal-border brutal-shadow w-fit">
-        {(['face', 'fingerprint'] as Mode[]).map((m) => (
-          <button
-            key={m}
-            onClick={() => { setMode(m); reset(); }}
-            className={`flex items-center gap-2 px-6 py-3 font-display font-bold text-sm uppercase tracking-wide transition-colors ${
-              mode === m ? 'bg-brutal-ink text-brutal-yellow' : 'bg-brutal-white hover:bg-brutal-surface'
-            } ${m === 'face' ? 'border-r-2 border-brutal-ink' : ''}`}
-          >
-            {m === 'face' ? <Camera size={16} /> : <Fingerprint size={16} />}
-            {m === 'face' ? 'Face ID' : 'Fingerprint'}
-          </button>
-        ))}
+        <div className="flex items-center gap-2 px-6 py-3 font-display font-bold text-sm uppercase tracking-wide bg-brutal-ink text-brutal-yellow">
+          <Camera size={16} /> Face ID
+        </div>
       </div>
 
       <div className="grid md:grid-cols-[1fr_auto] gap-8 items-start">
         {/* Scanner viewport */}
         <div className="relative aspect-square bg-brutal-ink border-4 border-brutal-ink brutal-shadow-lg overflow-hidden">
-          {mode === 'face' && (
-            <video ref={videoRef} autoPlay playsInline muted className="absolute inset-0 w-full h-full object-cover grayscale opacity-70" />
-          )}
-          {mode === 'fingerprint' && (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <Fingerprint size={120} className="text-brutal-surface-dim opacity-30" />
-            </div>
-          )}
+          <video ref={videoRef} autoPlay playsInline muted className="absolute inset-0 w-full h-full object-cover grayscale opacity-70" />
 
           {/* Corner brackets */}
           {(['tl', 'tr', 'bl', 'br'] as const).map((pos) => (
@@ -251,17 +233,12 @@ export default function BiometricPage() {
               <Move size={14} /> Instructions
             </h3>
             <ol className="space-y-2 text-xs font-body text-[#4a4a4a]">
-              {(mode === 'face' ? [
+              {[
                 'Position face within the frame',
                 'Ensure good lighting on your face',
                 'Look directly at the camera',
                 'Hold still during capture',
-              ] : [
-                'Place finger on scanner pad',
-                'Apply gentle, even pressure',
-                'Hold still until complete',
-                'Re-scan if prompted',
-              ]).map((step, i) => (
+              ].map((step, i) => (
                 <li key={i} className="flex gap-2">
                   <span className="font-display font-bold text-brutal-ink">{i + 1}.</span>
                   {step}

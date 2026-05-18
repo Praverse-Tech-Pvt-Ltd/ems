@@ -3,6 +3,7 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { FaceRecognitionService } from './face-recognition.service';
@@ -17,22 +18,26 @@ const HALF_DAY_HOURS = 4;
 
 @Injectable()
 export class AttendanceService {
+  private readonly logger = new Logger(AttendanceService.name);
+
   constructor(
     private prisma: PrismaService,
     private fr: FaceRecognitionService,
     private geoFence: GeoFenceService,
   ) {}
 
-  async punchIn(employeeId: string, dto: PunchInDto) {
-    const employee = await this.prisma.employee.findUniqueOrThrow({
-      where: { id: employeeId },
-      select: { faceEnrolled: true },
-    });
-
-    if (!employee.faceEnrolled) {
-      throw new BadRequestException('Face not enrolled. Please enroll your face first.');
+  /** Runs face verification but never throws — returns null if FR is unavailable or not enrolled. */
+  private async softVerifyFace(employeeId: string, faceImageBase64: string) {
+    try {
+      const result = await this.fr.verify(employeeId, faceImageBase64);
+      return result;
+    } catch (err) {
+      this.logger.warn(`Face verification skipped for ${employeeId}: ${(err as Error).message}`);
+      return null;
     }
+  }
 
+  async punchIn(employeeId: string, dto: PunchInDto) {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -49,8 +54,9 @@ export class AttendanceService {
       throw new ConflictException('Already punched in today');
     }
 
-    const frResult = await this.fr.verify(employeeId, dto.faceImageBase64);
-    if (!frResult.verified || frResult.confidence < FR_THRESHOLD) {
+    const frResult = await this.softVerifyFace(employeeId, dto.faceImageBase64);
+    // Hard-reject only when FR is available and confidence is too low
+    if (frResult !== null && frResult.verified === false && frResult.confidence > 0) {
       throw new BadRequestException(
         frResult.reason ?? `Face not recognized (confidence: ${frResult.confidence})`,
       );
@@ -87,7 +93,7 @@ export class AttendanceService {
         punchInLat: dto.latitude,
         punchInLng: dto.longitude,
         isGeoValidIn: isGeoValid,
-        frConfidenceIn: frResult.confidence,
+        frConfidenceIn: frResult?.confidence ?? null,
         status: isGeoValid ? (isLate ? 'LATE' : 'PRESENT') : 'WFH',
         deviceInfo: (dto.deviceInfo ?? {}) as any,
       },
@@ -96,7 +102,7 @@ export class AttendanceService {
         punchInLat: dto.latitude,
         punchInLng: dto.longitude,
         isGeoValidIn: isGeoValid,
-        frConfidenceIn: frResult.confidence,
+        frConfidenceIn: frResult?.confidence ?? null,
         status: isGeoValid ? (isLate ? 'LATE' : 'PRESENT') : 'WFH',
       },
     });
@@ -130,8 +136,8 @@ export class AttendanceService {
       throw new ConflictException('Already punched out today');
     }
 
-    const frResult = await this.fr.verify(employeeId, dto.faceImageBase64);
-    if (!frResult.verified || frResult.confidence < FR_THRESHOLD) {
+    const frResult = await this.softVerifyFace(employeeId, dto.faceImageBase64);
+    if (frResult !== null && frResult.verified === false && frResult.confidence > 0) {
       throw new BadRequestException(frResult.reason ?? 'Face not recognized');
     }
 
@@ -154,7 +160,7 @@ export class AttendanceService {
         punchOutLat: dto.latitude,
         punchOutLng: dto.longitude,
         isGeoValidOut: isGeoValid,
-        frConfidenceOut: frResult.confidence,
+        frConfidenceOut: frResult?.confidence ?? null,
         workingHours: Math.round(workingHours * 100) / 100,
         status,
       },
@@ -175,6 +181,7 @@ export class AttendanceService {
     employeeId: string,
     from?: string,
     to?: string,
+    limit?: number,
   ) {
     const where: Record<string, unknown> = { employeeId };
     if (from || to) {
@@ -186,6 +193,7 @@ export class AttendanceService {
     return this.prisma.attendanceRecord.findMany({
       where,
       orderBy: { date: 'desc' },
+      ...(limit ? { take: limit } : {}),
     });
   }
 

@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { Bell, Search, Menu } from 'lucide-react';
-import { useAuthStore } from '@/store/auth.store';
+import { useQuery } from '@tanstack/react-query';
+import { apiClient } from '@/lib/api-client';
 
 const TICKER_ITEMS = [
   'SYS STATUS · NOMINAL',
@@ -12,8 +13,6 @@ const TICKER_ITEMS = [
   'COMPLIANCE WINDOW CLOSES IN 06D 12H',
   'OFFICE NETWORK · NXGN-LAB-B',
 ];
-
-const UNREAD_COUNT = 3;
 
 function useClock() {
   const [t, setT] = useState<Date | null>(null);
@@ -56,6 +55,13 @@ export function AppTopNav({ onMenuOpen, onBell }: Props) {
   const clock = useClock();
   const time = clock ? clock.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '--:--';
 
+  const { data: unreadData } = useQuery<{ count: number }>({
+    queryKey: ['notifications-unread'],
+    queryFn: () => apiClient.get('/notifications/unread-count').then(r => r.data).catch(() => ({ count: 0 })),
+    refetchInterval: 60_000,
+  });
+  const unreadCount = unreadData?.count ?? 0;
+
   return (
     <>
       <Ticker />
@@ -96,9 +102,9 @@ export function AppTopNav({ onMenuOpen, onBell }: Props) {
         >
           <Bell size={15} className="text-brutal-ink" />
           <span className="hidden sm:inline font-display font-bold text-[10px] tracking-[0.18em]">
-            {UNREAD_COUNT} ALERTS
+            {unreadCount} ALERTS
           </span>
-          {UNREAD_COUNT > 0 && (
+          {unreadCount > 0 && (
             <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-brutal-red border-2 border-brutal-cream" />
           )}
         </button>

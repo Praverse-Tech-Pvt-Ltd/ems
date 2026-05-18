@@ -10,6 +10,9 @@ export class GeoFenceService {
       where: { isActive: true },
     });
 
+    // No office locations configured → treat as valid (geo-fence not set up)
+    if (locations.length === 0) return true;
+
     return locations.some((loc) =>
       this.haversineDistance(lat, lng, Number(loc.latitude), Number(loc.longitude)) <=
       loc.radiusMeters,

@@ -43,6 +43,13 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api/docs', app, document);
 
+  // Bare /health route outside the api/v1 prefix — used by the keep-alive ping
+  // and Render's own health-check without needing auth.
+  const httpAdapter = app.getHttpAdapter();
+  httpAdapter.get('/health', (_req: unknown, res: { json: (v: unknown) => void }) => {
+    res.json({ status: 'ok' });
+  });
+
   const port = process.env['PORT'] ?? 3001;
   await app.listen(port);
   console.log(`NexGen EMS API running on http://localhost:${port}`);

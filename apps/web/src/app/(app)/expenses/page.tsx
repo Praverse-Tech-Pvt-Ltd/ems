@@ -2,24 +2,51 @@
 
 import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useForm } from 'react-hook-form';
 import { apiClient } from '@/lib/api-client';
-import type { Expense } from '@/types';
+import { formatCurrency } from '@/lib/utils';
+import type { Expense, ExpenseStatus, ExpenseCategory, PaymentMode } from '@/types';
 import {
-  Plane, Coffee, Receipt, Heart, CreditCard, Filter, Plus, ChevronRight,
+  Plane, Coffee, Receipt, Heart, CreditCard, Filter, Plus, ChevronRight, Package, X,
 } from 'lucide-react';
 
-const REQUESTS_STATIC = [
-  { id: 'INV-094', Icon: Plane,       type: 'TRAVEL EXPENSE',       detail: 'Hyderabad · Trial site visit',  amount: '₹ 28,450', date: '15 MAY', status: 'UNDER FINANCE REVIEW', tone: 'info'   },
-  { id: 'INV-093', Icon: Coffee,      type: 'CLIENT HOSPITALITY',   detail: 'Investigator dinner — Apollo',  amount: '₹ 6,200',  date: '13 MAY', status: 'AWAITING MANAGER',     tone: 'hold'  },
-  { id: 'INV-092', Icon: Receipt,     type: 'REAGENT REIMBURSEMENT',detail: 'Sigma-Aldrich · Lot 22B',       amount: '₹ 4,820',  date: '12 MAY', status: 'APPROVED',             tone: 'ok'    },
-  { id: 'REQ-041', Icon: Heart,       type: 'SICK LEAVE',           detail: '1 day · self-certified',        amount: '17 MAY',    date: '11 MAY', status: 'PENDING',              tone: 'hold'  },
-  { id: 'INV-091', Icon: CreditCard,  type: 'SOFTWARE SUBSCRIPTION',detail: 'GraphPad Prism · annual',       amount: '₹ 32,000', date: '08 MAY', status: 'APPROVED',             tone: 'ok'    },
-  { id: 'REQ-039', Icon: Plane,       type: 'CONFERENCE TRAVEL',    detail: 'BioPharma Asia · Singapore',    amount: '$ 1,840',  date: '04 MAY', status: 'REJECTED',             tone: 'red'   },
-  { id: 'INV-088', Icon: Coffee,      type: 'TEAM OFFSITE MEAL',    detail: 'Q1 closeout · 14 attendees',    amount: '₹ 9,400',  date: '29 APR', status: 'APPROVED',             tone: 'ok'    },
-];
+const CATEGORY_ICON: Record<string, React.ElementType> = {
+  TRAVEL:       Plane,
+  FOOD:         Coffee,
+  OFFICE:       Receipt,
+  CLIENT_VISIT: Heart,
+  HOTEL:        Coffee,
+  STATIONERY:   Receipt,
+  MISC:         CreditCard,
+};
 
-const FILTERS = ['ALL', 'AWAITING MANAGER', 'UNDER FINANCE REVIEW', 'APPROVED', 'REJECTED', 'PENDING'] as const;
-type Filter = typeof FILTERS[number];
+const CATEGORY_LABEL: Record<string, string> = {
+  TRAVEL:       'TRAVEL EXPENSE',
+  FOOD:         'FOOD & MEALS',
+  OFFICE:       'OFFICE SUPPLIES',
+  CLIENT_VISIT: 'CLIENT HOSPITALITY',
+  HOTEL:        'ACCOMMODATION',
+  STATIONERY:   'STATIONERY',
+  MISC:         'MISCELLANEOUS',
+};
+
+function statusTone(s: ExpenseStatus): string {
+  if (s === 'APPROVED' || s === 'PAID')            return 'ok';
+  if (s === 'FINANCE_REVIEW' || s === 'L1_REVIEW') return 'info';
+  if (s === 'SUBMITTED' || s === 'DRAFT')           return 'hold';
+  if (s === 'REJECTED')                             return 'red';
+  return 'hold';
+}
+
+const STATUS_LABEL: Record<ExpenseStatus, string> = {
+  DRAFT:          'DRAFT',
+  SUBMITTED:      'AWAITING MANAGER',
+  L1_REVIEW:      'MANAGER REVIEW',
+  FINANCE_REVIEW: 'UNDER FINANCE REVIEW',
+  APPROVED:       'APPROVED',
+  REJECTED:       'REJECTED',
+  PAID:           'PAID',
+};
 
 const ACCENT: Record<string, string> = {
   ok:   'bg-[#0F8F3A]',
@@ -42,25 +69,170 @@ function Tag({ tone, children }: { tone: string; children: React.ReactNode }) {
   );
 }
 
-export default function ExpensesPage() {
-  const [filter, setFilter] = useState<Filter>('ALL');
-  const qc = useQueryClient();
+const ALL_STATUSES = ['ALL', 'AWAITING MANAGER', 'UNDER FINANCE REVIEW', 'APPROVED', 'REJECTED'] as const;
+type FilterLabel = typeof ALL_STATUSES[number];
 
-  const { data: apiExpenses = [] } = useQuery<Expense[]>({
+const FILTER_STATUS_MAP: Record<FilterLabel, ExpenseStatus[]> = {
+  'ALL':                    [],
+  'AWAITING MANAGER':       ['SUBMITTED'],
+  'UNDER FINANCE REVIEW':   ['L1_REVIEW', 'FINANCE_REVIEW'],
+  'APPROVED':               ['APPROVED', 'PAID'],
+  'REJECTED':               ['REJECTED'],
+};
+
+interface ExpenseFormData {
+  category: ExpenseCategory;
+  amount: number;
+  description: string;
+  expenseDate: string;
+  paymentMode: PaymentMode;
+}
+
+function SubmitModal({ onClose }: { onClose: () => void }) {
+  const qc = useQueryClient();
+  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<ExpenseFormData>({
+    defaultValues: {
+      category: 'MISC',
+      amount: 0,
+      description: '',
+      expenseDate: new Date().toISOString().split('T')[0],
+      paymentMode: 'BANK_TRANSFER',
+    },
+  });
+
+  const mutation = useMutation({
+    mutationFn: (data: ExpenseFormData) => apiClient.post('/expenses', {
+      ...data,
+      amount: Number(data.amount),
+    }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['expenses'] });
+      onClose();
+    },
+  });
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center p-4" style={{ background: 'rgba(15,15,15,0.65)', backdropFilter: 'blur(3px)' }}>
+      <div className="w-full max-w-[540px] brutal-border brutal-shadow-lg bg-brutal-cream animate-fade-up">
+        <div className="flex items-center justify-between px-5 py-3 bg-brutal-ink text-brutal-cream brutal-border-b">
+          <div className="flex items-center gap-3">
+            <span className="font-display font-bold text-[10px] tracking-[0.2em] bg-brutal-yellow text-brutal-ink px-2 py-0.5">NEW</span>
+            <span className="font-display font-bold text-[11px] tracking-[0.22em]">SUBMIT EXPENSE REQUEST</span>
+          </div>
+          <button onClick={onClose} className="w-8 h-8 grid place-items-center border-2 border-brutal-cream hover:bg-brutal-red transition">
+            <X size={14} />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit((d) => mutation.mutate(d))} className="p-6 space-y-4">
+          {mutation.isError && (
+            <div className="p-3 bg-brutal-red text-white font-display font-bold text-[11px] tracking-[0.12em] brutal-border">
+              {(mutation.error as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Submission failed. Please try again.'}
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="col-span-2">
+              <label className="block font-display font-bold text-[10px] tracking-[0.2em] mb-1.5">CATEGORY</label>
+              <select {...register('category', { required: true })}
+                className="w-full brutal-border bg-brutal-surface px-3 py-2 font-display font-bold text-[12px] focus:outline-none">
+                {(Object.keys(CATEGORY_LABEL) as ExpenseCategory[]).map(c => (
+                  <option key={c} value={c}>{CATEGORY_LABEL[c]}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block font-display font-bold text-[10px] tracking-[0.2em] mb-1.5">AMOUNT (₹)</label>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                {...register('amount', { required: true, min: 1 })}
+                className={`w-full brutal-border bg-brutal-surface px-3 py-2 font-display font-bold text-[12px] focus:outline-none ${errors.amount ? 'border-brutal-red' : ''}`}
+                placeholder="0.00"
+              />
+              {errors.amount && <p className="mt-1 font-display font-bold text-[10px] text-brutal-red">Required · must be > 0</p>}
+            </div>
+
+            <div>
+              <label className="block font-display font-bold text-[10px] tracking-[0.2em] mb-1.5">EXPENSE DATE</label>
+              <input
+                type="date"
+                {...register('expenseDate', { required: true })}
+                className="w-full brutal-border bg-brutal-surface px-3 py-2 font-display font-bold focus:outline-none"
+              />
+            </div>
+
+            <div className="col-span-2">
+              <label className="block font-display font-bold text-[10px] tracking-[0.2em] mb-1.5">PAYMENT MODE</label>
+              <select {...register('paymentMode')}
+                className="w-full brutal-border bg-brutal-surface px-3 py-2 font-display font-bold text-[12px] focus:outline-none">
+                <option value="BANK_TRANSFER">BANK TRANSFER</option>
+                <option value="UPI">UPI</option>
+                <option value="CARD">CARD</option>
+                <option value="CASH">CASH</option>
+              </select>
+            </div>
+
+            <div className="col-span-2">
+              <label className="block font-display font-bold text-[10px] tracking-[0.2em] mb-1.5">DESCRIPTION</label>
+              <textarea
+                rows={3}
+                {...register('description', { required: true })}
+                className={`w-full brutal-border bg-brutal-surface px-3 py-2 font-display font-bold text-[12px] focus:outline-none resize-none ${errors.description ? 'border-brutal-red' : ''}`}
+                placeholder="Briefly describe the expense..."
+              />
+              {errors.description && <p className="mt-1 font-display font-bold text-[10px] text-brutal-red">Required</p>}
+            </div>
+          </div>
+
+          <div className="flex gap-3 pt-2">
+            <button
+              type="submit"
+              disabled={isSubmitting || mutation.isPending}
+              className="brutal-btn-primary px-5 py-3 text-[13px] disabled:opacity-60 flex items-center gap-2"
+            >
+              <Plus size={15} />
+              {mutation.isPending ? 'SUBMITTING…' : 'SUBMIT REQUEST'}
+            </button>
+            <button type="button" onClick={onClose} className="brutal-btn-secondary px-5 py-3 text-[13px]">
+              CANCEL
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function formatDate(iso: string): string {
+  const d = new Date(iso);
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const yyyy = d.getFullYear();
+  return `${dd}/${mm}/${yyyy}`;
+}
+
+export default function ExpensesPage() {
+  const [filter, setFilter] = useState<FilterLabel>('ALL');
+  const [showModal, setShowModal] = useState(false);
+
+  const { data: expenses = [], isLoading } = useQuery<Expense[]>({
     queryKey: ['expenses'],
     queryFn: () => apiClient.get('/expenses').then(r => r.data).catch(() => []),
   });
 
-  const submitMutation = useMutation({
-    mutationFn: (data: Record<string, unknown>) => apiClient.post('/expenses', data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['expenses'] }),
-  });
+  const filtered = useMemo(() => {
+    if (filter === 'ALL') return expenses;
+    const statuses = FILTER_STATUS_MAP[filter];
+    return expenses.filter(e => statuses.includes(e.status));
+  }, [filter, expenses]);
 
-  const requests = REQUESTS_STATIC;
-  const filtered = useMemo(() =>
-    filter === 'ALL' ? requests : requests.filter(r => r.status === filter),
-    [filter]
-  );
+  const inFlight = expenses.filter(e => ['SUBMITTED', 'L1_REVIEW', 'FINANCE_REVIEW'].includes(e.status));
+  const approved = expenses.filter(e => ['APPROVED', 'PAID'].includes(e.status));
+  const rejected = expenses.filter(e => e.status === 'REJECTED');
+  const ytdTotal = approved.reduce((s, e) => s + e.amount, 0);
 
   return (
     <div className="space-y-8 max-w-[1320px] animate-fade-up">
@@ -72,7 +244,7 @@ export default function ExpensesPage() {
             YOUR <span className="inline-block bg-brutal-blue text-white px-2">QUEUE</span><span className="text-brutal-red">.</span>
           </h1>
           <div className="mt-3 font-display font-bold text-[11px] tracking-[0.16em] text-brutal-ink/60">
-            {requests.length} ITEMS · YTD REIMBURSED ₹ 80,710
+            {expenses.length} ITEMS · YTD REIMBURSED {formatCurrency(ytdTotal)}
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -80,7 +252,7 @@ export default function ExpensesPage() {
             <Filter size={14} /> FILTERS
           </button>
           <button
-            onClick={() => submitMutation.mutate({ category: 'MISC', amount: 0, description: 'New Expense', expenseDate: new Date().toISOString().split('T')[0] })}
+            onClick={() => setShowModal(true)}
             className="brutal-btn-primary px-5 py-3 text-[13px] flex items-center gap-2"
           >
             <Plus size={15} /> SUBMIT NEW REQUEST
@@ -91,14 +263,14 @@ export default function ExpensesPage() {
       {/* Summary blocks */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-0 brutal-border brutal-shadow">
         {[
-          { l: 'IN FLIGHT',      v: '3',   s: 'AWAITING DECISION',  bg: 'bg-brutal-yellow' },
-          { l: 'APPROVED · 30D', v: '4',   s: 'CLEARED BY FINANCE', bg: 'bg-[#0F8F3A] text-white' },
-          { l: 'REJECTED · 30D', v: '1',   s: 'SEE REASON CODES',   bg: 'bg-brutal-red text-white' },
-          { l: 'AVG CYCLE TIME', v: '2.4', s: 'DAYS · LAST QTR',    bg: 'bg-brutal-surface' },
+          { l: 'IN FLIGHT',      v: String(inFlight.length), s: 'AWAITING DECISION',              bg: 'bg-brutal-yellow' },
+          { l: 'APPROVED · ALL', v: String(approved.length), s: formatCurrency(ytdTotal) + ' CLEARED', bg: 'bg-[#0F8F3A] text-white' },
+          { l: 'REJECTED',       v: String(rejected.length), s: 'SEE REASON CODES',               bg: 'bg-brutal-red text-white' },
+          { l: 'TOTAL',          v: String(expenses.length), s: 'ALL REQUESTS',                    bg: 'bg-brutal-surface' },
         ].map((s, i) => (
           <div key={s.l} className={`p-5 ${i < 3 ? 'brutal-border-b md:border-b-0 md:brutal-border-r' : ''} ${s.bg}`}>
             <div className="font-display font-bold text-[10px] tracking-[0.22em]">{s.l}</div>
-            <div className="mt-2 text-[32px] sm:text-[40px] lg:text-[44px] leading-[0.9] font-bold num">{s.v}</div>
+            <div className="mt-2 text-[32px] sm:text-[40px] lg:text-[44px] leading-[0.9] font-bold num">{isLoading ? '—' : s.v}</div>
             <div className="mt-2 font-display font-bold text-[10px] tracking-[0.16em]">{s.s}</div>
           </div>
         ))}
@@ -106,9 +278,10 @@ export default function ExpensesPage() {
 
       {/* Filter chips */}
       <div className="flex flex-wrap items-center gap-2">
-        {FILTERS.map(f => {
+        {ALL_STATUSES.map(f => {
           const active = filter === f;
-          const count  = f === 'ALL' ? requests.length : requests.filter(r => r.status === f).length;
+          const statuses = FILTER_STATUS_MAP[f];
+          const count = f === 'ALL' ? expenses.length : expenses.filter(e => statuses.includes(e.status)).length;
           return (
             <button
               key={f}
@@ -124,46 +297,64 @@ export default function ExpensesPage() {
       </div>
 
       {/* List */}
-      <div className="space-y-3">
-        {filtered.map((r, i) => (
-          <div
-            key={r.id}
-            style={{ animationDelay: `${i * 30}ms` }}
-            className="animate-fade-up grid grid-cols-12 items-stretch brutal-border brutal-shadow-sm hover:brutal-shadow hover:-translate-x-px hover:-translate-y-px transition-all"
-          >
-            <div className={`col-span-12 sm:col-span-1 ${ACCENT[r.tone] ?? 'bg-brutal-surface'} grid place-items-center sm:brutal-border-r brutal-border-b sm:border-b-0 py-3`}>
-              <r.Icon size={18} className={r.tone === 'hold' ? 'text-brutal-ink' : 'text-white'} />
-            </div>
-            <div className="col-span-12 sm:col-span-5 px-5 py-3 sm:brutal-border-r flex flex-col justify-center">
-              <div className="flex items-center gap-2">
-                <span className="font-display font-bold text-[10px] tracking-[0.16em] text-brutal-ink/60">{r.id}</span>
-                <span className="w-1 h-1 bg-brutal-ink" />
-                <span className="font-display font-bold text-[14px] tracking-tight">{r.type}</span>
+      {isLoading ? (
+        <div className="brutal-border diag bg-brutal-cream p-12 text-center">
+          <div className="bg-brutal-cream inline-block px-4 py-2 brutal-border brutal-shadow font-display font-bold text-[11px] tracking-[0.22em]">
+            LOADING EXPENSES…
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {filtered.map((e, i) => {
+            const tone  = statusTone(e.status);
+            const Icon  = CATEGORY_ICON[e.category] ?? Package;
+            const label = CATEGORY_LABEL[e.category] ?? e.category;
+            const statusLabel = STATUS_LABEL[e.status] ?? e.status;
+            return (
+              <div
+                key={e.id}
+                style={{ animationDelay: `${i * 30}ms` }}
+                className="animate-fade-up grid grid-cols-12 items-stretch brutal-border brutal-shadow-sm hover:brutal-shadow hover:-translate-x-px hover:-translate-y-px transition-all"
+              >
+                <div className={`col-span-12 sm:col-span-1 ${ACCENT[tone] ?? 'bg-brutal-surface'} grid place-items-center sm:brutal-border-r brutal-border-b sm:border-b-0 py-3`}>
+                  <Icon size={18} className={tone === 'hold' ? 'text-brutal-ink' : 'text-white'} />
+                </div>
+                <div className="col-span-12 sm:col-span-5 px-5 py-3 sm:brutal-border-r flex flex-col justify-center">
+                  <div className="flex items-center gap-2">
+                    <span className="font-display font-bold text-[10px] tracking-[0.16em] text-brutal-ink/60">{e.id.slice(0, 8).toUpperCase()}</span>
+                    <span className="w-1 h-1 bg-brutal-ink" />
+                    <span className="font-display font-bold text-[14px] tracking-tight">{label}</span>
+                  </div>
+                  <div className="font-display font-bold text-[11px] tracking-[0.1em] text-brutal-ink/60 truncate mt-0.5">
+                    {e.description ?? e.category} · {e.paymentMode ?? 'BANK TRANSFER'}
+                  </div>
+                </div>
+                <div className="col-span-6 sm:col-span-2 px-5 py-3 sm:brutal-border-r flex items-center">
+                  <span className="font-display font-bold text-[12px] tracking-[0.12em] num">{formatDate(e.expenseDate)}</span>
+                </div>
+                <div className="col-span-6 sm:col-span-2 px-5 py-3 sm:brutal-border-r flex items-center justify-end">
+                  <span className="text-[17px] font-bold num tracking-tight">{formatCurrency(e.amount)}</span>
+                </div>
+                <div className="col-span-12 sm:col-span-2 px-3 py-3 flex items-center justify-end gap-2">
+                  <Tag tone={tone}>{statusLabel}</Tag>
+                  <button className="w-8 h-8 grid place-items-center border-[3px] border-brutal-ink hover:bg-brutal-yellow transition-colors">
+                    <ChevronRight size={14} />
+                  </button>
+                </div>
               </div>
-              <div className="font-display font-bold text-[11px] tracking-[0.1em] text-brutal-ink/60 truncate mt-0.5">{r.detail}</div>
+            );
+          })}
+          {filtered.length === 0 && (
+            <div className="brutal-border diag bg-brutal-cream p-12 text-center">
+              <div className="bg-brutal-cream inline-block px-4 py-2 brutal-border brutal-shadow font-display font-bold text-[11px] tracking-[0.22em]">
+                NOTHING MATCHES THAT FILTER
+              </div>
             </div>
-            <div className="col-span-6 sm:col-span-2 px-5 py-3 sm:brutal-border-r flex items-center">
-              <span className="font-display font-bold text-[12px] tracking-[0.12em] num">{r.date}</span>
-            </div>
-            <div className="col-span-6 sm:col-span-2 px-5 py-3 sm:brutal-border-r flex items-center justify-end">
-              <span className="text-[17px] font-bold num tracking-tight">{r.amount}</span>
-            </div>
-            <div className="col-span-12 sm:col-span-2 px-3 py-3 flex items-center justify-end gap-2">
-              <Tag tone={r.tone}>{r.status}</Tag>
-              <button className="w-8 h-8 grid place-items-center border-[3px] border-brutal-ink hover:bg-brutal-yellow transition-colors">
-                <ChevronRight size={14} />
-              </button>
-            </div>
-          </div>
-        ))}
-        {filtered.length === 0 && (
-          <div className="brutal-border diag bg-brutal-cream p-12 text-center">
-            <div className="bg-brutal-cream inline-block px-4 py-2 brutal-border brutal-shadow font-display font-bold text-[11px] tracking-[0.22em]">
-              NOTHING MATCHES THAT FILTER
-            </div>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      )}
+
+      {showModal && <SubmitModal onClose={() => setShowModal(false)} />}
     </div>
   );
 }

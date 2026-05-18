@@ -1,38 +1,39 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useAuthStore } from '@/store/auth.store';
 import { apiClient } from '@/lib/api-client';
+import { initials } from '@/lib/utils';
 import type { Employee } from '@/types';
 import { Search, Plus } from 'lucide-react';
 
-const EMPLOYEES_STATIC = [
-  { id: 'EMP-0421', name: 'Aarav Mehta',    role: 'RES. SCI. II',     dept: 'CLINICAL R&D', status: 'ACTIVE',     since: '2022', avatar: 'AM', self: true,  tone: 'yellow' },
-  { id: 'EMP-0418', name: 'Laila Park',     role: 'PRINCIPAL SCI.',   dept: 'CLINICAL R&D', status: 'ACTIVE',     since: '2019', avatar: 'LP', self: false, tone: 'blue'   },
-  { id: 'EMP-0392', name: 'Devansh Iyer',   role: 'QA LEAD',          dept: 'QUALITY',      status: 'ACTIVE',     since: '2020', avatar: 'DI', self: false, tone: null     },
-  { id: 'EMP-0501', name: 'Saanvi Rao',     role: 'BIOSTATISTICIAN',  dept: 'CLINICAL R&D', status: 'ACTIVE',     since: '2024', avatar: 'SR', self: false, tone: null     },
-  { id: 'EMP-0388', name: 'Mateus Costa',   role: 'PROCESS ENG.',     dept: 'MFG',          status: 'ACTIVE',     since: '2018', avatar: 'MC', self: false, tone: null     },
-  { id: 'EMP-0512', name: 'Ishaan Verma',   role: 'TRAINEE',          dept: 'CLINICAL R&D', status: 'ONBOARDING', since: '2026', avatar: 'IV', self: false, tone: 'yellow' },
-  { id: 'EMP-0274', name: 'Niki Tanaka',    role: 'REG. AFFAIRS',     dept: 'REGULATORY',   status: 'ACTIVE',     since: '2016', avatar: 'NT', self: false, tone: null     },
-  { id: 'EMP-0455', name: 'Priya Saxena',   role: 'FINANCE LEAD',     dept: 'FINANCE',      status: 'ACTIVE',     since: '2021', avatar: 'PS', self: false, tone: null     },
-  { id: 'EMP-0301', name: "Rohan D'Souza",  role: 'PROD. MANAGER',    dept: 'PRODUCT',      status: 'INACTIVE',   since: '2017', avatar: 'RD', self: false, tone: 'red'    },
-];
-
-const DEPTS = [
-  { l: 'CLINICAL R&D', v: 4 }, { l: 'QUALITY', v: 1 }, { l: 'MFG', v: 1 },
-  { l: 'REGULATORY', v: 1 }, { l: 'FINANCE', v: 1 },
-];
+const TONE_CYCLE = ['blue', null, null, 'yellow', null, null, 'red'] as const;
 
 export default function EmployeesPage() {
   const [q, setQ] = useState('');
+  const me = useAuthStore(s => s.user);
 
-  useQuery<Employee[]>({
+  const { data: employees = [], isLoading } = useQuery<Employee[]>({
     queryKey: ['employees'],
     queryFn: () => apiClient.get('/employees').then(r => r.data).catch(() => []),
   });
 
-  const filtered = EMPLOYEES_STATIC.filter(e =>
-    !q || (e.name + e.role + e.dept + e.id).toLowerCase().includes(q.toLowerCase())
+  const depts = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const e of employees) {
+      const d = e.department?.name ?? 'UNASSIGNED';
+      map.set(d, (map.get(d) ?? 0) + 1);
+    }
+    return Array.from(map.entries()).map(([l, v]) => ({ l, v }));
+  }, [employees]);
+
+  const filtered = useMemo(() =>
+    employees.filter(e =>
+      !q || (`${e.firstName} ${e.lastName} ${e.designation ?? ''} ${e.department?.name ?? ''} ${e.employeeCode}`)
+        .toLowerCase().includes(q.toLowerCase())
+    ),
+    [employees, q]
   );
 
   return (
@@ -41,9 +42,11 @@ export default function EmployeesPage() {
         <div>
           <div className="font-display font-bold text-[11px] tracking-[0.28em] text-brutal-ink/60">— EMPLOYEES / 07</div>
           <h1 className="mt-2 font-display font-bold text-[28px] sm:text-[36px] lg:text-[44px] leading-[1.05] tracking-tight">
-            <span className="inline-block bg-brutal-yellow px-2">{EMPLOYEES_STATIC.length}</span> ON STAFF<span className="text-brutal-red">.</span>
+            <span className="inline-block bg-brutal-yellow px-2">{isLoading ? '—' : employees.length}</span> ON STAFF<span className="text-brutal-red">.</span>
           </h1>
-          <div className="mt-3 font-display font-bold text-[11px] tracking-[0.16em] text-brutal-ink/60">DIRECTORY · 5 DEPARTMENTS</div>
+          <div className="mt-3 font-display font-bold text-[11px] tracking-[0.16em] text-brutal-ink/60">
+            DIRECTORY · {depts.length} DEPARTMENT{depts.length !== 1 ? 'S' : ''}
+          </div>
         </div>
         <div className="flex items-center gap-3">
           <div className="flex items-stretch brutal-border brutal-shadow-sm">
@@ -61,62 +64,85 @@ export default function EmployeesPage() {
       </div>
 
       {/* Department strip */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-0 brutal-border brutal-shadow">
-        {DEPTS.map((d, i) => (
-          <div key={d.l} className={`p-4 ${i < 4 ? 'md:brutal-border-r' : ''} ${i < 3 ? 'brutal-border-b md:border-b-0' : ''} ${i === 0 ? 'bg-brutal-blue text-white' : 'bg-brutal-cream'}`}>
-            <div className="font-display font-bold text-[10px] tracking-[0.2em]">{d.l}</div>
-            <div className="mt-1.5 text-[32px] font-bold num leading-none">{d.v}</div>
+      {depts.length > 0 && (
+        <div className={`grid grid-cols-2 md:grid-cols-${Math.min(depts.length, 5)} gap-0 brutal-border brutal-shadow`}>
+          {depts.slice(0, 5).map((d, i) => (
+            <div key={d.l} className={`p-4 ${i < depts.length - 1 && i < 4 ? 'md:brutal-border-r' : ''} ${i === 0 ? 'bg-brutal-blue text-white' : 'bg-brutal-cream'}`}>
+              <div className="font-display font-bold text-[10px] tracking-[0.2em]">{d.l}</div>
+              <div className="mt-1.5 text-[32px] font-bold num leading-none">{d.v}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Loading state */}
+      {isLoading && (
+        <div className="brutal-border diag bg-brutal-cream p-12 text-center">
+          <div className="bg-brutal-cream inline-block px-4 py-2 brutal-border brutal-shadow font-display font-bold text-[11px] tracking-[0.22em]">
+            LOADING DIRECTORY…
           </div>
-        ))}
-      </div>
+        </div>
+      )}
 
       {/* Cards grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        {filtered.map((e, i) => {
-          const avatarBg =
-            e.self             ? 'bg-brutal-yellow text-brutal-ink' :
-            e.tone === 'blue'  ? 'bg-brutal-blue text-white' :
-            e.tone === 'yellow'? 'bg-brutal-yellow text-brutal-ink' :
-            e.tone === 'red'   ? 'bg-brutal-red text-white' :
-            'bg-brutal-ink text-brutal-yellow';
-          const statusBg =
-            e.status === 'ACTIVE'     ? 'bg-[#0F8F3A] text-white' :
-            e.status === 'ONBOARDING' ? 'bg-brutal-yellow text-brutal-ink' :
-            'bg-brutal-red text-white';
-          return (
-            <div key={e.id} style={{ animationDelay: `${i * 30}ms` }}
-              className={`animate-fade-up brutal-border brutal-shadow-sm hover:brutal-shadow hover:-translate-x-px hover:-translate-y-px transition-all ${e.status === 'INACTIVE' ? 'opacity-60' : ''}`}>
-              <div className="flex items-stretch">
-                <div className={`w-20 shrink-0 grid place-items-center text-[28px] font-bold font-display brutal-border-r ${avatarBg}`}>
-                  {e.avatar}
-                </div>
-                <div className="flex-1 p-4 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="font-display font-bold text-[10px] tracking-[0.16em] text-brutal-ink/60">{e.id}</span>
-                    {e.self && <span className="font-display font-bold text-[9px] px-1 py-0.5 bg-brutal-yellow border-2 border-brutal-ink">YOU</span>}
+      {!isLoading && (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {filtered.map((e, i) => {
+            const isSelf = e.id === me?.id;
+            const tone = TONE_CYCLE[i % TONE_CYCLE.length];
+            const avatarBg =
+              isSelf        ? 'bg-brutal-yellow text-brutal-ink' :
+              tone === 'blue'   ? 'bg-brutal-blue text-white' :
+              tone === 'yellow' ? 'bg-brutal-yellow text-brutal-ink' :
+              tone === 'red'    ? 'bg-brutal-red text-white' :
+              'bg-brutal-ink text-brutal-yellow';
+            const statusBg =
+              e.status === 'ACTIVE'     ? 'bg-[#0F8F3A] text-white' :
+              e.status === 'TERMINATED' ? 'bg-brutal-red text-white' :
+              'bg-brutal-yellow text-brutal-ink';
+            const sinceYear = e.joiningDate ? new Date(e.joiningDate).getFullYear() : '—';
+            return (
+              <div key={e.id} style={{ animationDelay: `${i * 30}ms` }}
+                className={`animate-fade-up brutal-border brutal-shadow-sm hover:brutal-shadow hover:-translate-x-px hover:-translate-y-px transition-all ${e.status === 'INACTIVE' || e.status === 'TERMINATED' ? 'opacity-60' : ''}`}>
+                <div className="flex items-stretch">
+                  <div className={`w-20 shrink-0 grid place-items-center text-[28px] font-bold font-display brutal-border-r ${avatarBg}`}>
+                    {initials(e.firstName, e.lastName)}
                   </div>
-                  <div className="mt-1 text-[16px] font-bold tracking-tight truncate">{e.name}</div>
-                  <div className="font-display font-bold text-[10px] tracking-[0.18em] text-brutal-ink/60 mt-1">{e.role}</div>
+                  <div className="flex-1 p-4 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-display font-bold text-[10px] tracking-[0.16em] text-brutal-ink/60">{e.employeeCode}</span>
+                      {isSelf && <span className="font-display font-bold text-[9px] px-1 py-0.5 bg-brutal-yellow border-2 border-brutal-ink">YOU</span>}
+                    </div>
+                    <div className="mt-1 text-[16px] font-bold tracking-tight truncate">{e.firstName} {e.lastName}</div>
+                    <div className="font-display font-bold text-[10px] tracking-[0.18em] text-brutal-ink/60 mt-1">{(e.designation ?? e.role).toUpperCase()}</div>
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 brutal-border-t">
+                  <div className="px-3 py-2 brutal-border-r">
+                    <div className="font-display font-bold text-[9px] tracking-[0.18em] text-brutal-ink/60">DEPT</div>
+                    <div className="font-display font-bold text-[11px] tracking-[0.12em] truncate">{(e.department?.name ?? '—').toUpperCase()}</div>
+                  </div>
+                  <div className="px-3 py-2 brutal-border-r">
+                    <div className="font-display font-bold text-[9px] tracking-[0.18em] text-brutal-ink/60">SINCE</div>
+                    <div className="font-display font-bold text-[11px] tracking-[0.12em] num">{sinceYear}</div>
+                  </div>
+                  <div className={`px-3 py-2 ${statusBg}`}>
+                    <div className="font-display font-bold text-[9px] tracking-[0.18em] opacity-80">STATUS</div>
+                    <div className="font-display font-bold text-[11px] tracking-[0.12em]">{e.status}</div>
+                  </div>
                 </div>
               </div>
-              <div className="grid grid-cols-3 brutal-border-t">
-                <div className="px-3 py-2 brutal-border-r">
-                  <div className="font-display font-bold text-[9px] tracking-[0.18em] text-brutal-ink/60">DEPT</div>
-                  <div className="font-display font-bold text-[11px] tracking-[0.12em] truncate">{e.dept}</div>
-                </div>
-                <div className="px-3 py-2 brutal-border-r">
-                  <div className="font-display font-bold text-[9px] tracking-[0.18em] text-brutal-ink/60">SINCE</div>
-                  <div className="font-display font-bold text-[11px] tracking-[0.12em] num">{e.since}</div>
-                </div>
-                <div className={`px-3 py-2 ${statusBg}`}>
-                  <div className="font-display font-bold text-[9px] tracking-[0.18em] opacity-80">STATUS</div>
-                  <div className="font-display font-bold text-[11px] tracking-[0.12em]">{e.status}</div>
-                </div>
+            );
+          })}
+          {filtered.length === 0 && !isLoading && (
+            <div className="col-span-full brutal-border diag bg-brutal-cream p-12 text-center">
+              <div className="bg-brutal-cream inline-block px-4 py-2 brutal-border brutal-shadow font-display font-bold text-[11px] tracking-[0.22em]">
+                NO EMPLOYEES FOUND
               </div>
             </div>
-          );
-        })}
-      </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

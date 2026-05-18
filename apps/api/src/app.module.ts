@@ -18,6 +18,7 @@ import { ReportsModule } from './modules/reports/reports.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { CommentsModule } from './modules/comments/comments.module';
 import { CorporateModule } from './modules/corporate/corporate.module';
+import { KeepAliveModule } from './common/keep-alive/keep-alive.module';
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { CorporateModule } from './modules/corporate/corporate.module';
     AuditModule,
     CommentsModule,
     CorporateModule,
+    KeepAliveModule,
   ],
 })
 export class AppModule {}

@@ -14,13 +14,18 @@ export class FaceRecognitionService {
 
   constructor(private config: ConfigService) {}
 
+  async ping(): Promise<void> {
+    const frUrl = this.config.get<string>('FR_SERVICE_URL');
+    await axios.get(`${frUrl}/health`, { timeout: 5000 });
+  }
+
   async verify(employeeId: string, faceImageBase64: string): Promise<FrVerifyResult> {
     const frUrl = this.config.get<string>('FR_SERVICE_URL');
     try {
       const response = await axios.post<FrVerifyResult>(
         `${frUrl}/verify`,
         { employee_id: employeeId, face_image: faceImageBase64 },
-        { timeout: 10000 },
+        { timeout: 45000 },
       );
       return response.data;
     } catch (error) {
@@ -37,7 +42,7 @@ export class FaceRecognitionService {
       await axios.post(
         `${frUrl}/enroll`,
         { employee_id: employeeId, frames },
-        { timeout: 30000 },
+        { timeout: 60000 },
       );
     } catch (error) {
       this.logger.error('Face enrollment failed', error);
