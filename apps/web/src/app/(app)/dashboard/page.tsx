@@ -153,7 +153,7 @@ export default function DashboardPage() {
       const diff = (dow === 0 ? 6 : dow - 1) - daysFromMon;
       const date = new Date(now.getTime() - diff * 86400_000);
       const dateStr = date.toISOString().split('T')[0];
-      const record = weekAttendance.find(r => r.date?.startsWith(dateStr));
+      const record = weekAttendance.find(r => r.date?.startsWith(dateStr ?? ''));
       const isToday = diff === 0;
       const isFuture = diff < 0;
       const h = record?.workingHours ?? (isFuture ? 0 : 0);

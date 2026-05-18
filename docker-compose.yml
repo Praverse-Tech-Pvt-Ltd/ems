@@ -1,4 +1,19 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# NexGen EMS — Docker Compose
+#
+# Local dev (uses local postgres + redis):
+#   docker compose up --build
+#
+# Production (uses Neon + Upstash — skip postgres/redis):
+#   docker compose --profile prod up --build
+#
+# Run migrations after first start:
+#   docker compose exec api npx prisma migrate deploy --schema packages/db/prisma/schema.prisma
+# ─────────────────────────────────────────────────────────────────────────────
+
 services:
+
+  # ── PostgreSQL (local dev only — in prod use Neon) ───────────────────────────
   postgres:
     image: postgres:16-alpine
     container_name: nexgen_db
@@ -13,10 +28,11 @@ services:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U nexgen -d nexgen_ems']
-      interval: 10s
+      interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
 
+  # ── Redis (local dev only — in prod use Upstash) ─────────────────────────────
   redis:
     image: redis:7-alpine
     container_name: nexgen_redis
@@ -28,81 +44,91 @@ services:
       - redis_data:/data
     healthcheck:
       test: ['CMD', 'redis-cli', 'ping']
-      interval: 10s
-      timeout: 5s
+      interval: 5s
+      timeout: 3s
       retries: 5
 
+  # ── NestJS API ────────────────────────────────────────────────────────────────
   api:
     build:
-      context: ./apps/api
-      dockerfile: Dockerfile.dev
+      context: .
+      dockerfile: apps/api/Dockerfile
     container_name: nexgen_api
     restart: unless-stopped
     ports:
       - '3001:3001'
     environment:
-      NODE_ENV: development
-      DATABASE_URL: postgresql://nexgen:nexgen_dev_pass@postgres:5432/nexgen_ems?schema=public
-      REDIS_URL: redis://redis:6379
-      JWT_SECRET: dev_jwt_secret_change_in_production
-      JWT_REFRESH_SECRET: dev_refresh_secret_change_in_production
-      JWT_EXPIRES_IN: 15m
-      JWT_REFRESH_EXPIRES_IN: 7d
-      ENCRYPTION_KEY: dev_aes_key_32chars_change_prod!!
-      FR_SERVICE_URL: http://face-service:8000
-      AWS_REGION: ${AWS_REGION:-auto}
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
-      AWS_ENDPOINT_URL: ${AWS_ENDPOINT_URL:-}
-      S3_BUCKET_NAME: ${S3_BUCKET_NAME:-nexgen-ems-dev}
-      SES_FROM_EMAIL: ${SES_FROM_EMAIL:-noreply@nexgen-ems.in}
+      NODE_ENV: production
+      PORT: 3001
+      # Override with Neon URL in prod via .env or Render env vars
+      DATABASE_URL: ${DATABASE_URL:-postgresql://nexgen:nexgen_dev_pass@postgres:5432/nexgen_ems?sslmode=disable}
+      DIRECT_URL: ${DIRECT_URL:-postgresql://nexgen:nexgen_dev_pass@postgres:5432/nexgen_ems?sslmode=disable}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      JWT_SECRET: ${JWT_SECRET:-change_me_in_production_min32chars!!}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-change_me_refresh_min32chars!!!!!}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-15m}
+      JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-7d}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-change_me_32char_aes_key_prod!!!}
+      FR_SERVICE_URL: ${FR_SERVICE_URL:-http://face-service:8000}
+      STORAGE_DRIVER: ${STORAGE_DRIVER:-local}
+      LOCAL_STORAGE_DIR: uploads
+      SES_FROM_EMAIL: ${SES_FROM_EMAIL:-noreply@nexgen.in}
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASS: ${SMTP_PASS:-}
-      FCM_SERVER_KEY: ${FCM_SERVER_KEY:-}
-      OFFICE_LAT: '28.6139'
-      OFFICE_LNG: '77.2090'
-      OFFICE_RADIUS_METERS: '200'
-      FRONTEND_URL: http://localhost:3000
-    volumes:
-      - ./apps/api/src:/app/src
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -qO- http://localhost:3001/health || exit 1']
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-  face-service:
-    build:
-      context: ./apps/face-service
-      dockerfile: Dockerfile
-    container_name: nexgen_face_service
-    restart: unless-stopped
-    ports:
-      - '8000:8000'
-    environment:
-      FR_PROVIDER: deepface
-      AWS_REGION: ap-south-1
-      S3_BUCKET_NAME: nexgen-ems-dev
-    volumes:
-      - ./apps/face-service:/app
-
+  # ── Next.js Web ───────────────────────────────────────────────────────────────
   web:
     build:
-      context: ./apps/web
-      dockerfile: Dockerfile.dev
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3001}
     container_name: nexgen_web
     restart: unless-stopped
     ports:
       - '3000:3000'
     environment:
-      NEXT_PUBLIC_API_URL: http://localhost:3001
-    volumes:
-      - ./apps/web/src:/app/src
-      - ./apps/web/public:/app/public
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3001}
     depends_on:
-      - api
+      api:
+        condition: service_healthy
+
+  # ── Python Face Recognition Service ──────────────────────────────────────────
+  face-service:
+    build:
+      context: apps/face-service
+      dockerfile: Dockerfile
+    container_name: nexgen_face
+    restart: unless-stopped
+    ports:
+      - '8000:8000'
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql://nexgen:nexgen_dev_pass@postgres:5432/nexgen_ems?sslmode=disable}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_REGION: ${AWS_REGION:-ap-south-1}
+      REKOGNITION_COLLECTION_ID: ${REKOGNITION_COLLECTION_ID:-nexgen-employees}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD-SHELL', 'python -c "import urllib.request; urllib.request.urlopen(\"http://localhost:8000/health\")"']
+      interval: 15s
+      timeout: 10s
+      retries: 5
 
 volumes:
   postgres_data:

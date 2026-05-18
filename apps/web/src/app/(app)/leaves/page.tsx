@@ -10,9 +10,9 @@ import { Calendar, ChevronRight, Plus } from 'lucide-react';
 const LEAVE_META: Record<LeaveType, { label: string; bg: string }> = {
   CL: { label: 'CASUAL',    bg: 'bg-brutal-yellow text-brutal-ink' },
   SL: { label: 'SICK',      bg: 'bg-brutal-red text-white'          },
-  PL: { label: 'PRIVILEGE', bg: 'bg-brutal-blue text-white'         },
+  PL: { label: 'PAID',       bg: 'bg-brutal-blue text-white'         },
   UL: { label: 'UNPAID',    bg: 'bg-brutal-surface text-brutal-ink' },
-  CO: { label: 'COMP-OFF',  bg: 'bg-brutal-ink text-brutal-yellow'  },
+  CO: { label: 'ON DUTY',   bg: 'bg-brutal-ink text-brutal-yellow'  },
 };
 
 const TONE: Record<string, string> = {
@@ -203,7 +203,7 @@ export default function LeavesPage() {
           </div>
           <div className="mt-4 flex items-center gap-4 flex-wrap font-display font-bold text-[10px] tracking-[0.16em]">
             <span className="flex items-center gap-2"><span className="w-3 h-3 bg-brutal-yellow border-2 border-brutal-ink" /> YOUR APPROVED LEAVES</span>
-            <span className="flex items-center gap-2"><span className="w-3 h-3 bg-brutal-blue border-2 border-brutal-ink" /> PRIVILEGE</span>
+            <span className="flex items-center gap-2"><span className="w-3 h-3 bg-brutal-blue border-2 border-brutal-ink" /> PAID LEAVE</span>
             <span className="flex items-center gap-2"><span className="w-3 h-3 bg-brutal-red border-2 border-brutal-ink" /> TEAM ON LEAVE</span>
             <span className="flex items-center gap-2"><span className="w-3 h-3 bg-brutal-surface border-2 border-brutal-ink" /> WORKING DAY</span>
           </div>

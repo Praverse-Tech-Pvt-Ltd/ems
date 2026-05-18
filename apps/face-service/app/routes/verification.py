@@ -1,14 +1,14 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from app.services.face_service import verify_deepface
-from app.config import settings
+
+from app.services.face_service import verify
 
 router = APIRouter()
 
 
 class VerifyRequest(BaseModel):
     employee_id: str
-    face_image: str  # Base64-encoded face image
+    face_image: str
 
 
 class VerifyResponse(BaseModel):
@@ -20,12 +20,9 @@ class VerifyResponse(BaseModel):
 @router.post("", response_model=VerifyResponse)
 async def verify_face(request: VerifyRequest) -> VerifyResponse:
     try:
-        if settings.fr_provider == "deepface":
-            result = verify_deepface(request.employee_id, request.face_image)
-        else:
-            raise HTTPException(status_code=501, detail=f"Provider {settings.fr_provider} not implemented")
-
+        result = verify(request.employee_id, request.face_image)
         return VerifyResponse(**result)
-
+    except RuntimeError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

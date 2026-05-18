@@ -69,7 +69,7 @@ export const LEAVE_TYPES = [
   { value: 'SL', label: 'Sick Leave' },
   { value: 'PL', label: 'Paid Leave' },
   { value: 'UL', label: 'Unpaid Leave' },
-  { value: 'CO', label: 'Comp Off' },
+  { value: 'CO', label: 'On Duty (OD)' },
 ] as const;
 
 export const REQUEST_TYPES = [

@@ -1,8 +1,0 @@
-services:
-  - type: web
-    name: nexgen-ems-face-service
-    runtime: docker
-    rootDir: .
-    envVars:
-      - key: PORT
-        value: 8000

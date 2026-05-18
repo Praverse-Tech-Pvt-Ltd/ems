@@ -3,51 +3,82 @@ import * as bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
-async function main() {
-  // ── Admin user ──────────────────────────────────────────────────────────────
-  const passwordHash = await bcrypt.hash('Admin@123456', 10);
+const LEAVE_DEFAULTS = [
+  { leaveType: LeaveType.CL, totalDays: 7  },
+  { leaveType: LeaveType.SL, totalDays: 7  },
+  { leaveType: LeaveType.PL, totalDays: 14 },
+  { leaveType: LeaveType.UL, totalDays: 0  },
+  { leaveType: LeaveType.CO, totalDays: 0  },
+];
 
-  // Remove stale seed records that conflict on employeeCode
+async function seedLeaves(employeeId: string) {
+  const year = new Date().getFullYear();
+  for (const leave of LEAVE_DEFAULTS) {
+    await prisma.leaveBalance.upsert({
+      where: { employeeId_leaveType_year: { employeeId, leaveType: leave.leaveType, year } },
+      update: { totalDays: leave.totalDays },
+      create: { employeeId, year, ...leave, usedDays: 0 },
+    });
+  }
+}
+
+async function main() {
+  const year = new Date().getFullYear();
+  console.log(`\n── NexGen EMS Seed ─────────────────────────────`);
+  console.log(`   Leave year: ${year}`);
+  console.log(`   Allocations: CL=7  SL=7  PL=14\n`);
+
+  // ── Super Admin ──────────────────────────────────────────────────────────────
+  const superAdminHash = await bcrypt.hash('Admin@123456', 10);
+
   await prisma.employee.deleteMany({
-    where: { employeeCode: 'EMP001', NOT: { email: 'admin@nexgen.in' } },
+    where: { employeeCode: 'NXG-001', NOT: { email: 'superadmin@nexgen.in' } },
+  });
+
+  const superAdmin = await prisma.employee.upsert({
+    where: { email: 'superadmin@nexgen.in' },
+    update: { passwordHash: superAdminHash, role: Role.SUPER_ADMIN },
+    create: {
+      employeeCode: 'NXG-001',
+      email:        'superadmin@nexgen.in',
+      passwordHash: superAdminHash,
+      firstName:    'Super',
+      lastName:     'Admin',
+      role:         Role.SUPER_ADMIN,
+      status:       EmployeeStatus.ACTIVE,
+      joiningDate:  new Date('2024-01-01'),
+    },
+  });
+
+  await seedLeaves(superAdmin.id);
+  console.log(`✓ Super Admin   →  superadmin@nexgen.in  /  Admin@123456`);
+
+  // ── Admin ────────────────────────────────────────────────────────────────────
+  const adminHash = await bcrypt.hash('Admin@123456', 10);
+
+  await prisma.employee.deleteMany({
+    where: { employeeCode: 'NXG-002', NOT: { email: 'admin@nexgen.in' } },
   });
 
   const admin = await prisma.employee.upsert({
     where: { email: 'admin@nexgen.in' },
-    update: { passwordHash },
+    update: { passwordHash: adminHash, role: Role.ADMIN },
     create: {
-      employeeCode: 'EMP001',
-      email: 'admin@nexgen.in',
-      passwordHash,
-      firstName: 'Admin',
-      lastName: 'User',
-      role: Role.SUPER_ADMIN,
-      status: EmployeeStatus.ACTIVE,
-      joiningDate: new Date('2024-01-01'),
+      employeeCode: 'NXG-002',
+      email:        'admin@nexgen.in',
+      passwordHash: adminHash,
+      firstName:    'Admin',
+      lastName:     'User',
+      role:         Role.ADMIN,
+      status:       EmployeeStatus.ACTIVE,
+      joiningDate:  new Date('2024-01-01'),
     },
   });
 
-  console.log(`✓ Admin seeded: ${admin.email}`);
+  await seedLeaves(admin.id);
+  console.log(`✓ Admin         →  admin@nexgen.in       /  Admin@123456`);
 
-  // ── Default leave balances ───────────────────────────────────────────────────
-  const year = new Date().getFullYear();
-  const leaveDefaults = [
-    { leaveType: LeaveType.CL, totalDays: 12 },
-    { leaveType: LeaveType.SL, totalDays: 10 },
-    { leaveType: LeaveType.PL, totalDays: 15 },
-    { leaveType: LeaveType.UL, totalDays: 0  },
-    { leaveType: LeaveType.CO, totalDays: 0  },
-  ];
-
-  for (const leave of leaveDefaults) {
-    await prisma.leaveBalance.upsert({
-      where: { employeeId_leaveType_year: { employeeId: admin.id, leaveType: leave.leaveType, year } },
-      update: {},
-      create: { employeeId: admin.id, ...leave, year },
-    });
-  }
-
-  console.log(`✓ Leave balances seeded for ${admin.email}`);
+  console.log(`\n── Done ─────────────────────────────────────────\n`);
 }
 
 main()

@@ -90,13 +90,23 @@ npm --workspace @nexgen/web run dev
 | API | http://localhost:3001 |
 | Swagger Docs | http://localhost:3001/api/docs |
 
-## Default Admin
+## Default Credentials
 
+### Super Admin
+| Field | Value |
+|---|---|
+| Email | `superadmin@nexgen.in` |
+| Password | `Admin@123456` |
+| Role | `SUPER_ADMIN` — full access including audit logs and destructive operations |
+
+### Admin
 | Field | Value |
 |---|---|
 | Email | `admin@nexgen.in` |
 | Password | `Admin@123456` |
-| OTP / 2FA | Leave blank unless enabled |
+| Role | `ADMIN` — employee management, payroll, approvals |
+
+> OTP / 2FA: leave blank unless explicitly enabled per user.
 
 ## Major Features
 

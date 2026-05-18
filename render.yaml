@@ -1,0 +1,102 @@
+# NexGen EMS — Render Blueprint
+# Docs: https://render.com/docs/blueprint-spec
+#
+# Deploy to Render:
+#   1. Push this repo to GitHub
+#   2. Go to render.com → New → Blueprint
+#   3. Connect your repo — Render reads this file and creates all services
+#   4. Set the secret env vars listed below in each service's Render dashboard
+
+services:
+
+  # ── NestJS API ────────────────────────────────────────────────────────────────
+  - type: web
+    name: nexgen-api
+    runtime: docker
+    dockerfilePath: apps/api/Dockerfile
+    dockerContext: .
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3001
+      - key: DATABASE_URL
+        sync: false          # set in Render dashboard → from Neon
+      - key: DIRECT_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false          # set in Render dashboard → from Upstash
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 15m
+      - key: JWT_REFRESH_EXPIRES_IN
+        value: 7d
+      - key: ENCRYPTION_KEY
+        generateValue: true
+      - key: FR_SERVICE_URL
+        fromService:
+          name: nexgen-face
+          type: web
+          property: host
+          envVarKey: FR_SERVICE_URL
+      - key: STORAGE_DRIVER
+        value: local
+      - key: LOCAL_STORAGE_DIR
+        value: uploads
+      - key: FRONTEND_URL
+        sync: false          # set to your Render web URL after deploy
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: 587
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: SES_FROM_EMAIL
+        value: noreply@nexgen.in
+      - key: RENDER_SELF_URL
+        fromService:
+          name: nexgen-api
+          type: web
+          property: host
+          envVarKey: RENDER_SELF_URL
+
+  # ── Next.js Web ───────────────────────────────────────────────────────────────
+  - type: web
+    name: nexgen-web
+    runtime: docker
+    dockerfilePath: apps/web/Dockerfile
+    dockerContext: .
+    plan: free
+    envVars:
+      - key: NEXT_PUBLIC_API_URL
+        fromService:
+          name: nexgen-api
+          type: web
+          property: host
+          envVarKey: NEXT_PUBLIC_API_URL
+
+  # ── Python Face Recognition Service ──────────────────────────────────────────
+  - type: web
+    name: nexgen-face
+    runtime: docker
+    dockerfilePath: apps/face-service/Dockerfile
+    dockerContext: apps/face-service
+    plan: free
+    envVars:
+      - key: DATABASE_URL
+        sync: false          # same Neon URL as API (without pgbouncer)
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
+      - key: AWS_REGION
+        value: ap-south-1
+      - key: REKOGNITION_COLLECTION_ID
+        value: nexgen-employees

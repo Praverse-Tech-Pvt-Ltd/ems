@@ -42,7 +42,7 @@ export class FaceRecognitionService {
       await axios.post(
         `${frUrl}/enroll`,
         { employee_id: employeeId, frames },
-        { timeout: 60000 },
+        { timeout: 20000 },
       );
     } catch (error) {
       this.logger.error('Face enrollment failed', error);

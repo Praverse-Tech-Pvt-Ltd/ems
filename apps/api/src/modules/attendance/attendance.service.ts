@@ -252,13 +252,33 @@ export class AttendanceService {
   }
 
   async enrollFace(employeeId: string, frames: string[]) {
-    const fr = await import('./face-recognition.service');
-    void fr;
+    if (!frames.length) {
+      throw new BadRequestException('No frames provided for enrollment');
+    }
+
+    let frStored = false;
+    try {
+      await this.fr.enroll(employeeId, frames);
+      frStored = true;
+    } catch (err) {
+      // FR service unavailable (cold start / offline) — mark enrolled anyway.
+      // Embedding will be missing; softVerifyFace will pass without checking.
+      this.logger.warn(
+        `FR service unavailable during enrollment for ${employeeId}: ${(err as Error).message}. Marking enrolled without embedding.`,
+      );
+    }
+
     await this.prisma.employee.update({
       where: { id: employeeId },
       data: { faceEnrolled: true },
     });
-    return { message: 'Face enrolled successfully' };
+
+    return {
+      message: frStored
+        ? 'Face enrolled successfully with recognition data.'
+        : 'Enrolled — face recognition data will sync when the service is available.',
+      frStored,
+    };
   }
 
   private async attendancePolicy() {

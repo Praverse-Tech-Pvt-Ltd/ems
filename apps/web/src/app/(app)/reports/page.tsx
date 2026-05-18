@@ -54,7 +54,7 @@ export default function ReportsPage() {
     for (let d = 0; d < 14; d++) {
       const date = new Date(now.getTime() - (13 - d) * 86400_000);
       const dateStr = date.toISOString().split('T')[0];
-      const dayRecords = attendance.filter(r => r.date?.startsWith(dateStr));
+      const dayRecords = attendance.filter(r => r.date?.startsWith(dateStr ?? ''));
       if (dayRecords.length === 0) { bars.push(0); continue; }
       const present = dayRecords.filter(r => ['PRESENT', 'LATE', 'WFH'].includes(r.status)).length;
       bars.push(Math.round((present / dayRecords.length) * 100));

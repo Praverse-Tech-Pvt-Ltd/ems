@@ -1,115 +1,154 @@
 import base64
 import io
 import json
-import os
-import tempfile
-from typing import Optional
+import logging
 
-import numpy as np
+import boto3
 import psycopg2
+from botocore.exceptions import ClientError
 from PIL import Image
 
 from app.config import settings
 
+logger = logging.getLogger(__name__)
 
-def base64_to_image(b64_string: str) -> np.ndarray:
-    if "," in b64_string:
-        b64_string = b64_string.split(",")[1]
-    img_bytes = base64.b64decode(b64_string)
-    img = Image.open(io.BytesIO(img_bytes)).convert("RGB")
-    return np.array(img)
+
+def _rekognition():
+    return boto3.client(
+        "rekognition",
+        region_name=settings.aws_region,
+        aws_access_key_id=settings.aws_access_key_id,
+        aws_secret_access_key=settings.aws_secret_access_key,
+    )
 
 
 def _get_conn():
     return psycopg2.connect(settings.database_url)
 
 
-def save_embedding(employee_id: str, vector: list[float]) -> None:
+def _b64_to_bytes(b64_string: str) -> bytes:
+    if "," in b64_string:
+        b64_string = b64_string.split(",")[1]
+    raw = base64.b64decode(b64_string)
+    # Normalise to JPEG bytes that Rekognition accepts
+    img = Image.open(io.BytesIO(raw)).convert("RGB")
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG", quality=90)
+    return buf.getvalue()
+
+
+def ensure_collection() -> None:
+    client = _rekognition()
+    try:
+        client.describe_collection(CollectionId=settings.rekognition_collection_id)
+    except client.exceptions.ResourceNotFoundException:
+        client.create_collection(CollectionId=settings.rekognition_collection_id)
+        logger.info("Created Rekognition collection: %s", settings.rekognition_collection_id)
+
+
+def _save_face_id(employee_id: str, face_id: str) -> None:
     conn = _get_conn()
     try:
         with conn.cursor() as cur:
             cur.execute(
-                'UPDATE employees SET face_embedding = %s, face_enrolled = TRUE WHERE id = %s',
-                (json.dumps(vector), employee_id),
+                "UPDATE employees SET face_embedding = %s, face_enrolled = TRUE WHERE id = %s",
+                (json.dumps({"rekognition_face_id": face_id}), employee_id),
             )
         conn.commit()
     finally:
         conn.close()
 
 
-def load_embedding(employee_id: str) -> Optional[list[float]]:
+def _load_face_id(employee_id: str) -> str | None:
     conn = _get_conn()
     try:
         with conn.cursor() as cur:
-            cur.execute('SELECT face_embedding FROM employees WHERE id = %s', (employee_id,))
+            cur.execute("SELECT face_embedding FROM employees WHERE id = %s", (employee_id,))
             row = cur.fetchone()
-            if row and row[0] is not None:
-                return row[0] if isinstance(row[0], list) else json.loads(row[0])
-            return None
+            if not row or row[0] is None:
+                return None
+            data = row[0] if isinstance(row[0], dict) else json.loads(row[0])
+            return data.get("rekognition_face_id")
     finally:
         conn.close()
 
 
-def enroll_deepface(employee_id: str, frames: list[str]) -> None:
-    try:
-        from deepface import DeepFace  # type: ignore
-    except ImportError:
-        raise RuntimeError("deepface is not installed")
+def enroll(employee_id: str, frames: list[str]) -> None:
+    ensure_collection()
+    client = _rekognition()
 
-    embeddings = []
-    for frame_b64 in frames:
-        img_array = base64_to_image(frame_b64)
-        with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as f:
-            Image.fromarray(img_array).save(f.name)
-            tmp_path = f.name
+    # Delete any previously indexed face for this employee
+    old_face_id = _load_face_id(employee_id)
+    if old_face_id:
         try:
-            result = DeepFace.represent(
-                img_path=tmp_path,
-                model_name=settings.deepface_model,
-                enforce_detection=True,
+            client.delete_faces(
+                CollectionId=settings.rekognition_collection_id,
+                FaceIds=[old_face_id],
             )
-            embeddings.append(result[0]["embedding"])
-        finally:
-            os.unlink(tmp_path)
+        except ClientError:
+            pass
 
-    mean_vector = np.mean(embeddings, axis=0).tolist()
-    save_embedding(employee_id, mean_vector)
+    # Index the best-quality frame (use first frame; Rekognition picks the best face)
+    best_face_id: str | None = None
+    for frame_b64 in frames:
+        img_bytes = _b64_to_bytes(frame_b64)
+        try:
+            response = client.index_faces(
+                CollectionId=settings.rekognition_collection_id,
+                Image={"Bytes": img_bytes},
+                ExternalImageId=employee_id,
+                DetectionAttributes=[],
+                MaxFaces=1,
+                QualityFilter="AUTO",
+            )
+            if response.get("FaceRecords"):
+                best_face_id = response["FaceRecords"][0]["Face"]["FaceId"]
+                break
+        except ClientError as e:
+            logger.warning("index_faces failed for frame: %s", e)
+            continue
+
+    if not best_face_id:
+        raise RuntimeError("No face detected in any of the provided frames")
+
+    _save_face_id(employee_id, best_face_id)
 
 
-def verify_deepface(employee_id: str, face_image_b64: str) -> dict:
-    stored_vector = load_embedding(employee_id)
-    if stored_vector is None:
+def verify(employee_id: str, face_image_b64: str) -> dict:
+    stored_face_id = _load_face_id(employee_id)
+    if not stored_face_id:
         return {"verified": False, "confidence": 0.0, "reason": "No enrolled face found"}
 
-    try:
-        from deepface import DeepFace  # type: ignore
-    except ImportError:
-        raise RuntimeError("deepface is not installed")
-
-    img_array = base64_to_image(face_image_b64)
-    with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as f:
-        Image.fromarray(img_array).save(f.name)
-        tmp_path = f.name
+    ensure_collection()
+    client = _rekognition()
+    img_bytes = _b64_to_bytes(face_image_b64)
 
     try:
-        result = DeepFace.represent(
-            img_path=tmp_path,
-            model_name=settings.deepface_model,
-            enforce_detection=True,
+        response = client.search_faces_by_image(
+            CollectionId=settings.rekognition_collection_id,
+            Image={"Bytes": img_bytes},
+            MaxFaces=1,
+            FaceMatchThreshold=70.0,  # Rekognition similarity threshold (0-100)
         )
-        live_vector = np.array(result[0]["embedding"])
-    finally:
-        os.unlink(tmp_path)
+    except client.exceptions.InvalidParameterException:
+        return {"verified": False, "confidence": 0.0, "reason": "No face detected in image"}
+    except ClientError as e:
+        raise RuntimeError(f"Rekognition error: {e}")
 
-    stored = np.array(stored_vector)
-    cosine_sim = float(
-        np.dot(live_vector, stored) / (np.linalg.norm(live_vector) * np.linalg.norm(stored))
-    )
-    confidence = max(0.0, min(1.0, (cosine_sim + 1) / 2))
-    verified = confidence >= settings.fr_threshold
+    matches = response.get("FaceMatches", [])
+    if not matches:
+        return {"verified": False, "confidence": 0.0, "reason": "No matching face found"}
+
+    top = matches[0]
+    if top["Face"]["FaceId"] != stored_face_id:
+        return {"verified": False, "confidence": 0.0, "reason": "Face does not match enrolled employee"}
+
+    similarity = top["Similarity"]  # 0–100
+    confidence = round(similarity / 100, 4)
+    verified = similarity >= 80.0  # require 80% similarity
 
     return {
         "verified": verified,
-        "confidence": round(confidence, 4),
-        "reason": None if verified else f"Confidence too low: {confidence:.3f}",
+        "confidence": confidence,
+        "reason": None if verified else f"Similarity too low: {similarity:.1f}%",
     }

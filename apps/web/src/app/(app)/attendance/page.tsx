@@ -5,8 +5,9 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api-client';
 import type { AttendanceRecord } from '@/types';
 import {
-  Camera, MapPin, Wifi, ArrowRight, X, Check, AlertTriangle,
+  Camera, MapPin, Wifi, ArrowRight, X, Check, AlertTriangle, UserCheck,
 } from 'lucide-react';
+import Link from 'next/link';
 
 function useClock() {
   const [t, setT] = useState<Date | null>(null);
@@ -74,7 +75,7 @@ function PunchInModal({ onClose, punchType = 'in' }: { onClose: () => void; punc
     canvas.width = video.videoWidth || 480;
     canvas.height = video.videoHeight || 480;
     canvas.getContext('2d')?.drawImage(video, 0, 0);
-    return canvas.toDataURL('image/jpeg', 0.85);
+    return canvas.toDataURL('image/jpeg', 0.6);
   }, []);
 
   const handleVerify = useCallback(async () => {
@@ -256,6 +257,11 @@ export default function AttendancePage() {
       }).toUpperCase()
     : 'LOADING...';
 
+  const { data: me } = useQuery<{ faceEnrolled: boolean }>({
+    queryKey: ['me-face'],
+    queryFn: () => apiClient.get('/employees/me').then(r => r.data).catch(() => null),
+  });
+
   const { data: todayRecord } = useQuery<AttendanceRecord | null>({
     queryKey: ['attendance-today'],
     queryFn: () => apiClient.get('/attendance/today').then(r => r.data).catch(() => null),
@@ -273,6 +279,25 @@ export default function AttendancePage() {
 
   return (
     <div className="space-y-8 max-w-[1320px] animate-fade-up">
+
+      {/* Enrollment banner for first-time users */}
+      {me && !me.faceEnrolled && (
+        <div className="brutal-border brutal-shadow bg-brutal-yellow flex items-center justify-between gap-4 px-5 py-4 flex-wrap">
+          <div className="flex items-center gap-3">
+            <UserCheck size={20} className="text-brutal-ink shrink-0" />
+            <div>
+              <div className="font-display font-bold text-[12px] tracking-[0.2em]">FACE NOT ENROLLED</div>
+              <div className="font-display font-bold text-[10px] tracking-[0.14em] text-brutal-ink/70 mt-0.5">
+                You must enroll your face before punching in. It only takes 10 seconds.
+              </div>
+            </div>
+          </div>
+          <Link href="/attendance/biometric" className="brutal-btn-primary px-4 py-2 text-[11px] flex items-center gap-2 shrink-0">
+            <Camera size={13} /> ENROLL NOW →
+          </Link>
+        </div>
+      )}
+
       {/* Punch-in hero */}
       <section className="grid grid-cols-12 gap-0 brutal-border brutal-shadow-lg">
         <div className="col-span-12 lg:col-span-8 p-5 sm:p-7 lg:p-9 relative">

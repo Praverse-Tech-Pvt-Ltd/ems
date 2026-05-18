@@ -152,7 +152,7 @@ function SubmitModal({ onClose }: { onClose: () => void }) {
                 className={`w-full brutal-border bg-brutal-surface px-3 py-2 font-display font-bold text-[12px] focus:outline-none ${errors.amount ? 'border-brutal-red' : ''}`}
                 placeholder="0.00"
               />
-              {errors.amount && <p className="mt-1 font-display font-bold text-[10px] text-brutal-red">Required · must be > 0</p>}
+              {errors.amount && <p className="mt-1 font-display font-bold text-[10px] text-brutal-red">Required · must be &gt; 0</p>}
             </div>
 
             <div>
