@@ -1,5 +1,4 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 
 type JsonBody = Record<string, unknown>;
@@ -13,11 +12,10 @@ export class CorporateService {
   }
 
   async upsertSetting(userId: string, key: string, value: JsonBody) {
-    const jsonValue = value as Prisma.InputJsonObject;
     const setting = await this.prisma.companySetting.upsert({
       where: { key },
-      update: { value: jsonValue, updatedBy: userId },
-      create: { key, value: jsonValue, updatedBy: userId },
+      update: { value, updatedBy: userId },
+      create: { key, value, updatedBy: userId },
     });
     await this.prisma.auditLog.create({
       data: {
