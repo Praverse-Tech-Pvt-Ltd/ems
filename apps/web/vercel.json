@@ -1,6 +1,6 @@
 {
   "framework": "nextjs",
-  "buildCommand": "cd ../.. && npm install && npx turbo run build --filter=@nexgen/web",
-  "outputDirectory": ".next",
-  "installCommand": "echo 'deps installed at repo root'"
+  "installCommand": "cd ../.. && npm install",
+  "buildCommand": "cd ../.. && npx turbo run build --filter=@nexgen/web",
+  "outputDirectory": ".next"
 }
