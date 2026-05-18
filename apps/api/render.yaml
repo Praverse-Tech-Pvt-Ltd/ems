@@ -3,7 +3,7 @@ services:
     name: nexgen-ems-api
     runtime: node
     rootDir: .
-    buildCommand: npm install && npm run build
+    buildCommand: npm install && npx prisma generate --schema=../../packages/db/prisma/schema.prisma && npm run build
     startCommand: npm run start
     envVars:
       - key: NODE_ENV
