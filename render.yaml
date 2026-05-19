@@ -75,12 +75,9 @@ services:
       - key: CRON_TOKEN_CLEANUP
         value: "0 2 * * *"
 
-      # Face recognition service URL — pulled from nexgen-face service
+      # Face recognition service URL (set manually to the separately hosted face service URL)
       - key: FR_SERVICE_URL
-        fromService:
-          name: nexgen-face
-          type: web
-          property: hostURL
+        sync: false
 
   # ── Next.js Web ───────────────────────────────────────────────────────────────
   - type: web
@@ -99,16 +96,3 @@ services:
           type: web
           property: hostURL
 
-  # ── Python Face Recognition Service ──────────────────────────────────────────
-  - type: web
-    name: nexgen-face
-    runtime: docker
-    dockerfilePath: apps/face-service/Dockerfile
-    dockerContext: apps/face-service
-    plan: free
-    healthCheckPath: /health
-    envVars:
-      - key: DATABASE_URL
-        sync: false          # same Neon direct URL (no pgbouncer)
-      - key: CONFIDENCE_THRESHOLD
-        value: 0.55

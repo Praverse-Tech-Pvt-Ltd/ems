@@ -13,6 +13,33 @@ const LEAVE_DEFAULTS = [
   { leaveType: LeaveType.CO, totalDays: 0  },
 ];
 
+async function ensureFaceRecognitionSchema() {
+  await prisma.$executeRawUnsafe(`CREATE EXTENSION IF NOT EXISTS vector;`);
+  await prisma.$executeRawUnsafe(`
+    ALTER TABLE employees
+      ADD COLUMN IF NOT EXISTS face_vector vector(128),
+      ADD COLUMN IF NOT EXISTS face_model TEXT,
+      ADD COLUMN IF NOT EXISTS face_enrolled_at TIMESTAMPTZ;
+  `);
+
+  try {
+    await prisma.$executeRawUnsafe(`
+      CREATE INDEX IF NOT EXISTS employees_face_vector_hnsw_idx
+      ON employees
+      USING hnsw (face_vector vector_cosine_ops)
+      WHERE face_vector IS NOT NULL;
+    `);
+  } catch {
+    await prisma.$executeRawUnsafe(`
+      CREATE INDEX IF NOT EXISTS employees_face_vector_ivfflat_idx
+      ON employees
+      USING ivfflat (face_vector vector_cosine_ops)
+      WITH (lists = 100)
+      WHERE face_vector IS NOT NULL;
+    `);
+  }
+}
+
 async function seedLeaves(employeeId: string) {
   const year = new Date().getFullYear();
   for (const leave of LEAVE_DEFAULTS) {
@@ -25,6 +52,8 @@ async function seedLeaves(employeeId: string) {
 }
 
 async function main() {
+  await ensureFaceRecognitionSchema();
+
   const year = new Date().getFullYear();
   console.log(`\n── NexGen EMS Seed ─────────────────────────────`);
   console.log(`   Leave year: ${year}`);

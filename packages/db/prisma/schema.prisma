@@ -8,7 +8,7 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
-// ─── Enums ───────────────────────────────────────────────────────────────────
+// ─── Enums ──────────────────────────────────────────────────────────────────
 
 enum Role {
   EMPLOYEE
@@ -203,9 +203,12 @@ model Employee {
   panEnc           String?        @map("pan_enc")
   aadhaarLast4     String?        @map("aadhaar_last4") @db.Char(4)
   profilePhotoUrl  String?        @map("profile_photo_url")
-  faceEnrolled     Boolean        @default(false) @map("face_enrolled")
-  faceEmbedding    Json?          @map("face_embedding")
-  faceVectorS3Key  String?        @map("face_vector_s3_key")
+  faceEnrolled     Boolean                    @default(false) @map("face_enrolled")
+  faceVector       Unsupported("vector(128)")? @map("face_vector")
+  faceEmbedding    Json?                      @map("face_embedding")
+  faceVectorS3Key  String?                    @map("face_vector_s3_key")
+  faceModel        String?                    @map("face_model")
+  faceEnrolledAt   DateTime?                  @map("face_enrolled_at") @db.Timestamptz
   status           EmployeeStatus @default(ACTIVE)
   address          String?
   emergencyContact String?        @map("emergency_contact")
@@ -713,4 +716,3 @@ model PasswordResetToken {
 
   @@map("password_reset_tokens")
 }
-

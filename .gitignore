@@ -42,3 +42,4 @@ packages/db/node_modules
 
 # Docker
 docker-compose.override.yml
+docs/Render_Deployment_Guide.md
