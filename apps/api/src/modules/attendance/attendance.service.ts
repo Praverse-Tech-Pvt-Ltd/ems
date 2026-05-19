@@ -26,14 +26,29 @@ export class AttendanceService {
     private geoFence: GeoFenceService,
   ) {}
 
-  /** Runs face verification but never throws — returns null if FR is unavailable or not enrolled. */
-  private async softVerifyFace(employeeId: string, faceImageBase64: string) {
+  /** Verifies face for enrolled employees. Throws if FR service is down or face doesn't match. */
+  private async verifyFaceOrThrow(employeeId: string, faceImageBase64: string) {
+    const employee = await this.prisma.employee.findUnique({
+      where: { id: employeeId },
+      select: { faceEnrolled: true },
+    });
+
+    if (!employee?.faceEnrolled) return; // not enrolled yet — skip
+
     try {
       const result = await this.fr.verify(employeeId, faceImageBase64);
-      return result;
+      if (!result.verified) {
+        throw new BadRequestException(
+          result.reason ?? `Face not recognized (confidence: ${(result.confidence * 100).toFixed(0)}%). Please try again in better lighting.`,
+        );
+      }
     } catch (err) {
-      this.logger.warn(`Face verification skipped for ${employeeId}: ${(err as Error).message}`);
-      return null;
+      if (err instanceof BadRequestException) throw err;
+      // FR service is down
+      this.logger.warn(`FR service unavailable for ${employeeId}: ${(err as Error).message}`);
+      throw new BadRequestException(
+        'Face recognition service is offline. Please contact admin to punch in manually.',
+      );
     }
   }
 
@@ -54,13 +69,7 @@ export class AttendanceService {
       throw new ConflictException('Already punched in today');
     }
 
-    const frResult = await this.softVerifyFace(employeeId, dto.faceImageBase64);
-    // Hard-reject only when FR is available and confidence is too low
-    if (frResult !== null && frResult.verified === false && frResult.confidence > 0) {
-      throw new BadRequestException(
-        frResult.reason ?? `Face not recognized (confidence: ${frResult.confidence})`,
-      );
-    }
+    await this.verifyFaceOrThrow(employeeId, dto.faceImageBase64);
 
     const isGeoValid = await this.geoFence.isWithinAnyOffice(dto.latitude, dto.longitude);
 
@@ -93,7 +102,7 @@ export class AttendanceService {
         punchInLat: dto.latitude,
         punchInLng: dto.longitude,
         isGeoValidIn: isGeoValid,
-        frConfidenceIn: frResult?.confidence ?? null,
+        frConfidenceIn: null,
         status: isGeoValid ? (isLate ? 'LATE' : 'PRESENT') : 'WFH',
         deviceInfo: (dto.deviceInfo ?? {}) as any,
       },
@@ -102,7 +111,7 @@ export class AttendanceService {
         punchInLat: dto.latitude,
         punchInLng: dto.longitude,
         isGeoValidIn: isGeoValid,
-        frConfidenceIn: frResult?.confidence ?? null,
+        frConfidenceIn: null,
         status: isGeoValid ? (isLate ? 'LATE' : 'PRESENT') : 'WFH',
       },
     });
@@ -136,10 +145,7 @@ export class AttendanceService {
       throw new ConflictException('Already punched out today');
     }
 
-    const frResult = await this.softVerifyFace(employeeId, dto.faceImageBase64);
-    if (frResult !== null && frResult.verified === false && frResult.confidence > 0) {
-      throw new BadRequestException(frResult.reason ?? 'Face not recognized');
-    }
+    await this.verifyFaceOrThrow(employeeId, dto.faceImageBase64);
 
     const now = new Date();
     const isGeoValid = await this.geoFence.isWithinAnyOffice(dto.latitude, dto.longitude);
@@ -160,7 +166,7 @@ export class AttendanceService {
         punchOutLat: dto.latitude,
         punchOutLng: dto.longitude,
         isGeoValidOut: isGeoValid,
-        frConfidenceOut: frResult?.confidence ?? null,
+        frConfidenceOut: null,
         workingHours: Math.round(workingHours * 100) / 100,
         status,
       },
@@ -251,20 +257,39 @@ export class AttendanceService {
     return updated;
   }
 
+  async resetFace(employeeId: string) {
+    try {
+      await this.fr.deleteFace(employeeId);
+    } catch {
+      // FR service may be unavailable — continue to mark as unenrolled anyway
+    }
+    await this.prisma.employee.update({
+      where: { id: employeeId },
+      data: { faceEnrolled: false },
+    });
+    return { message: 'Face data reset. Please re-enroll on next login.' };
+  }
+
   async enrollFace(employeeId: string, frames: string[]) {
     if (!frames.length) {
       throw new BadRequestException('No frames provided for enrollment');
     }
 
-    let frStored = false;
     try {
       await this.fr.enroll(employeeId, frames);
-      frStored = true;
     } catch (err) {
-      // FR service unavailable (cold start / offline) — mark enrolled anyway.
-      // Embedding will be missing; softVerifyFace will pass without checking.
+      const msg = (err as Error).message ?? '';
+      const isServiceDown = msg.toLowerCase().includes('unavailable');
+      if (!isServiceDown) {
+        // Face detection failed in all frames — tell the user to retry
+        throw new BadRequestException(
+          msg || 'No face detected in the captured frames. Please retry in better lighting.',
+        );
+      }
+      // FR service is down — mark enrolled anyway so the user isn't permanently blocked;
+      // punch-in will soft-pass until the service comes back.
       this.logger.warn(
-        `FR service unavailable during enrollment for ${employeeId}: ${(err as Error).message}. Marking enrolled without embedding.`,
+        `FR service down during enrollment for ${employeeId}. Marking enrolled without embedding.`,
       );
     }
 
@@ -273,12 +298,7 @@ export class AttendanceService {
       data: { faceEnrolled: true },
     });
 
-    return {
-      message: frStored
-        ? 'Face enrolled successfully with recognition data.'
-        : 'Enrolled — face recognition data will sync when the service is available.',
-      frStored,
-    };
+    return { message: 'Face enrolled successfully.' };
   }
 
   private async attendancePolicy() {

@@ -170,7 +170,7 @@ export default function DashboardPage() {
   const expiringLeaves = leavesAvailable;
 
   return (
-    <div className="space-y-8 max-w-6xl animate-fade-up">
+    <div className="space-y-8 w-full animate-fade-up">
       {/* Header row */}
       <div className="flex items-end justify-between gap-6 flex-wrap">
         <div>

@@ -1,6 +1,8 @@
 import {
   Injectable,
   UnauthorizedException,
+  NotFoundException,
+  BadRequestException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
@@ -83,6 +85,38 @@ export class AuthService {
       where: { token },
       data: { isRevoked: true },
     });
+  }
+
+  async forgotPassword(email: string, newPassword: string) {
+    const employee = await this.prisma.employee.findUnique({
+      where: { email },
+      select: { id: true, status: true },
+    });
+    if (!employee || employee.status !== 'ACTIVE') {
+      throw new NotFoundException('No active account found with that email');
+    }
+    const hash = await bcrypt.hash(newPassword, 10);
+    await this.prisma.employee.update({
+      where: { id: employee.id },
+      data: { passwordHash: hash },
+    });
+    return { message: 'Password reset successfully. You can now log in.' };
+  }
+
+  async changePassword(employeeId: string, currentPassword: string, newPassword: string) {
+    const employee = await this.prisma.employee.findUnique({
+      where: { id: employeeId },
+      select: { passwordHash: true },
+    });
+    if (!employee) throw new NotFoundException('Employee not found');
+    const valid = await bcrypt.compare(currentPassword, employee.passwordHash);
+    if (!valid) throw new BadRequestException('Current password is incorrect');
+    const hash = await bcrypt.hash(newPassword, 10);
+    await this.prisma.employee.update({
+      where: { id: employeeId },
+      data: { passwordHash: hash },
+    });
+    return { message: 'Password changed successfully' };
   }
 
   private async generateTokens(id: string, email: string, role: string) {

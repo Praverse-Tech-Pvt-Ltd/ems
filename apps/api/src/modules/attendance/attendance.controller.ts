@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Patch, Body, Param, Query, UseGuards } from '@nestjs/common';
+import { Controller, Post, Delete, Get, Patch, Body, Param, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { AttendanceService } from './attendance.service';
 import { FaceRecognitionService } from './face-recognition.service';
@@ -42,6 +42,11 @@ export class AttendanceController {
   @Post('face/enroll')
   enrollFace(@CurrentUser() user: { id: string }, @Body() body: { frames?: string[] }) {
     return this.service.enrollFace(user.id, body.frames ?? []);
+  }
+
+  @Delete('face/reset')
+  resetMyFace(@CurrentUser() user: { id: string }) {
+    return this.service.resetFace(user.id);
   }
 
   @Get('today')

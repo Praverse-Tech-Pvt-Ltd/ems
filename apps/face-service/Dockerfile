@@ -9,20 +9,25 @@ WORKDIR /app
 
 # Install CPU-only torch from PyTorch index
 RUN pip install --no-cache-dir \
-    "numpy==1.26.4" \
-    torch==2.2.2+cpu \
-    torchvision==0.17.2+cpu \
+    torch==2.6.0+cpu \
+    torchvision==0.21.0+cpu \
     --index-url https://download.pytorch.org/whl/cpu
 
-# Install remaining deps — numpy already satisfied, pip won't upgrade it
+# facenet-pytorch installed with --no-deps: its torch<2.3 pin is stale but the code is compatible
+RUN pip install --no-cache-dir --no-deps facenet-pytorch==2.6.0
+
+# Install remaining deps
 RUN pip install --no-cache-dir \
     fastapi==0.115.0 \
     "uvicorn[standard]==0.30.6" \
     python-multipart==0.0.9 \
+    "numpy>=1.24,<2.0" \
+    "requests>=2.0.0,<3.0.0" \
+    "tqdm>=4.0.0,<5.0.0" \
     opencv-python-headless==4.10.0.84 \
-    "facenet-pytorch==2.6.0" \
-    psycopg2-binary==2.9.9 \
+    "psycopg2-binary>=2.9.9" \
     pgvector==0.3.2 \
+    pydantic-settings==2.3.4 \
     python-dotenv==1.0.1 \
     "Pillow==10.2.0"
 

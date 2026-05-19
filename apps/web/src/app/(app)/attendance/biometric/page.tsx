@@ -42,6 +42,12 @@ export default function BiometricPage() {
     setFrameCount(0);
     setProgress(0);
 
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setState('error');
+      setMessage('Camera API not available. Open the app on http://localhost:3000 (not an IP address) — browsers block camera on non-HTTPS/non-localhost URLs.');
+      return;
+    }
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'user', width: 480, height: 480 },
@@ -51,9 +57,21 @@ export default function BiometricPage() {
         videoRef.current.srcObject = stream;
         await videoRef.current.play();
       }
-    } catch {
+    } catch (err: unknown) {
+      console.error('[Camera] getUserMedia failed:', err);
+      const name = (err as { name?: string })?.name ?? '';
+      if (name === 'NotFoundError' || name === 'DevicesNotFoundError') {
+        setMessage('No camera found. Plug in a webcam and try again.');
+      } else if (name === 'NotReadableError' || name === 'TrackStartError') {
+        setMessage('Camera is in use by another app (Teams, Zoom, etc.). Close it and try again.');
+      } else if (name === 'OverconstrainedError') {
+        setMessage('Camera does not support the required resolution. Try a different camera.');
+      } else if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
+        setMessage('Permission denied. Click the camera icon in the browser address bar, allow access, then refresh the page.');
+      } else {
+        setMessage(`Camera error: ${name || 'unknown'}. Ensure the app is open at localhost:3000.`);
+      }
       setState('error');
-      setMessage('Camera access denied. Please allow camera permissions and try again.');
       return;
     }
 
@@ -173,7 +191,7 @@ export default function BiometricPage() {
             playsInline
             muted
             className={`absolute inset-0 w-full h-full object-cover scale-x-[-1] transition-opacity duration-300 ${
-              isActive && state !== 'processing' ? 'opacity-80 grayscale' : 'opacity-0'
+              isActive && state !== 'processing' ? 'opacity-100' : 'opacity-0'
             }`}
           />
 

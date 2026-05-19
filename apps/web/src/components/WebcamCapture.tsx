@@ -26,6 +26,10 @@ export function WebcamCapture({
   const [error, setError] = useState<string | null>(null);
 
   const startCamera = useCallback(async () => {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setError('Camera not available. Open the app at http://localhost:3000 — browsers block camera on non-HTTPS/non-localhost URLs.');
+      return;
+    }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { width, height, facingMode: 'user' },
@@ -35,8 +39,17 @@ export function WebcamCapture({
         videoRef.current.srcObject = stream;
         videoRef.current.onloadedmetadata = () => setReady(true);
       }
-    } catch {
-      setError('Camera access denied. Please allow camera permissions.');
+    } catch (err: unknown) {
+      const name = (err as { name?: string })?.name ?? '';
+      if (name === 'NotFoundError' || name === 'DevicesNotFoundError') {
+        setError('No camera found. Plug in a webcam and try again.');
+      } else if (name === 'NotReadableError' || name === 'TrackStartError') {
+        setError('Camera is in use by another app. Close Teams, Zoom, etc. and try again.');
+      } else if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
+        setError('Permission denied. Click the camera icon in the address bar, allow access, then refresh.');
+      } else {
+        setError(`Camera error (${name || 'unknown'}). Ensure the app is open at localhost:3000.`);
+      }
     }
   }, [width, height]);
 
@@ -76,29 +89,28 @@ export function WebcamCapture({
   return (
     <div className="flex flex-col items-center gap-4">
       {error ? (
-        <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-red-700 text-sm">
+        <div className="w-full brutal-border bg-brutal-red text-white px-4 py-3 font-display font-bold text-xs uppercase tracking-widest">
           {error}
         </div>
       ) : (
         <>
-          <div className="relative rounded-xl overflow-hidden border-2 border-gray-200 shadow-md">
+          <div className="relative overflow-hidden brutal-border" style={{ width, height }}>
             <video
               ref={videoRef}
               autoPlay
               playsInline
               muted
-              className="block"
+              className="block w-full h-full object-cover scale-x-[-1]"
               style={{ width, height }}
             />
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <div
-                className="rounded-full border-2 border-dashed border-white/60"
-                style={{ width: 180, height: 220 }}
-              />
+              <div className="w-36 h-48 border-[3px] border-dashed border-brutal-yellow rounded-full opacity-70" />
             </div>
             {!ready && (
-              <div className="absolute inset-0 bg-gray-900/60 flex items-center justify-center">
-                <span className="text-white text-sm">Starting camera…</span>
+              <div className="absolute inset-0 bg-brutal-ink/80 flex items-center justify-center">
+                <span className="font-display font-bold text-xs tracking-widest text-brutal-cream uppercase">
+                  Starting camera…
+                </span>
               </div>
             )}
           </div>
@@ -107,7 +119,7 @@ export function WebcamCapture({
             <button
               onClick={handleManualCapture}
               disabled={!ready}
-              className="px-6 py-2 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="brutal-btn-primary px-6 py-3 text-sm disabled:opacity-50"
             >
               Capture Photo
             </button>

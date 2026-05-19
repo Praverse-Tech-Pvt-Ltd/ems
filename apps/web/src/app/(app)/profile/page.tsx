@@ -15,14 +15,17 @@ import {
   FileCheck2,
   Fingerprint,
   IdCard,
+  KeyRound,
   Mail,
   Phone,
+  RefreshCw,
   Shield,
   Upload,
   User,
   XCircle,
 } from 'lucide-react';
 import Link from 'next/link';
+import { FaceEnrollModal } from '@/components/layouts/FaceEnrollModal';
 
 type Requirement = { key: string; label: string; complete: boolean };
 type Onboarding = {
@@ -49,6 +52,17 @@ export default function ProfilePage() {
   const [panNumber, setPanNumber] = useState('');
   const [aadhaarLast4, setAadhaarLast4] = useState('');
 
+  // Change password state
+  const [currentPw, setCurrentPw] = useState('');
+  const [newPw, setNewPw] = useState('');
+  const [confirmPw, setConfirmPw] = useState('');
+  const [pwError, setPwError] = useState('');
+  const [pwSuccess, setPwSuccess] = useState('');
+
+  // Face reset state
+  const [showEnrollModal, setShowEnrollModal] = useState(false);
+  const [faceResetConfirm, setFaceResetConfirm] = useState(false);
+
   const { data: profile, isLoading } = useQuery<Employee & { manager?: Employee }>({
     queryKey: ['profile'],
     queryFn: () => apiClient.get('/employees/me').then((r) => r.data),
@@ -63,6 +77,40 @@ export default function ProfilePage() {
     queryClient.invalidateQueries({ queryKey: ['profile'] });
     queryClient.invalidateQueries({ queryKey: ['profile-onboarding'] });
   };
+
+  const changePw = useMutation({
+    mutationFn: () => apiClient.patch('/auth/change-password', {
+      currentPassword: currentPw,
+      newPassword: newPw,
+    }),
+    onSuccess: () => {
+      setPwSuccess('Password changed successfully.');
+      setPwError('');
+      setCurrentPw(''); setNewPw(''); setConfirmPw('');
+    },
+    onError: (err: unknown) => {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      setPwError(msg ?? 'Failed to change password.');
+      setPwSuccess('');
+    },
+  });
+
+  const handleChangePw = () => {
+    setPwError(''); setPwSuccess('');
+    if (newPw !== confirmPw) { setPwError('Passwords do not match.'); return; }
+    if (newPw.length < 8) { setPwError('New password must be at least 8 characters.'); return; }
+    changePw.mutate();
+  };
+
+  const resetFace = useMutation({
+    mutationFn: () => apiClient.delete('/attendance/face/reset'),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['profile'] });
+      queryClient.invalidateQueries({ queryKey: ['me-face'] });
+      setFaceResetConfirm(false);
+      setShowEnrollModal(true);
+    },
+  });
 
   const saveBank = useMutation({
     mutationFn: () => apiClient.patch('/employees/me/bank-details', {
@@ -119,7 +167,7 @@ export default function ProfilePage() {
   const completionPercent = onboarding?.completionPercent ?? Math.round((completed / requirements.length) * 100);
 
   return (
-    <div className="space-y-8 max-w-6xl">
+    <div className="space-y-8 w-full">
       <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-5">
         <div>
           <h1 className="font-display font-bold text-5xl uppercase tracking-tighter text-brutal-ink leading-none">
@@ -275,26 +323,108 @@ export default function ProfilePage() {
             ))}
           </div>
 
-          <div className={`brutal-border brutal-shadow p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 ${
-            profile.faceEnrolled ? 'bg-brutal-yellow' : 'bg-brutal-surface'
-          }`}>
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-brutal-ink text-brutal-yellow flex items-center justify-center">
-                <Fingerprint size={20} />
+          {/* Face ID card */}
+          <div className={`brutal-border brutal-shadow p-5 ${profile.faceEnrolled ? 'bg-brutal-yellow' : 'bg-brutal-surface'}`}>
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-brutal-ink text-brutal-yellow flex items-center justify-center">
+                  <Fingerprint size={20} />
+                </div>
+                <div>
+                  <p className="font-display font-bold uppercase">Face ID</p>
+                  <p className="font-display font-bold text-[10px] uppercase tracking-widest text-[#4a4a4a]">
+                    {profile.faceEnrolled ? 'Enrolled · used for all punch-ins' : 'Required on first login for attendance'}
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="font-display font-bold uppercase">Face Recognition Capture</p>
-                <p className="font-display font-bold text-[10px] uppercase tracking-widest text-[#4a4a4a]">
-                  {profile.faceEnrolled ? 'Captured and enrolled' : 'Required on first login for attendance'}
-                </p>
+              <div className="flex gap-2 flex-wrap">
+                <Link href="/attendance/biometric" className="brutal-btn-secondary px-4 py-2 text-xs text-center">
+                  {profile.faceEnrolled ? 'Re-enroll' : 'Enroll Now'}
+                </Link>
+                {profile.faceEnrolled && (
+                  <button
+                    onClick={() => setFaceResetConfirm(true)}
+                    className="brutal-border px-4 py-2 text-xs font-display font-bold uppercase tracking-wide bg-brutal-red text-white hover:bg-brutal-ink transition-colors flex items-center gap-1.5"
+                  >
+                    <RefreshCw size={12} /> Reset Face ID
+                  </button>
+                )}
               </div>
             </div>
-            <Link href="/attendance/biometric" className="brutal-btn-secondary px-4 py-2 text-xs text-center">
-              {profile.faceEnrolled ? 'Recapture' : 'Capture Now'}
-            </Link>
+
+            {/* Reset confirmation */}
+            {faceResetConfirm && (
+              <div className="mt-4 brutal-border border-brutal-red bg-white p-4">
+                <p className="font-display font-bold text-sm uppercase text-brutal-red mb-3">
+                  This will delete your stored face data and require re-enrollment. Continue?
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => resetFace.mutate()}
+                    disabled={resetFace.isPending}
+                    className="brutal-btn-primary px-4 py-2 text-xs bg-brutal-red border-brutal-red disabled:opacity-50"
+                  >
+                    {resetFace.isPending ? 'Resetting…' : 'Yes, Reset'}
+                  </button>
+                  <button
+                    onClick={() => setFaceResetConfirm(false)}
+                    className="brutal-btn-secondary px-4 py-2 text-xs"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Change Password */}
+          <div className="bg-brutal-white brutal-border brutal-shadow p-5">
+            <h3 className="font-display font-bold text-lg uppercase brutal-border-b pb-3 mb-4 flex items-center gap-2">
+              <KeyRound size={18} /> Change Password
+            </h3>
+            <div className="space-y-3">
+              {[
+                ['Current Password', currentPw, setCurrentPw],
+                ['New Password', newPw, setNewPw],
+                ['Confirm New Password', confirmPw, setConfirmPw],
+              ].map(([label, value, setter]) => (
+                <label key={label as string} className="block">
+                  <span className="font-display font-bold text-[10px] uppercase tracking-widest text-[#4a4a4a]">{label as string}</span>
+                  <input
+                    type="password"
+                    value={value as string}
+                    onChange={(e) => (setter as (v: string) => void)(e.target.value)}
+                    placeholder="••••••••"
+                    className="mt-1 w-full brutal-border bg-brutal-surface px-3 py-2 font-body text-sm focus:outline-none focus:border-brutal-blue"
+                  />
+                </label>
+              ))}
+            </div>
+            {pwError && (
+              <p className="mt-2 font-display font-bold text-xs uppercase text-brutal-red">{pwError}</p>
+            )}
+            {pwSuccess && (
+              <p className="mt-2 font-display font-bold text-xs uppercase text-[#0F8F3A]">{pwSuccess}</p>
+            )}
+            <button
+              disabled={changePw.isPending || !currentPw || !newPw || !confirmPw}
+              onClick={handleChangePw}
+              className="mt-4 brutal-btn-primary px-4 py-3 text-xs disabled:opacity-40 flex items-center gap-2"
+            >
+              <KeyRound size={14} />
+              {changePw.isPending ? 'Saving…' : 'Update Password'}
+            </button>
           </div>
         </section>
       </div>
+
+      {showEnrollModal && (
+        <FaceEnrollModal onDone={() => {
+          setShowEnrollModal(false);
+          queryClient.invalidateQueries({ queryKey: ['me-face'] });
+          queryClient.invalidateQueries({ queryKey: ['profile'] });
+        }} />
+      )}
     </div>
   );
 }
