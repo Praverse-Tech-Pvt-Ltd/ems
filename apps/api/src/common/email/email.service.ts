@@ -6,7 +6,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { createResendClient } from './resend.client';
 import { render } from '@react-email/components';
 import * as React from 'react';
-import { QUEUE_EMAIL_NAME } from './email.module';
+import { QUEUE_EMAIL_NAME } from './email.constants';
 
 import {
   WelcomeEmail,
@@ -67,7 +67,7 @@ export class EmailService {
 
   // 1. Send OTP (Direct, not enqueued to avoid authentication delay)
   async sendOtp(to: string, otpCode: string) {
-    const from = this.config.get<string>('SES_FROM_EMAIL', 'noreply@yourdomain.com');
+    const from = `${this.config.get<string>('RESEND_FROM_NAME', 'NexGen Pharma EMS')} <${this.config.get<string>('RESEND_FROM_EMAIL', 'noreply@nexgenpharma.com')}>`;
     const html = await render(React.createElement(OtpEmail, { otpCode }));
     const text = getOtpText(otpCode);
 
@@ -250,7 +250,7 @@ export class EmailService {
         throw new Error(`Unsupported email action: ${action}`);
     }
 
-    const from = this.config.get<string>('SES_FROM_EMAIL', 'noreply@yourdomain.com');
+    const from = `${this.config.get<string>('RESEND_FROM_NAME', 'NexGen Pharma EMS')} <${this.config.get<string>('RESEND_FROM_EMAIL', 'noreply@nexgenpharma.com')}>`;
     const response = await this.resend.emails.send({
       from,
       to,

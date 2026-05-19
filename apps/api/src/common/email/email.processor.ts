@@ -1,7 +1,7 @@
 import { Process, Processor } from '@nestjs/bull';
 import { Job } from 'bull';
 import { EmailService } from './email.service';
-import { QUEUE_EMAIL_NAME } from './email.module';
+import { QUEUE_EMAIL_NAME } from './email.constants';
 import { Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
