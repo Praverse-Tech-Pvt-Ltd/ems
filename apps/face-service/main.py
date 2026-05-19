@@ -2,7 +2,6 @@ import os
 import io
 import base64
 import logging
-import tempfile
 from typing import Optional
 
 import cv2
@@ -12,7 +11,8 @@ from fastapi import FastAPI, File, UploadFile, HTTPException, Form
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
-from deepface import DeepFace
+import insightface
+from insightface.app import FaceAnalysis
 
 import psycopg2
 from psycopg2.extras import RealDictCursor
@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 app = FastAPI(
     title="Face Recognition Service",
     description="Face encoding, registration, and recognition for EMS",
-    version="2.0.0",
+    version="3.0.0",
 )
 
 app.add_middleware(
@@ -39,10 +39,11 @@ app.add_middleware(
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 RECOGNITION_THRESHOLD = float(os.getenv("RECOGNITION_THRESHOLD", "0.5"))
-
-# DeepFace model — Facenet512 gives 512-d embeddings, no C++ needed
-MODEL_NAME = "Facenet512"
 EMBEDDING_DIM = 512
+
+# Initialise InsightFace (downloads ONNX models on first run, ~100MB)
+face_app = FaceAnalysis(name="buffalo_sc", providers=["CPUExecutionProvider"])
+face_app.prepare(ctx_id=0, det_size=(640, 640))
 
 
 def get_db():
@@ -53,7 +54,7 @@ def get_db():
 
 def image_array_from_bytes(file_bytes: bytes) -> np.ndarray:
     image = Image.open(io.BytesIO(file_bytes)).convert("RGB")
-    return np.array(image)
+    return cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
 
 
 def image_array_from_base64(b64_string: str) -> np.ndarray:
@@ -62,51 +63,39 @@ def image_array_from_base64(b64_string: str) -> np.ndarray:
     return image_array_from_bytes(base64.b64decode(b64_string))
 
 
-def encode_face(image_array: np.ndarray) -> Optional[list]:
-    """Return 512-d face embedding using DeepFace/Facenet512, or None if no face."""
-    try:
-        # DeepFace needs a file path or BGR array — convert RGB→BGR
-        bgr = cv2.cvtColor(image_array, cv2.COLOR_RGB2BGR)
-        result = DeepFace.represent(
-            img_path=bgr,
-            model_name=MODEL_NAME,
-            enforce_detection=True,
-            detector_backend="opencv",
-        )
-        return result[0]["embedding"]
-    except Exception as e:
-        logger.warning("Face encoding failed: %s", e)
+def encode_face(bgr_image: np.ndarray) -> Optional[list]:
+    """Return 512-d InsightFace embedding or None if no face detected."""
+    faces = face_app.get(bgr_image)
+    if not faces:
         return None
+    # Use the largest detected face
+    face = max(faces, key=lambda f: (f.bbox[2] - f.bbox[0]) * (f.bbox[3] - f.bbox[1]))
+    return face.normed_embedding.tolist()
 
 
-# ── Request / Response models ──────────────────────────────────────────────
+# ── Models ─────────────────────────────────────────────────────────────────
 
 class RegisterRequest(BaseModel):
     employee_id: str
     image_base64: str
 
-
 class RecognizeRequest(BaseModel):
     image_base64: str
-
 
 class VerifyRequest(BaseModel):
     employee_id: str
     image_base64: str
-
 
 class RegisterResponse(BaseModel):
     success: bool
     employee_id: str
     message: str
 
-
 class RecognizeResponse(BaseModel):
     success: bool
     employee_id: Optional[str] = None
     confidence: Optional[float] = None
     message: str
-
 
 class VerifyResponse(BaseModel):
     success: bool
@@ -119,7 +108,7 @@ class VerifyResponse(BaseModel):
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "service": "face-recognition", "model": MODEL_NAME}
+    return {"status": "ok", "service": "face-recognition", "model": "insightface/buffalo_sc"}
 
 
 @app.post("/register", response_model=RegisterResponse)
@@ -141,8 +130,7 @@ def register_face(payload: RegisterRequest):
                 INSERT INTO face_embeddings (employee_id, embedding)
                 VALUES (%s, %s)
                 ON CONFLICT (employee_id)
-                DO UPDATE SET embedding = EXCLUDED.embedding,
-                              updated_at = NOW()
+                DO UPDATE SET embedding = EXCLUDED.embedding, updated_at = NOW()
                 """,
                 (payload.employee_id, encoding),
             )
@@ -154,18 +142,11 @@ def register_face(payload: RegisterRequest):
     finally:
         conn.close()
 
-    return RegisterResponse(
-        success=True,
-        employee_id=payload.employee_id,
-        message="Face registered successfully",
-    )
+    return RegisterResponse(success=True, employee_id=payload.employee_id, message="Face registered successfully")
 
 
 @app.post("/register/upload", response_model=RegisterResponse)
-async def register_face_upload(
-    employee_id: str = Form(...),
-    file: UploadFile = File(...),
-):
+async def register_face_upload(employee_id: str = Form(...), file: UploadFile = File(...)):
     file_bytes = await file.read()
     try:
         image = image_array_from_bytes(file_bytes)
@@ -184,8 +165,7 @@ async def register_face_upload(
                 INSERT INTO face_embeddings (employee_id, embedding)
                 VALUES (%s, %s)
                 ON CONFLICT (employee_id)
-                DO UPDATE SET embedding = EXCLUDED.embedding,
-                              updated_at = NOW()
+                DO UPDATE SET embedding = EXCLUDED.embedding, updated_at = NOW()
                 """,
                 (employee_id, encoding),
             )
@@ -197,11 +177,7 @@ async def register_face_upload(
     finally:
         conn.close()
 
-    return RegisterResponse(
-        success=True,
-        employee_id=employee_id,
-        message="Face registered successfully",
-    )
+    return RegisterResponse(success=True, employee_id=employee_id, message="Face registered successfully")
 
 
 @app.post("/recognize", response_model=RecognizeResponse)
@@ -220,8 +196,7 @@ def recognize_face(payload: RecognizeRequest):
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute(
                 """
-                SELECT employee_id,
-                       1 - (embedding <=> %s::vector) AS confidence
+                SELECT employee_id, 1 - (embedding <=> %s::vector) AS confidence
                 FROM face_embeddings
                 ORDER BY embedding <=> %s::vector
                 LIMIT 1
@@ -240,17 +215,9 @@ def recognize_face(payload: RecognizeRequest):
 
     confidence = float(row["confidence"])
     if confidence < (1 - RECOGNITION_THRESHOLD):
-        return RecognizeResponse(
-            success=False,
-            message=f"No match found (best confidence: {confidence:.2f})",
-        )
+        return RecognizeResponse(success=False, message=f"No match found (best confidence: {confidence:.2f})")
 
-    return RecognizeResponse(
-        success=True,
-        employee_id=row["employee_id"],
-        confidence=confidence,
-        message="Employee identified successfully",
-    )
+    return RecognizeResponse(success=True, employee_id=row["employee_id"], confidence=confidence, message="Employee identified successfully")
 
 
 @app.post("/verify", response_model=VerifyResponse)
@@ -287,13 +254,7 @@ def verify_face(payload: VerifyRequest):
 
     confidence = float(row["confidence"])
     matched = confidence >= (1 - RECOGNITION_THRESHOLD)
-
-    return VerifyResponse(
-        success=True,
-        match=matched,
-        confidence=confidence,
-        message="Match" if matched else "No match",
-    )
+    return VerifyResponse(success=True, match=matched, confidence=confidence, message="Match" if matched else "No match")
 
 
 @app.delete("/employee/{employee_id}")
@@ -301,10 +262,7 @@ def delete_face(employee_id: str):
     conn = get_db()
     try:
         with conn.cursor() as cur:
-            cur.execute(
-                "DELETE FROM face_embeddings WHERE employee_id = %s",
-                (employee_id,),
-            )
+            cur.execute("DELETE FROM face_embeddings WHERE employee_id = %s", (employee_id,))
             deleted = cur.rowcount
             conn.commit()
     except Exception as e:
