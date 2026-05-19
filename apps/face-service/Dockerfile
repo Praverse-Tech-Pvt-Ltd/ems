@@ -7,21 +7,20 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-# Install CPU-only torch first from the PyTorch index to avoid downloading CUDA builds
+# Install CPU-only torch from PyTorch index
 RUN pip install --no-cache-dir \
+    "numpy==1.26.4" \
     torch==2.2.2+cpu \
     torchvision==0.17.2+cpu \
     --index-url https://download.pytorch.org/whl/cpu
 
-COPY apps/face-service/requirements.txt .
-# Skip torch/torchvision in main install since already installed above
+# Install remaining deps — numpy already satisfied, pip won't upgrade it
 RUN pip install --no-cache-dir \
     fastapi==0.115.0 \
     "uvicorn[standard]==0.30.6" \
     python-multipart==0.0.9 \
-    "numpy>=1.24,<2.0" \
     opencv-python-headless==4.10.0.84 \
-    facenet-pytorch==2.6.0 \
+    "facenet-pytorch==2.6.0" \
     psycopg2-binary==2.9.9 \
     pgvector==0.3.2 \
     python-dotenv==1.0.1 \
