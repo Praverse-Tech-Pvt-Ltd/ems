@@ -207,8 +207,6 @@ model Employee {
   faceEmbedding    Json?          @map("face_embedding")
   faceVectorS3Key  String?        @map("face_vector_s3_key")
   status           EmployeeStatus @default(ACTIVE)
-  totpSecret       String?        @map("totp_secret")
-  totpEnabled      Boolean        @default(false) @map("totp_enabled")
   address          String?
   emergencyContact String?        @map("emergency_contact")
   createdAt        DateTime       @default(now()) @map("created_at")
@@ -240,6 +238,7 @@ model Employee {
   attendanceRegularized  AttendanceRecord[] @relation("AttendanceRegularizer")
   consentRecords         ConsentRecord[]
   refreshTokens          RefreshToken[]
+  passwordResetTokens    PasswordResetToken[]
   documents              EmployeeDocument[]
   tasksCreated           Task[]             @relation("TaskCreator")
   taskAssignments        TaskAssignment[]
@@ -699,3 +698,19 @@ model EmployeeLifecycleEvent {
 
   @@map("employee_lifecycle_events")
 }
+
+model PasswordResetToken {
+  id           String    @id @default(uuid())
+  employeeId   String    @map("employee_id")
+  otpHash      String    @map("otp_hash")
+  expiresAt    DateTime  @map("expires_at") @db.Timestamptz
+  usedAt       DateTime? @map("used_at") @db.Timestamptz
+  attemptCount Int       @default(0) @map("attempt_count")
+  ipAddress    String    @map("ip_address") @db.VarChar(45)
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  employee     Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@map("password_reset_tokens")
+}
+

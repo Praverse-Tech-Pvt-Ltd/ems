@@ -95,14 +95,14 @@ npm --workspace @nexgen/web run dev
 ### Super Admin
 | Field | Value |
 |---|---|
-| Email | `superadmin@nexgen.in` |
+| Email | `ashwani@nexgenpharmasolutions.com` |
 | Password | `Admin@123456` |
 | Role | `SUPER_ADMIN` — full access including audit logs and destructive operations |
 
 ### Admin
 | Field | Value |
 |---|---|
-| Email | `admin@nexgen.in` |
+| Email | `pratham.s@nexgenharmasolutions.com` |
 | Password | `Admin@123456` |
 | Role | `ADMIN` — employee management, payroll, approvals |
 

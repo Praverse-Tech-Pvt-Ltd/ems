@@ -96,8 +96,8 @@ npx ts-node packages/db/prisma/seed.ts
 ```
 
 Creates:
-- `superadmin@nexgen.in` / `Admin@123456` (SUPER_ADMIN, NXG-001)
-- `admin@nexgen.in` / `Admin@123456` (ADMIN, NXG-002)
+- `ashwani@nexgenpharmasolutions.com` / `Admin@123456` (SUPER_ADMIN, NXG-001)
+- `pratham.s@nexgenharmasolutions.com` / `Admin@123456` (ADMIN, NXG-002)
 - Leave balances: CL=7, SL=7, PL=14, OD=0, UL=0
 
 ---

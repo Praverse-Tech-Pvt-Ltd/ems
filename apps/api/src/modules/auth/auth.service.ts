@@ -1,14 +1,10 @@
 import {
   Injectable,
   UnauthorizedException,
-  ConflictException,
-  BadRequestException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcryptjs';
-import * as speakeasy from 'speakeasy';
-import * as QRCode from 'qrcode';
 import { PrismaService } from '../../common/prisma/prisma.service';
 
 @Injectable()
@@ -19,7 +15,7 @@ export class AuthService {
     private config: ConfigService,
   ) {}
 
-  async login(email: string, password: string, totpCode?: string) {
+  async login(email: string, password: string) {
     const employee = await this.prisma.employee.findUnique({
       where: { email },
       select: {
@@ -30,8 +26,6 @@ export class AuthService {
         status: true,
         firstName: true,
         lastName: true,
-        totpEnabled: true,
-        totpSecret: true,
       },
     });
 
@@ -42,21 +36,6 @@ export class AuthService {
     const passwordValid = await bcrypt.compare(password, employee.passwordHash);
     if (!passwordValid) {
       throw new UnauthorizedException('Invalid credentials');
-    }
-
-    if (employee.totpEnabled) {
-      if (!totpCode) {
-        throw new UnauthorizedException('2FA code required');
-      }
-      const valid = speakeasy.totp.verify({
-        secret: employee.totpSecret!,
-        encoding: 'base32',
-        token: totpCode,
-        window: 1,
-      });
-      if (!valid) {
-        throw new UnauthorizedException('Invalid 2FA code');
-      }
     }
 
     const tokens = await this.generateTokens(employee.id, employee.email, employee.role);
@@ -104,56 +83,6 @@ export class AuthService {
       where: { token },
       data: { isRevoked: true },
     });
-  }
-
-  async setup2fa(employeeId: string) {
-    const employee = await this.prisma.employee.findUniqueOrThrow({
-      where: { id: employeeId },
-      select: { email: true, totpEnabled: true },
-    });
-
-    if (employee.totpEnabled) {
-      throw new ConflictException('2FA already enabled');
-    }
-
-    const secret = speakeasy.generateSecret({ name: `NexGen EMS (${employee.email})` });
-    const qrCodeUrl = await QRCode.toDataURL(secret.otpauth_url!);
-
-    await this.prisma.employee.update({
-      where: { id: employeeId },
-      data: { totpSecret: secret.base32 },
-    });
-
-    return { qrCode: qrCodeUrl, secret: secret.base32 };
-  }
-
-  async verify2fa(employeeId: string, token: string) {
-    const employee = await this.prisma.employee.findUniqueOrThrow({
-      where: { id: employeeId },
-      select: { totpSecret: true },
-    });
-
-    if (!employee.totpSecret) {
-      throw new BadRequestException('2FA setup not initiated');
-    }
-
-    const valid = speakeasy.totp.verify({
-      secret: employee.totpSecret,
-      encoding: 'base32',
-      token,
-      window: 1,
-    });
-
-    if (!valid) {
-      throw new UnauthorizedException('Invalid code');
-    }
-
-    await this.prisma.employee.update({
-      where: { id: employeeId },
-      data: { totpEnabled: true },
-    });
-
-    return { message: '2FA enabled successfully' };
   }
 
   private async generateTokens(id: string, email: string, role: string) {

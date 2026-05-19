@@ -46,7 +46,7 @@ status: active
 ### Super Admin
 | Field | Value |
 |-------|-------|
-| Email | `superadmin@nexgen.in` |
+| Email | `ashwani@nexgenpharmasolutions.com` |
 | Password | `Admin@123456` |
 | Employee Code | `NXG-001` |
 | Role | `SUPER_ADMIN` |
@@ -54,7 +54,7 @@ status: active
 ### Admin
 | Field | Value |
 |-------|-------|
-| Email | `admin@nexgen.in` |
+| Email | `pratham.s@nexgenharmasolutions.com` |
 | Password | `Admin@123456` |
 | Employee Code | `NXG-002` |
 | Role | `ADMIN` |
