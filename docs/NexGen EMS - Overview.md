@@ -49,15 +49,18 @@ status: active
 | Email | `ashwani@nexgenpharmasolutions.com` |
 | Password | `Admin@123456` |
 | Employee Code | `NXG-001` |
+| Designation | Managing Director |
 | Role | `SUPER_ADMIN` |
 
 ### Admin
 | Field | Value |
 |-------|-------|
-| Email | `pratham.s@nexgenharmasolutions.com` |
+| Email | `pratham.s@nexgenpharmasolutions.com` |
 | Password | `Admin@123456` |
 | Employee Code | `NXG-002` |
-| Role | `ADMIN` |
+| Designation | Director |
+| Role | `SUPER_ADMIN` |
+| Authority | Approval/rejection authority for all employee-submitted requests, including leaves, expenses, payroll, documents, invoices, attendance regularization, WFH, advances, assets, and travel approvals. |
 
 ---
 
@@ -70,6 +73,8 @@ status: active
 | Paid Leave | PL | 14 |
 | On Duty | OD | 0 |
 | Unpaid Leave | UL | 0 |
+
+Leave balances are annual and do not roll over. Unused paid leave (PL) is payable by the company as part of payroll/HR settlement. Interns do not receive the permanent employee leave allocation during internship; internship-period leave is deductible/unpaid.
 
 ---
 

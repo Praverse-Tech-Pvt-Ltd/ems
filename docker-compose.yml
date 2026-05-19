@@ -15,7 +15,7 @@ services:
 
   # ── PostgreSQL (local dev only — in prod use Neon) ───────────────────────────
   postgres:
-    image: postgres:16-alpine
+    image: pgvector/pgvector:pg16
     container_name: nexgen_db
     restart: unless-stopped
     ports:

@@ -5,13 +5,20 @@ declare const process: any;
 
 const prisma = new PrismaClient();
 
-const LEAVE_DEFAULTS = [
+const PERMANENT_LEAVE_DEFAULTS = [
   { leaveType: LeaveType.CL, totalDays: 7  },
   { leaveType: LeaveType.SL, totalDays: 7  },
   { leaveType: LeaveType.PL, totalDays: 14 },
   { leaveType: LeaveType.UL, totalDays: 0  },
   { leaveType: LeaveType.CO, totalDays: 0  },
 ];
+
+const INTERN_LEAVE_DEFAULTS = PERMANENT_LEAVE_DEFAULTS.map((leave) => ({
+  ...leave,
+  totalDays: 0,
+}));
+
+type SeedEmployee = Awaited<ReturnType<typeof prisma.employee.findUnique>>;
 
 async function ensureFaceRecognitionSchema() {
   await prisma.$executeRawUnsafe(`CREATE EXTENSION IF NOT EXISTS vector;`);
@@ -40,14 +47,138 @@ async function ensureFaceRecognitionSchema() {
   }
 }
 
-async function seedLeaves(employeeId: string) {
+async function seedLeaves(employeeId: string, isIntern = false) {
   const year = new Date().getFullYear();
-  for (const leave of LEAVE_DEFAULTS) {
+  const defaults = isIntern ? INTERN_LEAVE_DEFAULTS : PERMANENT_LEAVE_DEFAULTS;
+  for (const leave of defaults) {
     await prisma.leaveBalance.upsert({
       where: { employeeId_leaveType_year: { employeeId, leaveType: leave.leaveType, year } },
       update: { totalDays: leave.totalDays },
       create: { employeeId, year, ...leave, usedDays: 0 },
     });
+  }
+}
+
+async function seedSalaryStructure(
+  employeeId: string,
+  effectiveFrom: string,
+  monthlyAmount: number,
+  notes: string,
+  approvedBy?: string,
+) {
+  await prisma.salaryStructure.upsert({
+    where: {
+      employeeId_effectiveFrom: {
+        employeeId,
+        effectiveFrom: new Date(effectiveFrom),
+      },
+    },
+    update: {
+      basic: monthlyAmount,
+      hra: 0,
+      allowances: 0,
+      pfDeduction: 0,
+      professionalTax: 0,
+      tds: 0,
+      notes,
+      approvedBy,
+      approvedAt: approvedBy ? new Date() : undefined,
+    },
+    create: {
+      employeeId,
+      basic: monthlyAmount,
+      hra: 0,
+      allowances: 0,
+      pfDeduction: 0,
+      professionalTax: 0,
+      tds: 0,
+      effectiveFrom: new Date(effectiveFrom),
+      notes,
+      approvedBy,
+      approvedAt: approvedBy ? new Date() : undefined,
+    },
+  });
+}
+
+async function upsertSalarySlip(
+  employee: NonNullable<SeedEmployee>,
+  uploadedBy: string,
+  month: number,
+  year: number,
+  amount: number,
+  notes: string,
+  status: 'DRAFT' | 'APPROVED' | 'TRANSFERRED' = 'APPROVED',
+) {
+  const now = new Date();
+  await prisma.salarySlip.upsert({
+    where: {
+      employeeId_month_year: {
+        employeeId: employee.id,
+        month,
+        year,
+      },
+    },
+    update: {
+      baseSalary: amount,
+      incentives: 0,
+      reimbursements: 0,
+      grossSalary: amount,
+      deductions: 0,
+      netPayable: amount,
+      lopDays: 0,
+      daysPresent: 30,
+      notes,
+      status,
+      approvedBy: uploadedBy,
+      approvedAt: now,
+      transferredAt: status === 'TRANSFERRED' ? now : null,
+      paymentRef: status === 'TRANSFERRED' ? `SEEDED-${year}-${String(month).padStart(2, '0')}` : null,
+      slipPdfS3Key: `salary-slips/${year}/${String(month).padStart(2, '0')}/${employee.employeeCode}.pdf`,
+    },
+    create: {
+      employeeId: employee.id,
+      month,
+      year,
+      baseSalary: amount,
+      incentives: 0,
+      reimbursements: 0,
+      grossSalary: amount,
+      deductions: 0,
+      netPayable: amount,
+      lopDays: 0,
+      daysPresent: 30,
+      notes,
+      status,
+      uploadedBy,
+      approvedBy: uploadedBy,
+      approvedAt: now,
+      transferredAt: status === 'TRANSFERRED' ? now : null,
+      paymentRef: status === 'TRANSFERRED' ? `SEEDED-${year}-${String(month).padStart(2, '0')}` : null,
+      slipPdfS3Key: `salary-slips/${year}/${String(month).padStart(2, '0')}/${employee.employeeCode}.pdf`,
+    },
+  });
+}
+
+async function seedMonthlySlips(
+  employee: NonNullable<SeedEmployee>,
+  uploadedBy: string,
+  startMonth: number,
+  endMonth: number,
+  year: number,
+  amount: number,
+  notes: string,
+  transferredMonths: number[] = [],
+) {
+  for (let month = startMonth; month <= endMonth; month += 1) {
+    await upsertSalarySlip(
+      employee,
+      uploadedBy,
+      month,
+      year,
+      amount,
+      notes,
+      transferredMonths.includes(month) ? 'TRANSFERRED' : 'APPROVED',
+    );
   }
 }
 
@@ -75,6 +206,7 @@ async function main() {
         lastName: 'Shrivastav',
         passwordHash: superAdminHash,
         role: Role.SUPER_ADMIN,
+        designation: 'Managing Director',
       }
     });
   } else {
@@ -86,6 +218,7 @@ async function main() {
         firstName:    'Ashwani',
         lastName:     'Shrivastav',
         role:         Role.SUPER_ADMIN,
+        designation:  'Managing Director',
         status:       EmployeeStatus.ACTIVE,
         joiningDate:  new Date('2024-01-01'),
       }
@@ -104,42 +237,65 @@ async function main() {
   const adminHash = await bcrypt.hash('Admin@123456', 10);
 
   let adminRecord = await prisma.employee.findFirst({
-    where: { OR: [{ employeeCode: 'NXG-002' }, { email: 'admin@nexgen.in' }, { email: 'pratham.s@nexgenharmasolutions.com' }] }
+    where: { OR: [{ employeeCode: 'NXG-002' }, { email: 'admin@nexgen.in' }, { email: 'pratham.s@nexgenharmasolutions.com' }, { email: 'pratham.s@nexgenpharmasolutions.com' }] }
   });
 
   if (adminRecord) {
     await prisma.employee.update({
       where: { id: adminRecord.id },
       data: {
-        email: 'pratham.s@nexgenharmasolutions.com',
+        email: 'pratham.s@nexgenpharmasolutions.com',
         firstName: 'Pratham',
         lastName: 'Shrivastav',
         passwordHash: adminHash,
         role: Role.SUPER_ADMIN,
+        designation: 'Director',
+        salaryGrade: 'PERMANENT_FIXED_VARIABLE',
+        grossSalary: 200000,
+        joiningDate: new Date('2024-01-01'),
       }
     });
   } else {
     await prisma.employee.create({
       data: {
         employeeCode: 'NXG-002',
-        email:        'pratham.s@nexgenharmasolutions.com',
+        email:        'pratham.s@nexgenpharmasolutions.com',
         passwordHash: adminHash,
         firstName:    'Pratham',
         lastName:     'Shrivastav',
         role:         Role.SUPER_ADMIN,
         status:       EmployeeStatus.ACTIVE,
         joiningDate:  new Date('2024-01-01'),
+        designation:  'Director',
+        salaryGrade:  'PERMANENT_FIXED_VARIABLE',
+        grossSalary:  200000,
       }
     });
   }
 
   const admin = await prisma.employee.findUnique({
-    where: { email: 'pratham.s@nexgenharmasolutions.com' }
+    where: { email: 'pratham.s@nexgenpharmasolutions.com' }
   });
   if (admin) {
     await seedLeaves(admin.id);
+    await seedSalaryStructure(
+      admin.id,
+      '2026-01-01',
+      100000,
+      'Monthly fixed component INR 1,00,000. Variable component up to INR 1,00,000 per month to be updated by Pratham as applicable.',
+      admin.id,
+    );
+    await seedMonthlySlips(
+      admin,
+      admin.id,
+      1,
+      5,
+      year,
+      100000,
+      'Fixed monthly salary. Variable component is not included and will be updated by Pratham when applicable.',
+    );
   }
-  console.log(`✓ Super Admin   →  pratham.s@nexgenharmasolutions.com       /  Admin@123456`);
+  console.log(`✓ Super Admin   →  pratham.s@nexgenpharmasolutions.com      /  Admin@123456`);
 
   // ── Departments ──────────────────────────────────────────────────────────────
   console.log(`\n── Seeding Departments ──────────────────────────`);
@@ -184,6 +340,11 @@ async function main() {
         passwordHash: chandniHash,
         firstName: 'Chandni',
         lastName: 'Jha',
+        joiningDate: new Date('2026-06-01'),
+        designation: 'QA Chemist',
+        departmentId: qaDept.id,
+        salaryGrade: 'PERMANENT',
+        grossSalary: 25000,
       }
     });
   } else {
@@ -200,6 +361,8 @@ async function main() {
         joiningDate:  new Date('2026-06-01'), // Tentative June 1st joining
         designation:  'QA Chemist',
         departmentId: qaDept.id,
+        salaryGrade:  'PERMANENT',
+        grossSalary:  25000,
       }
     });
   }
@@ -209,6 +372,13 @@ async function main() {
   });
   if (chandni) {
     await seedLeaves(chandni.id);
+    await seedSalaryStructure(
+      chandni.id,
+      '2026-06-01',
+      25000,
+      'Permanent employee salary: INR 25,000 per month, no deductions.',
+      admin?.id,
+    );
   }
   console.log(`✓ Employee 1    →  chandni.jha@nexgenharmasolutions.com  /  ${chandniPassword}`);
 
@@ -228,6 +398,11 @@ async function main() {
         passwordHash: devHash,
         firstName: 'Dev',
         lastName: 'Patel',
+        joiningDate: new Date('2026-01-09'),
+        designation: 'Software Development Intern',
+        departmentId: swDept.id,
+        salaryGrade: 'INTERN',
+        grossSalary: 10000,
       }
     });
   } else {
@@ -243,6 +418,8 @@ async function main() {
         joiningDate:  new Date('2026-01-09'),
         designation:  'Software Development Intern',
         departmentId: swDept.id,
+        salaryGrade:  'INTERN',
+        grossSalary:  10000,
       }
     });
   }
@@ -251,7 +428,24 @@ async function main() {
     where: { email: 'dev.patel@praversetech.com' }
   });
   if (dev) {
-    await seedLeaves(dev.id);
+    await seedLeaves(dev.id, true);
+    await seedSalaryStructure(
+      dev.id,
+      '2026-04-01',
+      10000,
+      'Intern stipend: INR 10,000 per month from April 2026 onward. Leave during internship is deductible/unpaid.',
+      admin?.id,
+    );
+    await seedMonthlySlips(
+      dev,
+      admin?.id ?? dev.id,
+      4,
+      5,
+      year,
+      10000,
+      'Intern stipend. Leave during internship period is deductible/unpaid. April stipend is payable/paid in May.',
+      [4],
+    );
   }
   console.log(`✓ Employee 2    →  dev.patel@praversetech.com    /  ${devPassword}`);
 
@@ -271,6 +465,11 @@ async function main() {
         passwordHash: maanavHash,
         firstName: 'Maanav',
         lastName: 'Shah',
+        joiningDate: new Date('2026-01-05'),
+        designation: 'Software Development Intern',
+        departmentId: swDept.id,
+        salaryGrade: 'INTERN',
+        grossSalary: 10000,
       }
     });
   } else {
@@ -286,6 +485,8 @@ async function main() {
         joiningDate:  new Date('2026-01-05'),
         designation:  'Software Development Intern',
         departmentId: swDept.id,
+        salaryGrade:  'INTERN',
+        grossSalary:  10000,
       }
     });
   }
@@ -294,7 +495,23 @@ async function main() {
     where: { email: 'maanav.shah@praversetech.com' }
   });
   if (maanav) {
-    await seedLeaves(maanav.id);
+    await seedLeaves(maanav.id, true);
+    await seedSalaryStructure(
+      maanav.id,
+      '2026-01-05',
+      10000,
+      'Intern stipend: INR 10,000 per month. Leave during internship is deductible/unpaid.',
+      admin?.id,
+    );
+    await seedMonthlySlips(
+      maanav,
+      admin?.id ?? maanav.id,
+      1,
+      5,
+      year,
+      10000,
+      'Intern stipend. Leave during internship period is deductible/unpaid.',
+    );
   }
   console.log(`✓ Employee 3    →  maanav.shah@praversetech.com   /  ${maanavPassword}`);
 
@@ -314,6 +531,11 @@ async function main() {
         passwordHash: shifaHash,
         firstName: 'Shifa',
         lastName: 'Mobh',
+        joiningDate: new Date('2026-02-02'),
+        designation: 'Officer - Regulatory Affairs',
+        departmentId: raDept.id,
+        salaryGrade: 'PERMANENT',
+        grossSalary: 25000,
       }
     });
   } else {
@@ -327,8 +549,10 @@ async function main() {
         role:         Role.EMPLOYEE,
         status:       EmployeeStatus.ACTIVE,
         joiningDate:  new Date('2026-02-02'),
-        designation:  'Officer – Regulatory Affairs',
+        designation:  'Officer - Regulatory Affairs',
         departmentId: raDept.id,
+        salaryGrade:  'PERMANENT',
+        grossSalary:  25000,
       }
     });
   }
@@ -338,6 +562,22 @@ async function main() {
   });
   if (shifa) {
     await seedLeaves(shifa.id);
+    await seedSalaryStructure(
+      shifa.id,
+      '2026-02-02',
+      25000,
+      'Permanent employee salary: INR 25,000 per month, no deductions.',
+      admin?.id,
+    );
+    await seedMonthlySlips(
+      shifa,
+      admin?.id ?? shifa.id,
+      2,
+      5,
+      year,
+      25000,
+      'Monthly salary, no deductions.',
+    );
   }
   console.log(`✓ Employee 4    →  shifa.mobh@nexgenharmasolutions.com   /  ${shifaPassword}`);
 

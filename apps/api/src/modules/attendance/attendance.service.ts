@@ -35,6 +35,23 @@ export class AttendanceService {
 
     if (!employee?.faceEnrolled) return; // not enrolled yet — skip
 
+    const embeddingRows = await this.prisma.$queryRaw<{ count: bigint }[]>`
+      SELECT COUNT(*)::bigint AS count
+      FROM face_embeddings
+      WHERE employee_id = ${employeeId}
+    `;
+    const count = embeddingRows[0]?.count ?? 0n;
+
+    if (Number(count) === 0) {
+      await this.prisma.employee.update({
+        where: { id: employeeId },
+        data: { faceEnrolled: false, faceEnrolledAt: null },
+      });
+      throw new BadRequestException(
+        'Face enrollment is incomplete. Please enroll your face again before punching in.',
+      );
+    }
+
     try {
       const result = await this.fr.verify(employeeId, faceImageBase64);
       if (!result.verified) {
@@ -263,9 +280,13 @@ export class AttendanceService {
     } catch {
       // FR service may be unavailable — continue to mark as unenrolled anyway
     }
+    await this.prisma.$executeRaw`
+      DELETE FROM face_embeddings
+      WHERE employee_id = ${employeeId}
+    `;
     await this.prisma.employee.update({
       where: { id: employeeId },
-      data: { faceEnrolled: false },
+      data: { faceEnrolled: false, faceEnrolledAt: null },
     });
     return { message: 'Face data reset. Please re-enroll on next login.' };
   }
@@ -279,23 +300,27 @@ export class AttendanceService {
       await this.fr.enroll(employeeId, frames);
     } catch (err) {
       const msg = (err as Error).message ?? '';
-      const isServiceDown = msg.toLowerCase().includes('unavailable');
-      if (!isServiceDown) {
-        // Face detection failed in all frames — tell the user to retry
-        throw new BadRequestException(
-          msg || 'No face detected in the captured frames. Please retry in better lighting.',
-        );
-      }
-      // FR service is down — mark enrolled anyway so the user isn't permanently blocked;
-      // punch-in will soft-pass until the service comes back.
-      this.logger.warn(
-        `FR service down during enrollment for ${employeeId}. Marking enrolled without embedding.`,
+      throw new BadRequestException(
+        msg || 'Face enrollment failed. Please make sure the face service is running and retry.',
+      );
+    }
+
+    const embeddingRows = await this.prisma.$queryRaw<{ count: bigint }[]>`
+      SELECT COUNT(*)::bigint AS count
+      FROM face_embeddings
+      WHERE employee_id = ${employeeId}
+    `;
+    const count = embeddingRows[0]?.count ?? 0n;
+
+    if (Number(count) === 0) {
+      throw new BadRequestException(
+        'Face enrollment did not save a biometric template. Please retry.',
       );
     }
 
     await this.prisma.employee.update({
       where: { id: employeeId },
-      data: { faceEnrolled: true },
+      data: { faceEnrolled: true, faceEnrolledAt: new Date() },
     });
 
     return { message: 'Face enrolled successfully.' };

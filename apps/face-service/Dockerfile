@@ -31,7 +31,7 @@ RUN pip install --no-cache-dir \
     python-dotenv==1.0.1 \
     "Pillow==10.2.0"
 
-COPY apps/face-service/ .
+COPY . .
 
 EXPOSE 8000
 

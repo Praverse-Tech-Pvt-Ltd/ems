@@ -209,14 +209,16 @@ npm run dev
 |---|---|
 | Email | `ashwani@nexgenpharmasolutions.com` |
 | Password | `Admin@123456` |
+| Designation | Managing Director |
 | Role | `SUPER_ADMIN` — full access including audit logs and destructive operations |
 
 ### Admin
 | Field | Value |
 |---|---|
-| Email | `pratham.s@nexgenharmasolutions.com` |
+| Email | `pratham.s@nexgenpharmasolutions.com` |
 | Password | `Admin@123456` |
-| Role | `ADMIN` — employee management, payroll, approvals |
+| Designation | Director |
+| Role | `SUPER_ADMIN` — approval/rejection authority for employee requests, leaves, expenses, payroll, documents, invoices, attendance regularization, and company workflows |
 
 ---
 
@@ -369,7 +371,7 @@ pip install -r requirements.txt            # Install / update deps
 - **Change Password** — authenticated password change from Profile / Settings.
 - **Employee onboarding** — bank details, Aadhaar, PAN, photograph, and face capture with checklist tracking.
 - **Payroll** — salary structures, payroll generation, incentives, deductions, approved reimbursements, approval/rejection/transfer workflow, branded PDF salary slips.
-- **Leaves** — leave requests, balances, and approval workflow.
+- **Leaves** — annual CL/SL/PL balances, no rollover, paid-leave payout tracking, intern unpaid/deductible leave, and approval workflow.
 - **Expenses** — expense claims with receipt uploads and approval.
 - **Company OS** — policies with acknowledgements, holiday calendar, tasks, lifecycle events, direct and group chat with admin monitoring.
 - **Audit log** — sensitive changes and key workflow events recorded.

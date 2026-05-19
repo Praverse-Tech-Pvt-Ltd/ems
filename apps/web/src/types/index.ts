@@ -54,6 +54,7 @@ export interface Employee {
   faceEnrolled: boolean;
   department?: Department;
   manager?: Pick<Employee, 'id' | 'firstName' | 'lastName'>;
+  approvalAuthority?: string[];
 }
 
 export interface AttendanceRecord {
