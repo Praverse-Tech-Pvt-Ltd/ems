@@ -25,7 +25,7 @@ RUN pip install --no-cache-dir \
     psycopg2-binary==2.9.9 \
     pgvector==0.3.2 \
     python-dotenv==1.0.1 \
-    "Pillow==10.4.0"
+    "Pillow==10.2.0"
 
 COPY apps/face-service/ .
 
