@@ -19,7 +19,7 @@ RUN pip install --no-cache-dir \
     fastapi==0.115.0 \
     "uvicorn[standard]==0.30.6" \
     python-multipart==0.0.9 \
-    "numpy==1.26.4" \
+    "numpy>=1.24,<2.0" \
     opencv-python-headless==4.10.0.84 \
     facenet-pytorch==2.6.0 \
     psycopg2-binary==2.9.9 \
