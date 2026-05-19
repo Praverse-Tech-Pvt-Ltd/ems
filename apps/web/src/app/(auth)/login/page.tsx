@@ -12,7 +12,6 @@ import { AlertCircle, Eye, EyeOff } from 'lucide-react';
 const loginSchema = z.object({
   email:    z.string().email('Invalid email'),
   password: z.string().min(8, 'Min 8 characters'),
-  totpCode: z.string().length(6).optional().or(z.literal('')),
 });
 type LoginForm = z.infer<typeof loginSchema>;
 
@@ -134,20 +133,6 @@ export default function LoginPage() {
                 </button>
               </div>
               {errors.password && <p className="font-display font-bold text-xs uppercase text-brutal-red mt-1.5">{errors.password.message}</p>}
-            </div>
-
-            {/* 2FA */}
-            <div>
-              <label className="block font-display font-bold text-xs uppercase tracking-widest text-brutal-ink mb-2">
-                2FA Code <span className="text-[#4a4a4a] font-normal">(optional)</span>
-              </label>
-              <input
-                {...register('totpCode')}
-                type="text"
-                placeholder="123456"
-                maxLength={6}
-                className="w-full brutal-border bg-brutal-cream px-4 py-3 font-mono tracking-widest text-sm focus:outline-none"
-              />
             </div>
 
             {/* Error */}

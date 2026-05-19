@@ -1,11 +1,13 @@
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  directUrl  = env("DIRECT_URL")
+  extensions = [pgvector(map: "vector", schema: "public")]
 }
 
 // ─── Enums ──────────────────────────────────────────────────────────────────
@@ -250,6 +252,7 @@ model Employee {
   policyAcknowledgements PolicyAcknowledgement[]
   lifecycleEvents        EmployeeLifecycleEvent[] @relation("LifecycleEmployee")
   lifecycleEventsCreated EmployeeLifecycleEvent[] @relation("LifecycleCreator")
+  faceEmbeddingRecord    FaceEmbedding?
 
   @@map("employees")
 }
@@ -715,4 +718,19 @@ model PasswordResetToken {
   employee     Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
   @@map("password_reset_tokens")
+}
+
+// ── Face Recognition ─────────────────────────────────────────────────────────
+
+model FaceEmbedding {
+  id         String                     @id @default(uuid())
+  employeeId String                     @unique @map("employee_id")
+  /// 128-dimensional dlib face embedding stored as pgvector
+  embedding  Unsupported("vector(128)")
+  createdAt  DateTime                   @default(now()) @map("created_at")
+  updatedAt  DateTime                   @updatedAt @map("updated_at")
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@map("face_embeddings")
 }

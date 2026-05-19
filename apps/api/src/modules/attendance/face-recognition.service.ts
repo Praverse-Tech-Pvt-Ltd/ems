@@ -14,20 +14,26 @@ export class FaceRecognitionService {
 
   constructor(private config: ConfigService) {}
 
+  private get frUrl(): string {
+    return this.config.get<string>('FACE_SERVICE_URL') ?? 'http://localhost:8000';
+  }
+
   async ping(): Promise<void> {
-    const frUrl = this.config.get<string>('FR_SERVICE_URL');
-    await axios.get(`${frUrl}/health`, { timeout: 5000 });
+    await axios.get(`${this.frUrl}/health`, { timeout: 5000 });
   }
 
   async verify(employeeId: string, faceImageBase64: string): Promise<FrVerifyResult> {
-    const frUrl = this.config.get<string>('FR_SERVICE_URL');
     try {
-      const response = await axios.post<FrVerifyResult>(
-        `${frUrl}/verify`,
-        { employee_id: employeeId, face_image: faceImageBase64 },
+      const { data } = await axios.post<{ success: boolean; match: boolean; confidence?: number; message: string }>(
+        `${this.frUrl}/verify`,
+        { employee_id: employeeId, image_base64: faceImageBase64 },
         { timeout: 45000 },
       );
-      return response.data;
+      return {
+        verified: data.match,
+        confidence: data.confidence ?? 0,
+        reason: data.message,
+      };
     } catch (error) {
       this.logger.error('Face recognition service unavailable', error);
       throw new ServiceUnavailableException(
@@ -37,11 +43,12 @@ export class FaceRecognitionService {
   }
 
   async enroll(employeeId: string, frames: string[]): Promise<void> {
-    const frUrl = this.config.get<string>('FR_SERVICE_URL');
+    // Use the best frame (first) for registration
+    const imageBase64 = frames[0];
     try {
       await axios.post(
-        `${frUrl}/enroll`,
-        { employee_id: employeeId, frames },
+        `${this.frUrl}/register`,
+        { employee_id: employeeId, image_base64: imageBase64 },
         { timeout: 20000 },
       );
     } catch (error) {

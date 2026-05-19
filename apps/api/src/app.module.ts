@@ -20,6 +20,7 @@ import { AuditModule } from './modules/audit/audit.module';
 import { CommentsModule } from './modules/comments/comments.module';
 import { CorporateModule } from './modules/corporate/corporate.module';
 import { KeepAliveModule } from './common/keep-alive/keep-alive.module';
+import { FaceRecognitionModule } from './modules/face-recognition/face-recognition.module';
 
 @Module({
   imports: [
@@ -61,6 +62,7 @@ import { KeepAliveModule } from './common/keep-alive/keep-alive.module';
     CommentsModule,
     CorporateModule,
     KeepAliveModule,
+    FaceRecognitionModule,
   ],
 })
 export class AppModule {}

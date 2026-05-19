@@ -1,15 +1,12 @@
 # NexGen EMS — Render Blueprint
 # Docs: https://render.com/docs/blueprint-spec
 #
-# Deploy to Render:
+# Deploy:
 #   1. Push this repo to GitHub
-#   2. Go to render.com → New → Blueprint
-#   3. Connect your repo — Render reads this file and creates all services
-#   4. After first deploy, manually set in Render dashboard:
-#      - nexgen-api:  DATABASE_URL, DIRECT_URL, REDIS_URL, RESEND_API_KEY, FRONTEND_URL
-#      - nexgen-web:  (auto-configured via fromService)
-#      - nexgen-face: DATABASE_URL
-#   5. Set RENDER_SELF_URL on nexgen-api to its own https URL (e.g. https://nexgen-api.onrender.com)
+#   2. render.com → New → Blueprint → connect repo
+#   3. After first deploy, set the "sync: false" vars manually in the Render dashboard
+#
+# Frontend is hosted on Vercel — set NEXT_PUBLIC_API_URL there to the nexgen-api hostURL.
 
 services:
 
@@ -27,7 +24,7 @@ services:
       - key: PORT
         value: 3001
 
-      # Set these manually in the Render dashboard after first deploy
+      # Set manually in Render dashboard after first deploy
       - key: DATABASE_URL
         sync: false
       - key: DIRECT_URL
@@ -38,9 +35,11 @@ services:
         sync: false
       - key: FRONTEND_URL
         sync: false
-      # Set to this service's own URL (e.g. https://nexgen-api.onrender.com)
-      # Used by keep-alive cron to prevent Render free-tier spin-down
+      # Set to this service's own URL to keep the free-tier instance alive
       - key: RENDER_SELF_URL
+        sync: false
+      # Set to the nexgen-face service URL once it is deployed
+      - key: FACE_SERVICE_URL
         sync: false
 
       # Auto-generated secrets
@@ -61,7 +60,7 @@ services:
       - key: LOCAL_STORAGE_DIR
         value: uploads
       - key: RESEND_FROM_EMAIL
-        value: noreply@nexgenpharma.com
+        value: nexgenpharmasolution@gmail.com
       - key: RESEND_FROM_NAME
         value: NexGen Pharma EMS
       - key: BCRYPT_OTP_ROUNDS
@@ -74,25 +73,28 @@ services:
         value: 1800
       - key: CRON_TOKEN_CLEANUP
         value: "0 2 * * *"
+      - key: RECOGNITION_THRESHOLD
+        value: "0.5"
+      - key: OFFICE_LAT
+        value: "28.6139"
+      - key: OFFICE_LNG
+        value: "77.2090"
+      - key: OFFICE_RADIUS_METERS
+        value: "200"
 
-      # Face recognition service URL (set manually to the separately hosted face service URL)
-      - key: FR_SERVICE_URL
-        sync: false
-
-  # ── Next.js Web ───────────────────────────────────────────────────────────────
+  # ── Python Face Recognition Service ──────────────────────────────────────────
+  # Requires Starter plan ($7/mo) — free tier spins down and dlib builds are heavy.
+  # Build takes ~20 min on first deploy (dlib compiles from source).
   - type: web
-    name: nexgen-web
+    name: nexgen-face
     runtime: docker
-    dockerfilePath: apps/web/Dockerfile
-    dockerContext: .
-    plan: free
-    healthCheckPath: /
-    buildCommand: ""
-    dockerCommand: ""
+    dockerfilePath: apps/face-service/Dockerfile
+    dockerContext: apps/face-service
+    plan: starter
+    healthCheckPath: /health
     envVars:
-      - key: NEXT_PUBLIC_API_URL
-        fromService:
-          name: nexgen-api
-          type: web
-          property: hostURL
-
+      # Use the DIRECT (non-pooled) URL — psycopg2 needs persistent connections
+      - key: DATABASE_URL
+        sync: false
+      - key: RECOGNITION_THRESHOLD
+        value: "0.5"
