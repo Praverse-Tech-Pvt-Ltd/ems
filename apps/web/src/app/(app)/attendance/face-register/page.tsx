@@ -145,7 +145,7 @@ export default function FaceRegisterPage() {
           <ol className="space-y-2 font-body text-xs text-[#4a4a4a]">
             {[
               'Enter the employee ID above',
-              'Position the employee's face within the oval guide',
+              "Position the employee's face within the oval guide",
               'Ensure good, even lighting on the face',
               'Click "Capture Photo" when ready',
               'Review the image, then click "Register Face"',
