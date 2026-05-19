@@ -5,7 +5,11 @@
 #   1. Push this repo to GitHub
 #   2. Go to render.com → New → Blueprint
 #   3. Connect your repo — Render reads this file and creates all services
-#   4. Set the secret env vars listed below in each service's Render dashboard
+#   4. After first deploy, manually set in Render dashboard:
+#      - nexgen-api:  DATABASE_URL, DIRECT_URL, REDIS_URL, RESEND_API_KEY, FRONTEND_URL
+#      - nexgen-web:  (auto-configured via fromService)
+#      - nexgen-face: DATABASE_URL
+#   5. Set RENDER_SELF_URL on nexgen-api to its own https URL (e.g. https://nexgen-api.onrender.com)
 
 services:
 
@@ -22,50 +26,61 @@ services:
         value: production
       - key: PORT
         value: 3001
+
+      # Set these manually in the Render dashboard after first deploy
       - key: DATABASE_URL
-        sync: false          # set in Render dashboard → from Neon
+        sync: false
       - key: DIRECT_URL
         sync: false
       - key: REDIS_URL
-        sync: false          # set in Render dashboard → from Upstash
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+      # Set to this service's own URL (e.g. https://nexgen-api.onrender.com)
+      # Used by keep-alive cron to prevent Render free-tier spin-down
+      - key: RENDER_SELF_URL
+        sync: false
+
+      # Auto-generated secrets
       - key: JWT_SECRET
         generateValue: true
       - key: JWT_REFRESH_SECRET
         generateValue: true
+      - key: ENCRYPTION_KEY
+        generateValue: true
+
+      # Static values
       - key: JWT_EXPIRES_IN
         value: 15m
       - key: JWT_REFRESH_EXPIRES_IN
         value: 7d
-      - key: ENCRYPTION_KEY
-        generateValue: true
-      - key: FR_SERVICE_URL
-        fromService:
-          name: nexgen-face
-          type: web
-          property: host
-          envVarKey: FR_SERVICE_URL
       - key: STORAGE_DRIVER
         value: local
       - key: LOCAL_STORAGE_DIR
         value: uploads
-      - key: FRONTEND_URL
-        sync: false          # set to your Render web URL after deploy
-      - key: SMTP_HOST
-        sync: false
-      - key: SMTP_PORT
-        value: 587
-      - key: SMTP_USER
-        sync: false
-      - key: SMTP_PASS
-        sync: false
-      - key: SES_FROM_EMAIL
-        value: noreply@nexgen.in
-      - key: RENDER_SELF_URL
+      - key: RESEND_FROM_EMAIL
+        value: noreply@nexgenpharma.com
+      - key: RESEND_FROM_NAME
+        value: NexGen Pharma EMS
+      - key: BCRYPT_OTP_ROUNDS
+        value: 8
+      - key: BCRYPT_ROUNDS
+        value: 12
+      - key: RATE_LIMIT_OTP_MAX
+        value: 3
+      - key: RATE_LIMIT_OTP_WINDOW
+        value: 1800
+      - key: CRON_TOKEN_CLEANUP
+        value: "0 2 * * *"
+
+      # Face recognition service URL — pulled from nexgen-face service
+      - key: FR_SERVICE_URL
         fromService:
-          name: nexgen-api
+          name: nexgen-face
           type: web
-          property: host
-          envVarKey: RENDER_SELF_URL
+          property: hostURL
 
   # ── Next.js Web ───────────────────────────────────────────────────────────────
   - type: web
@@ -74,13 +89,15 @@ services:
     dockerfilePath: apps/web/Dockerfile
     dockerContext: .
     plan: free
+    healthCheckPath: /
+    buildCommand: ""
+    dockerCommand: ""
     envVars:
       - key: NEXT_PUBLIC_API_URL
         fromService:
           name: nexgen-api
           type: web
-          property: host
-          envVarKey: NEXT_PUBLIC_API_URL
+          property: hostURL
 
   # ── Python Face Recognition Service ──────────────────────────────────────────
   - type: web
@@ -89,14 +106,9 @@ services:
     dockerfilePath: apps/face-service/Dockerfile
     dockerContext: apps/face-service
     plan: free
+    healthCheckPath: /health
     envVars:
       - key: DATABASE_URL
-        sync: false          # same Neon URL as API (without pgbouncer)
-      - key: AWS_ACCESS_KEY_ID
-        sync: false
-      - key: AWS_SECRET_ACCESS_KEY
-        sync: false
-      - key: AWS_REGION
-        value: ap-south-1
-      - key: REKOGNITION_COLLECTION_ID
-        value: nexgen-employees
+        sync: false          # same Neon direct URL (no pgbouncer)
+      - key: CONFIDENCE_THRESHOLD
+        value: 0.55

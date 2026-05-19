@@ -5,7 +5,7 @@ import { QUEUE_EMAIL_NAME } from './email.constants';
 import { Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
-@Processor(QUEUE_EMAIL_NAME)
+@Processor('email')
 export class EmailProcessor {
   private readonly logger = new Logger(EmailProcessor.name);
 

@@ -10,7 +10,7 @@ export { QUEUE_EMAIL_NAME };
 @Module({
   imports: [
     BullModule.registerQueue({
-      name: QUEUE_EMAIL_NAME,
+      name: 'email',
     }),
   ],
   providers: [EmailService, EmailProcessor],

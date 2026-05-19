@@ -28,9 +28,20 @@ import { KeepAliveModule } from './common/keep-alive/keep-alive.module';
     ScheduleModule.forRoot(),
     BullModule.forRootAsync({
       imports: [ConfigModule],
-      useFactory: async (config: ConfigService) => ({
-        redis: config.getOrThrow<string>('REDIS_URL'),
-      }),
+      useFactory: async (config: ConfigService) => {
+        const redisUrl = config.getOrThrow<string>('REDIS_URL');
+        const parsed = new URL(redisUrl);
+        const isTls = parsed.protocol === 'rediss:';
+        return {
+          redis: {
+            host: parsed.hostname,
+            port: parseInt(parsed.port || (isTls ? '6380' : '6379'), 10),
+            password: parsed.password || undefined,
+            username: parsed.username || undefined,
+            tls: isTls ? {} : undefined,
+          },
+        };
+      },
       inject: [ConfigService],
     }),
     PrismaModule,

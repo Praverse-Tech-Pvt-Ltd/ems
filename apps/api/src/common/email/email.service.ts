@@ -39,7 +39,7 @@ export class EmailService {
   constructor(
     private readonly config: ConfigService,
     private readonly prisma: PrismaService,
-    @InjectQueue(QUEUE_EMAIL_NAME) private readonly emailQueue: Queue,
+    @InjectQueue('email') private readonly emailQueue: Queue,
   ) {
     const apiKey = this.config.getOrThrow<string>('RESEND_API_KEY');
     this.resend = createResendClient(apiKey);

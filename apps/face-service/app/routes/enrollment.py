@@ -22,7 +22,7 @@ async def enroll_face(request: EnrollRequest) -> EnrollResponse:
         raise HTTPException(status_code=400, detail="At least 1 frame required")
     try:
         enroll(request.employee_id, request.frames)
-        return EnrollResponse(success=True, message="Face enrolled successfully via AWS Rekognition")
+        return EnrollResponse(success=True, message="Face enrolled successfully")
     except RuntimeError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
