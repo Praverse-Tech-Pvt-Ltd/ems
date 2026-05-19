@@ -4,15 +4,15 @@ import base64
 import logging
 from typing import Optional
 
-import cv2
 import numpy as np
 from PIL import Image
 from fastapi import FastAPI, File, UploadFile, HTTPException, Form
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
-import insightface
-from insightface.app import FaceAnalysis
+
+import torch
+from facenet_pytorch import MTCNN, InceptionResnetV1
 
 import psycopg2
 from psycopg2.extras import RealDictCursor
@@ -23,11 +23,7 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI(
-    title="Face Recognition Service",
-    description="Face encoding, registration, and recognition for EMS",
-    version="3.0.0",
-)
+app = FastAPI(title="Face Recognition Service", version="4.0.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -39,11 +35,10 @@ app.add_middleware(
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 RECOGNITION_THRESHOLD = float(os.getenv("RECOGNITION_THRESHOLD", "0.5"))
-EMBEDDING_DIM = 512
 
-# Initialise InsightFace (downloads ONNX models on first run, ~100MB)
-face_app = FaceAnalysis(name="buffalo_sc", providers=["CPUExecutionProvider"])
-face_app.prepare(ctx_id=0, det_size=(640, 640))
+device = torch.device("cpu")
+mtcnn = MTCNN(image_size=160, margin=20, keep_all=False, device=device)
+resnet = InceptionResnetV1(pretrained="vggface2").eval().to(device)
 
 
 def get_db():
@@ -52,28 +47,24 @@ def get_db():
     return conn
 
 
-def image_array_from_bytes(file_bytes: bytes) -> np.ndarray:
-    image = Image.open(io.BytesIO(file_bytes)).convert("RGB")
-    return cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
+def pil_from_bytes(file_bytes: bytes) -> Image.Image:
+    return Image.open(io.BytesIO(file_bytes)).convert("RGB")
 
 
-def image_array_from_base64(b64_string: str) -> np.ndarray:
+def pil_from_base64(b64_string: str) -> Image.Image:
     if "," in b64_string:
         b64_string = b64_string.split(",")[1]
-    return image_array_from_bytes(base64.b64decode(b64_string))
+    return pil_from_bytes(base64.b64decode(b64_string))
 
 
-def encode_face(bgr_image: np.ndarray) -> Optional[list]:
-    """Return 512-d InsightFace embedding or None if no face detected."""
-    faces = face_app.get(bgr_image)
-    if not faces:
+def encode_face(pil_image: Image.Image) -> Optional[list]:
+    face_tensor = mtcnn(pil_image)
+    if face_tensor is None:
         return None
-    # Use the largest detected face
-    face = max(faces, key=lambda f: (f.bbox[2] - f.bbox[0]) * (f.bbox[3] - f.bbox[1]))
-    return face.normed_embedding.tolist()
+    with torch.no_grad():
+        embedding = resnet(face_tensor.unsqueeze(0).to(device))
+    return embedding[0].tolist()
 
-
-# ── Models ─────────────────────────────────────────────────────────────────
 
 class RegisterRequest(BaseModel):
     employee_id: str
@@ -104,24 +95,20 @@ class VerifyResponse(BaseModel):
     message: str
 
 
-# ── Endpoints ──────────────────────────────────────────────────────────────
-
 @app.get("/health")
 def health():
-    return {"status": "ok", "service": "face-recognition", "model": "insightface/buffalo_sc"}
+    return {"status": "ok", "service": "face-recognition", "model": "facenet-vggface2"}
 
 
 @app.post("/register", response_model=RegisterResponse)
 def register_face(payload: RegisterRequest):
     try:
-        image = image_array_from_base64(payload.image_base64)
+        image = pil_from_base64(payload.image_base64)
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid image data")
-
     encoding = encode_face(image)
     if encoding is None:
         raise HTTPException(status_code=422, detail="No face detected in the image")
-
     conn = get_db()
     try:
         with conn.cursor() as cur:
@@ -141,7 +128,6 @@ def register_face(payload: RegisterRequest):
         raise HTTPException(status_code=500, detail="Database error")
     finally:
         conn.close()
-
     return RegisterResponse(success=True, employee_id=payload.employee_id, message="Face registered successfully")
 
 
@@ -149,14 +135,12 @@ def register_face(payload: RegisterRequest):
 async def register_face_upload(employee_id: str = Form(...), file: UploadFile = File(...)):
     file_bytes = await file.read()
     try:
-        image = image_array_from_bytes(file_bytes)
+        image = pil_from_bytes(file_bytes)
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid image file")
-
     encoding = encode_face(image)
     if encoding is None:
         raise HTTPException(status_code=422, detail="No face detected in the image")
-
     conn = get_db()
     try:
         with conn.cursor() as cur:
@@ -176,21 +160,18 @@ async def register_face_upload(employee_id: str = Form(...), file: UploadFile = 
         raise HTTPException(status_code=500, detail="Database error")
     finally:
         conn.close()
-
     return RegisterResponse(success=True, employee_id=employee_id, message="Face registered successfully")
 
 
 @app.post("/recognize", response_model=RecognizeResponse)
 def recognize_face(payload: RecognizeRequest):
     try:
-        image = image_array_from_base64(payload.image_base64)
+        image = pil_from_base64(payload.image_base64)
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid image data")
-
     encoding = encode_face(image)
     if encoding is None:
         return RecognizeResponse(success=False, message="No face detected in the image")
-
     conn = get_db()
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -209,28 +190,23 @@ def recognize_face(payload: RecognizeRequest):
         raise HTTPException(status_code=500, detail="Database error")
     finally:
         conn.close()
-
     if row is None:
         return RecognizeResponse(success=False, message="No registered faces found")
-
     confidence = float(row["confidence"])
     if confidence < (1 - RECOGNITION_THRESHOLD):
         return RecognizeResponse(success=False, message=f"No match found (best confidence: {confidence:.2f})")
-
     return RecognizeResponse(success=True, employee_id=row["employee_id"], confidence=confidence, message="Employee identified successfully")
 
 
 @app.post("/verify", response_model=VerifyResponse)
 def verify_face(payload: VerifyRequest):
     try:
-        image = image_array_from_base64(payload.image_base64)
+        image = pil_from_base64(payload.image_base64)
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid image data")
-
     encoding = encode_face(image)
     if encoding is None:
         return VerifyResponse(success=False, match=False, message="No face detected")
-
     conn = get_db()
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -248,10 +224,8 @@ def verify_face(payload: VerifyRequest):
         raise HTTPException(status_code=500, detail="Database error")
     finally:
         conn.close()
-
     if row is None:
         raise HTTPException(status_code=404, detail="Employee face not registered")
-
     confidence = float(row["confidence"])
     matched = confidence >= (1 - RECOGNITION_THRESHOLD)
     return VerifyResponse(success=True, match=matched, confidence=confidence, message="Match" if matched else "No match")
@@ -270,8 +244,6 @@ def delete_face(employee_id: str):
         raise HTTPException(status_code=500, detail="Database error")
     finally:
         conn.close()
-
     if deleted == 0:
         raise HTTPException(status_code=404, detail="No face found for this employee")
-
     return {"success": True, "message": f"Face data deleted for {employee_id}"}
