@@ -1,11 +1,11 @@
 -- Enable pgvector extension
 CREATE EXTENSION IF NOT EXISTS vector;
 
--- Face embeddings table for 128-d dlib face encodings
+-- Face embeddings table for 512-d DeepFace/Facenet512 encodings
 CREATE TABLE IF NOT EXISTS "face_embeddings" (
     "id"          TEXT         NOT NULL DEFAULT gen_random_uuid()::text,
     "employee_id" TEXT         NOT NULL,
-    "embedding"   vector(128)  NOT NULL,
+    "embedding"   vector(512)  NOT NULL,
     "created_at"  TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at"  TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 

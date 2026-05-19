@@ -2,16 +2,17 @@ import os
 import io
 import base64
 import logging
+import tempfile
 from typing import Optional
 
 import cv2
 import numpy as np
-import face_recognition
 from PIL import Image
 from fastapi import FastAPI, File, UploadFile, HTTPException, Form
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
+from deepface import DeepFace
 
 import psycopg2
 from psycopg2.extras import RealDictCursor
@@ -25,7 +26,7 @@ logger = logging.getLogger(__name__)
 app = FastAPI(
     title="Face Recognition Service",
     description="Face encoding, registration, and recognition for EMS",
-    version="1.0.0",
+    version="2.0.0",
 )
 
 app.add_middleware(
@@ -39,6 +40,10 @@ app.add_middleware(
 DATABASE_URL = os.getenv("DATABASE_URL")
 RECOGNITION_THRESHOLD = float(os.getenv("RECOGNITION_THRESHOLD", "0.5"))
 
+# DeepFace model — Facenet512 gives 512-d embeddings, no C++ needed
+MODEL_NAME = "Facenet512"
+EMBEDDING_DIM = 512
+
 
 def get_db():
     conn = psycopg2.connect(DATABASE_URL)
@@ -46,31 +51,39 @@ def get_db():
     return conn
 
 
-def load_image_from_upload(file_bytes: bytes) -> np.ndarray:
+def image_array_from_bytes(file_bytes: bytes) -> np.ndarray:
     image = Image.open(io.BytesIO(file_bytes)).convert("RGB")
     return np.array(image)
 
 
-def load_image_from_base64(b64_string: str) -> np.ndarray:
+def image_array_from_base64(b64_string: str) -> np.ndarray:
     if "," in b64_string:
         b64_string = b64_string.split(",")[1]
-    image_bytes = base64.b64decode(b64_string)
-    return load_image_from_upload(image_bytes)
+    return image_array_from_bytes(base64.b64decode(b64_string))
 
 
 def encode_face(image_array: np.ndarray) -> Optional[list]:
-    """Return 128-d face encoding or None if no face found."""
-    encodings = face_recognition.face_encodings(image_array)
-    if not encodings:
+    """Return 512-d face embedding using DeepFace/Facenet512, or None if no face."""
+    try:
+        # DeepFace needs a file path or BGR array — convert RGB→BGR
+        bgr = cv2.cvtColor(image_array, cv2.COLOR_RGB2BGR)
+        result = DeepFace.represent(
+            img_path=bgr,
+            model_name=MODEL_NAME,
+            enforce_detection=True,
+            detector_backend="opencv",
+        )
+        return result[0]["embedding"]
+    except Exception as e:
+        logger.warning("Face encoding failed: %s", e)
         return None
-    return encodings[0].tolist()
 
 
 # ── Request / Response models ──────────────────────────────────────────────
 
 class RegisterRequest(BaseModel):
     employee_id: str
-    image_base64: str  # data URI or raw base64
+    image_base64: str
 
 
 class RecognizeRequest(BaseModel):
@@ -106,14 +119,13 @@ class VerifyResponse(BaseModel):
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "service": "face-recognition"}
+    return {"status": "ok", "service": "face-recognition", "model": MODEL_NAME}
 
 
 @app.post("/register", response_model=RegisterResponse)
 def register_face(payload: RegisterRequest):
-    """Encode and store a face embedding for an employee."""
     try:
-        image = load_image_from_base64(payload.image_base64)
+        image = image_array_from_base64(payload.image_base64)
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid image data")
 
@@ -154,10 +166,9 @@ async def register_face_upload(
     employee_id: str = Form(...),
     file: UploadFile = File(...),
 ):
-    """Register a face from a multipart file upload."""
     file_bytes = await file.read()
     try:
-        image = load_image_from_upload(file_bytes)
+        image = image_array_from_bytes(file_bytes)
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid image file")
 
@@ -195,18 +206,14 @@ async def register_face_upload(
 
 @app.post("/recognize", response_model=RecognizeResponse)
 def recognize_face(payload: RecognizeRequest):
-    """Identify an employee from an image using cosine similarity on pgvector."""
     try:
-        image = load_image_from_base64(payload.image_base64)
+        image = image_array_from_base64(payload.image_base64)
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid image data")
 
     encoding = encode_face(image)
     if encoding is None:
-        return RecognizeResponse(
-            success=False,
-            message="No face detected in the image",
-        )
+        return RecognizeResponse(success=False, message="No face detected in the image")
 
     conn = get_db()
     try:
@@ -232,7 +239,6 @@ def recognize_face(payload: RecognizeRequest):
         return RecognizeResponse(success=False, message="No registered faces found")
 
     confidence = float(row["confidence"])
-
     if confidence < (1 - RECOGNITION_THRESHOLD):
         return RecognizeResponse(
             success=False,
@@ -249,9 +255,8 @@ def recognize_face(payload: RecognizeRequest):
 
 @app.post("/verify", response_model=VerifyResponse)
 def verify_face(payload: VerifyRequest):
-    """1:1 verification — check if image matches a specific employee."""
     try:
-        image = load_image_from_base64(payload.image_base64)
+        image = image_array_from_base64(payload.image_base64)
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid image data")
 
@@ -293,7 +298,6 @@ def verify_face(payload: VerifyRequest):
 
 @app.delete("/employee/{employee_id}")
 def delete_face(employee_id: str):
-    """Remove a face embedding for an employee."""
     conn = get_db()
     try:
         with conn.cursor() as cur:
