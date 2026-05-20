@@ -100,20 +100,11 @@ export function FaceEnrollModal({ onDone }: Props) {
       setPhase('success');
       setTimeout(onDone, 1800);
     } catch (err: unknown) {
-      const status = (err as { response?: { status?: number } })?.response?.status;
-      if (status && status < 500) {
-        // 4xx — genuine bad request, ask user to retry
-        const msg =
-          (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-          'Enrollment failed. Please try again.';
-        setPhase('error');
-        setErrorMsg(msg);
-      } else {
-        // 5xx / network — FR service cold-starting; API still marks enrolled, proceed
-        await qc.invalidateQueries({ queryKey: ['me-face'] });
-        setPhase('success');
-        setTimeout(onDone, 1800);
-      }
+      const msg =
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
+        'Enrollment failed. Please make sure the face service is running and try again.';
+      setPhase('error');
+      setErrorMsg(msg);
     }
   }, [captureFrame, onDone, qc]);
 

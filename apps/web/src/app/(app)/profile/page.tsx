@@ -20,6 +20,7 @@ import {
   Phone,
   RefreshCw,
   Shield,
+  ShieldCheck,
   Upload,
   User,
   XCircle,
@@ -235,6 +236,26 @@ export default function ProfilePage() {
               ))}
             </div>
           </div>
+
+          {!!profile.approvalAuthority?.length && (
+            <div className="bg-brutal-white brutal-border brutal-shadow p-6">
+              <h3 className="font-display font-bold text-xl uppercase brutal-border-b pb-3 mb-5 flex items-center gap-2">
+                <ShieldCheck size={20} /> Approval Authority
+              </h3>
+              <div className="grid grid-cols-1 gap-3">
+                {profile.approvalAuthority.map((authority) => (
+                  <div key={authority} className="flex items-start gap-3">
+                    <div className="w-7 h-7 bg-brutal-yellow brutal-border flex items-center justify-center flex-shrink-0">
+                      <CheckCircle size={14} />
+                    </div>
+                    <p className="font-display font-bold text-xs uppercase tracking-wide text-brutal-ink leading-relaxed">
+                      {authority}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </section>
 
         <section className="space-y-6">

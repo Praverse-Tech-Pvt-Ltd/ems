@@ -7,6 +7,7 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcryptjs';
+import { randomUUID } from 'crypto';
 import { PrismaService } from '../../common/prisma/prisma.service';
 
 @Injectable()
@@ -18,8 +19,9 @@ export class AuthService {
   ) {}
 
   async login(email: string, password: string) {
+    const normalizedEmail = email.trim().toLowerCase();
     const employee = await this.prisma.employee.findUnique({
-      where: { email },
+      where: { email: normalizedEmail },
       select: {
         id: true,
         email: true,
@@ -88,8 +90,9 @@ export class AuthService {
   }
 
   async forgotPassword(email: string, newPassword: string) {
+    const normalizedEmail = email.trim().toLowerCase();
     const employee = await this.prisma.employee.findUnique({
-      where: { email },
+      where: { email: normalizedEmail },
       select: { id: true, status: true },
     });
     if (!employee || employee.status !== 'ACTIVE') {
@@ -127,6 +130,7 @@ export class AuthService {
     const refreshToken = this.jwt.sign(payload, {
       secret: this.config.getOrThrow<string>('JWT_REFRESH_SECRET'),
       expiresIn: refreshExpiresIn,
+      jwtid: randomUUID(),
     });
 
     const expiresAt = new Date();

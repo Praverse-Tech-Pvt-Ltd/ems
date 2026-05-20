@@ -33,6 +33,34 @@ const EMPLOYEE_SELECT = {
   createdAt: true,
 } as const;
 
+const APPROVAL_AUTHORITIES_BY_ROLE: Record<string, string[]> = {
+  SUPER_ADMIN: [
+    'Approve or reject leave requests',
+    'Approve or reject expense claims at manager and finance levels',
+    'Approve, reject, and transfer salary slips',
+    'Approve salary structures and payroll changes',
+    'Approve or reject employee documents and KYC submissions',
+    'Approve or reject employee requests including WFH, advances, assets, travel, and attendance corrections',
+    'Approve or reject invoices and payment status changes',
+    'Regularize attendance and review audit-sensitive employee actions',
+  ],
+  ADMIN: [
+    'Approve or reject leave requests',
+    'Approve or reject expense claims at manager and finance levels',
+    'Approve, reject, and transfer salary slips',
+    'Approve salary structures and payroll changes',
+    'Approve or reject employee documents and KYC submissions',
+    'Approve or reject employee requests including WFH, advances, assets, travel, and attendance corrections',
+    'Approve or reject invoices and payment status changes',
+  ],
+  MANAGER: [
+    'Approve or reject leave requests',
+    'Approve or reject manager-level expense claims',
+    'Approve or reject employee requests including WFH, advances, assets, travel, and attendance corrections',
+    'Regularize attendance where manager approval is allowed',
+  ],
+};
+
 @Injectable()
 export class EmployeesService {
   constructor(
@@ -83,11 +111,21 @@ export class EmployeesService {
   }
 
   async seedLeaveBalances(employeeId: string) {
+    const employee = await this.prisma.employee.findUnique({
+      where: { id: employeeId },
+      select: { salaryGrade: true, designation: true },
+    });
+    const isIntern =
+      employee?.salaryGrade === 'INTERN' ||
+      employee?.designation?.toLowerCase().includes('intern');
+
     const year = new Date().getFullYear();
     const allocations: { leaveType: string; totalDays: number }[] = [
-      { leaveType: 'SL', totalDays: 7 },
-      { leaveType: 'CL', totalDays: 7 },
-      { leaveType: 'PL', totalDays: 14 },
+      { leaveType: 'SL', totalDays: isIntern ? 0 : 7 },
+      { leaveType: 'CL', totalDays: isIntern ? 0 : 7 },
+      { leaveType: 'PL', totalDays: isIntern ? 0 : 14 },
+      { leaveType: 'UL', totalDays: 0 },
+      { leaveType: 'CO', totalDays: 0 },
     ];
     await Promise.all(
       allocations.map(a =>
@@ -144,7 +182,10 @@ export class EmployeesService {
       select: EMPLOYEE_SELECT,
     });
     if (!employee) throw new NotFoundException('Employee not found');
-    return employee;
+    return {
+      ...employee,
+      approvalAuthority: APPROVAL_AUTHORITIES_BY_ROLE[employee.role] ?? [],
+    };
   }
 
   async update(id: string, dto: UpdateEmployeeDto) {

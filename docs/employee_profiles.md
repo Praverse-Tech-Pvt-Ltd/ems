@@ -18,9 +18,9 @@ This document contains structured, clean employee profile data for NexGen Pharma
 *   **Languages:** Hindi, Gujarati, English
 
 #### B. Employment / Internship Details
-*   **Employee Type:** Full-time (To be finalized by HR / Management)
-*   **Employment Status:** Pending Joining
-*   **Date of Joining:** To be collected
+*   **Employee Type:** Full-time Employee
+*   **Employment Status:** Active from 01-Jun-2026
+*   **Date of Joining:** 01-Jun-2026
 *   **Probation Period:** To be collected
 
 #### C. Department and Role
@@ -29,8 +29,8 @@ This document contains structured, clean employee profile data for NexGen Pharma
 *   **Reporting Manager:** Ashwani Shrivastav (Managing Director) or Assigned Reporting Manager
 
 #### D. Compensation / Stipend Details
-*   **Salary / CTC:** To be collected
-*   **Salary Break-up / Structure:** To be collected
+*   **Salary / CTC:** INR 25,000 per month
+*   **Salary Break-up / Structure:** Fixed monthly salary with no deductions.
 
 #### E. Work Location and Work Mode
 *   **Work Location:** NexGen Pharma Solutions Office, Vadodara, Gujarat
@@ -60,19 +60,19 @@ This document contains structured, clean employee profile data for NexGen Pharma
 *   **IP Ownership:** All deliverables prepared during employment will remain the property of NexGen Pharma Solutions Pvt. Ltd.
 
 #### I. Missing Information to be Collected
-1.  Date of Joining (DOJ) at NexGen
-2.  Final Employment Type confirmation
-3.  Approved Salary / CTC structure
+1.  Probation period confirmation
+2.  Offer letter / appointment letter signing status
+3.  Bank details for salary transfer
 4.  Official Employee ID allocation
 5.  Emergency Contact details
 6.  Aadhaar Card number & PAN details
-7.  Bank details for salary transfer
-8.  Present and permanent full address
-9.  Offer letter / appointment letter signing status
+7.  Present and permanent full address
+8.  Emergency Contact details
+9.  Final onboarding verification
 10. Reporting manager assignment confirmation
 
 #### J. Recommended Employee Status
-*   **Status:** Pending Joining
+*   **Status:** Active from 01-Jun-2026
 
 ---
 
@@ -101,7 +101,8 @@ This document contains structured, clean employee profile data for NexGen Pharma
 *   **Reporting Manager:** Ashwani Shrivastav (Managing Director) or Assigned Reporting Manager
 
 #### D. Compensation / Stipend Details
-*   **Stipend:** Performance Based Honorarium (May be paid based on measurable deliverables, work quality, role ownership, and management evaluation at company discretion).
+*   **Stipend:** INR 10,000 per month from April 2026 onward. April stipend is payable/paid in May.
+*   **Leave Treatment:** Internship-period leaves are deductible/unpaid. Permanent employee leave balances do not apply until HR converts the intern to full-time.
 
 #### E. Work Location and Work Mode
 *   **Work Location:** NexGen Pharma Solutions Office, Vadodara, Gujarat
@@ -167,6 +168,7 @@ This document contains structured, clean employee profile data for NexGen Pharma
 
 #### D. Compensation / Stipend Details
 *   **Stipend:** INR 10,000 per month (Fixed)
+*   **Leave Treatment:** Internship-period leaves are deductible/unpaid. Permanent employee leave balances do not apply until HR converts the intern to full-time.
 
 #### E. Work Location and Work Mode
 *   **Work Location:** NexGen Pharma Solutions Office, Vadodara, Gujarat
@@ -229,7 +231,7 @@ This document contains structured, clean employee profile data for NexGen Pharma
 
 #### D. Compensation / Stipend Details
 *   **CTC:** INR 3,00,000 per annum
-*   **Salary Notes:** Detailed salary structure breakup, along with applicable statutory taxes and deductions (TDS, PF/ESI, Professional Tax, etc.) will be finalized and communicated after completion of onboarding formalities.
+*   **Salary Notes:** INR 25,000 per month fixed salary with no deductions.
 
 #### E. Work Location and Work Mode
 *   **Work Location:** Vadodara or as assigned based on business needs
@@ -283,13 +285,43 @@ The following credentials have been officially generated, hashed via bcrypt, and
 | Sr. No. | Employee Name | Corporate Username (Email) | Default Password | Initial Role | Status |
 | :---: | :--- | :--- | :--- | :--- | :--- |
 | **1** | Ashwani Shrivastav | `ashwani@nexgenpharmasolutions.com` | `Admin@123456` | `SUPER_ADMIN` (Includes `MANAGER`) | `ACTIVE` |
-| **2** | Pratham Shrivastav | `pratham.s@nexgenharmasolutions.com` | `Admin@123456` | `SUPER_ADMIN` (Includes `MANAGER`) | `ACTIVE` |
+| **2** | Pratham Shrivastav | `pratham.s@nexgenpharmasolutions.com` | `Admin@123456` | `SUPER_ADMIN` (Includes `MANAGER`) | `ACTIVE` |
 | **3** | Chandni Jha | `chandni.jha@nexgenharmasolutions.com` | `Chandni@NEX2026` | `EMPLOYEE` | `ACTIVE` |
 | **4** | Dev Patel | `dev.patel@praversetech.com` | `Dev@NEX2026` | `EMPLOYEE` | `ACTIVE` |
 | **5** | Maanav Shah | `maanav.shah@praversetech.com` | `Maanav@NEX2026` | `EMPLOYEE` | `ACTIVE` |
 | **6** | Shifa Mobh | `shifa.mobh@nexgenharmasolutions.com` | `Shifa@NEX2026` | `EMPLOYEE` | `ACTIVE` |
 
+Designation records: Ashwani Shrivastav is Managing Director. Pratham Shrivastav is Director.
+
 > **Security Note:** Employees must be prompted to change their temporary passwords upon their first successful login.
+
+### 2.1 Pratham Shrivastav Approval Authority
+
+Pratham Shrivastav has `SUPER_ADMIN` authority in the EMS and is authorized to approve or reject all employee-submitted items, including:
+
+*   Leave requests
+*   Expense claims at manager and finance approval levels
+*   Salary slips, salary structures, payroll changes, and transfer marking
+*   Employee documents and KYC submissions
+*   WFH, advance payment, asset, travel, document, and attendance-correction requests
+*   Invoices and payment status changes
+*   Attendance regularization and audit-sensitive employee actions
+
+---
+
+## 2.2 Leave And Payroll Rules
+
+Permanent employee annual leave allocation:
+
+| Leave Type | Code | Annual Days | Rollover |
+| :--- | :---: | ---: | :---: |
+| Sick Leave | `SL` | 7 | No |
+| Casual Leave | `CL` | 7 | No |
+| Paid Leave | `PL` | 14 | No |
+
+Unused paid leave (`PL`) does not roll over. Remaining paid leave is payable by the company as per payroll/HR settlement.
+
+Interns do not receive the permanent employee leave allocation during internship. Any leave taken by Dev Patel or Maanav Shah while they are interns is deductible/unpaid. Pratham Shrivastav will convert interns to full-time when the company decides to do so.
 
 ---
 
@@ -297,10 +329,10 @@ The following credentials have been officially generated, hashed via bcrypt, and
 
 | Sr. No. | Employee Name | Employee Type | Department | Designation | DOJ / Start Date | Work Mode | Location | Reporting Manager | Salary / Stipend / CTC | Status | Missing Data |
 | :---: | :--- | :--- | :--- | :--- | :---: | :--- | :--- | :--- | :--- | :--- | :--- |
-| **1** | Chandni Jha | Full-time (TBD) | Quality Assurance | QA Chemist / QA Executive | To be decided | On-site | Vadodara Office | Ashwani Shrivastav | To be collected | **Pending Joining** | DOJ, Salary structure, Aadhaar/PAN, Address, Emergency Contact, Bank Details |
-| **2** | Dev Patel | Intern | Software Dev / Robotics & AI | Software Dev Intern – Robotics & Intelligent Systems | 09-Jan-2026 | On-site only | Vadodara Office | Ashwani Shrivastav | Performance Based Honorarium | **Intern Active** | Contact, Email, Address, Emergency Contact, Academic docs, Aadhaar/PAN, Bank Details, Intern ID |
+| **1** | Chandni Jha | Full-time | Quality Assurance | QA Chemist / QA Executive | 01-Jun-2026 | On-site | Vadodara Office | Ashwani Shrivastav | INR 25,000 per month, no deductions | **Active from 01-Jun-2026** | Probation, Aadhaar/PAN, Address, Emergency Contact, Bank Details |
+| **2** | Dev Patel | Intern | Software Dev / Robotics & AI | Software Dev Intern – Robotics & Intelligent Systems | 09-Jan-2026 | On-site only | Vadodara Office | Ashwani Shrivastav | INR 10,000 per month from Apr-2026 onward; April stipend paid/payable in May | **Intern Active** | Contact, Email, Address, Emergency Contact, Academic docs, Aadhaar/PAN, Bank Details, Intern ID |
 | **3** | Maanav Shah | Intern | Software Dev / Robotics & AI | Software Dev Intern – Robotics & Intelligent Systems | 05-Jan-2026 | On-site only | Vadodara Office | Ashwani Shrivastav | INR 10,000 per month | **Intern Active** | Contact, Email, Address, Emergency Contact, Academic docs, Aadhaar/PAN, Bank Details, Intern ID |
-| **4** | Shifa Mobh | Full-time | Regulatory Affairs | Officer – Regulatory Affairs | 02-Feb-2026 | On-site / Hybrid | Vadodara or Assigned | Ashwani Shrivastav | INR 3,00,000 per annum | **Active** | Contact, Email, Address, Emergency Contact, Edu docs, Experience letters, Aadhaar/PAN, Bank Details, Employee ID |
+| **4** | Shifa Mobh | Full-time | Regulatory Affairs | Officer - Regulatory Affairs | 02-Feb-2026 | On-site / Hybrid | Vadodara or Assigned | Ashwani Shrivastav | INR 25,000 per month, no deductions | **Active** | Contact, Email, Address, Emergency Contact, Edu docs, Experience letters, Aadhaar/PAN, Bank Details, Employee ID |
 
 ---
 
