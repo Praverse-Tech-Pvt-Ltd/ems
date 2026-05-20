@@ -5,12 +5,15 @@ import { useQuery } from '@tanstack/react-query';
 import { useAuthStore } from '@/store/auth.store';
 import { apiClient } from '@/lib/api-client';
 import { formatDate } from '@/lib/utils';
-import type { DashboardStats, AttendanceRecord, LeaveBalance, Notification } from '@/types';
+import type { DashboardStats, AttendanceRecord, LeaveBalance, Notification, AttendanceStats } from '@/types';
 import {
   Fingerprint, CheckCircle, AlertTriangle, DollarSign,
   Calendar, Wifi, MapPin, ArrowRight, ArrowUp, ArrowDown, Bell, ChevronRight,
+  Camera, UserCheck,
 } from 'lucide-react';
+import type { LeaveRequest } from '@/types';
 import Link from 'next/link';
+import { PunchModal } from '@/components/PunchModal';
 
 function useClock() {
   const [t, setT] = useState<Date | null>(null);
@@ -74,11 +77,17 @@ function flatSpark(value: number, len = 7): number[] {
 export default function DashboardPage() {
   const user  = useAuthStore((s) => s.user);
   const clock = useClock();
+  const [punchModal, setPunchModal] = useState<'in' | 'out' | null>(null);
   const time  = clock ? clock.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '--:--';
   const secs  = clock ? String(clock.getSeconds()).padStart(2, '0') : '00';
   const date  = clock ? clock.toLocaleDateString('en-GB', {
     weekday: 'long', day: '2-digit', month: 'long', year: 'numeric',
   }).toUpperCase() : 'LOADING...';
+
+  const { data: me } = useQuery<{ faceEnrolled: boolean }>({
+    queryKey: ['me-face'],
+    queryFn:  () => apiClient.get('/employees/me').then((r) => r.data).catch(() => null),
+  });
 
   const { data: stats } = useQuery<DashboardStats>({
     queryKey: ['dashboard-stats'],
@@ -90,14 +99,24 @@ export default function DashboardPage() {
     queryFn:  () => apiClient.get('/attendance/today').then((r) => r.data).catch(() => null),
   });
 
+  const { data: myLeaves = [] } = useQuery<LeaveRequest[]>({
+    queryKey: ['my-leaves-dashboard'],
+    queryFn:  () => apiClient.get('/leaves/my').then((r) => r.data).catch(() => []),
+  });
+
   const { data: recentActivity = [] } = useQuery<AttendanceRecord[]>({
     queryKey: ['attendance-recent'],
-    queryFn:  () => apiClient.get('/attendance?limit=5').then((r) => r.data),
+    queryFn:  () => apiClient.get('/attendance/my?limit=5').then((r) => r.data).catch(() => []),
   });
 
   const { data: weekAttendance = [] } = useQuery<AttendanceRecord[]>({
     queryKey: ['attendance-week'],
-    queryFn:  () => apiClient.get('/attendance?limit=7').then((r) => r.data).catch(() => []),
+    queryFn:  () => apiClient.get('/attendance/my?limit=7').then((r) => r.data).catch(() => []),
+  });
+
+  const { data: attendanceStats } = useQuery<AttendanceStats>({
+    queryKey: ['attendance-stats'],
+    queryFn:  () => apiClient.get('/attendance/my/stats').then((r) => r.data).catch(() => null),
   });
 
   const { data: leaveBalances = [] } = useQuery<LeaveBalance[]>({
@@ -114,25 +133,32 @@ export default function DashboardPage() {
   // ── KPI values from live data ─────────────────────────────────────────────
   const leavesAvailable = leaveBalances.reduce((s, b) => s + (b.totalDays - b.usedDays), 0);
   const pendingApprovals = (stats?.pendingLeaves ?? 0) + (stats?.pendingExpenses ?? 0);
-  const hoursThisWeek = weekAttendance.reduce((s, r) => s + (r.workingHours ?? 0), 0);
+  const hoursThisWeek = weekAttendance.reduce((s, r) => s + Number(r.workingHours ?? 0), 0);
+
+  const attendancePct = attendanceStats?.attendancePercent ?? 0;
 
   const kpis = useMemo(() => [
     {
       label: 'LEAVES AVAILABLE', value: leavesAvailable, unit: 'DAYS',
       trend: 0, dir: 'down' as const,
       spark: flatSpark(leavesAvailable), accent: 'yellow',
+      sub: null,
     },
     {
       label: 'PENDING APPROVALS', value: pendingApprovals, unit: 'ITEMS',
       trend: 0, dir: 'up' as const,
       spark: flatSpark(pendingApprovals), accent: 'red',
+      sub: null,
     },
     {
-      label: 'HOURS LOGGED · WK', value: Math.round(hoursThisWeek * 10) / 10, unit: 'HRS',
+      label: 'ATTENDANCE · MTD', value: attendancePct, unit: '%',
       trend: 0, dir: 'up' as const,
-      spark: weekAttendance.map(r => r.workingHours ?? 0).reverse(), accent: 'blue',
+      spark: flatSpark(attendancePct), accent: 'blue',
+      sub: attendanceStats
+        ? `${attendanceStats.attendedDays} / ${attendanceStats.totalWorkingDays} DAYS · ${attendanceStats.month}`
+        : null,
     },
-  ], [leavesAvailable, pendingApprovals, hoursThisWeek, weekAttendance]);
+  ], [leavesAvailable, pendingApprovals, attendancePct, attendanceStats]);
 
   // ── Workflow feed from notifications ─────────────────────────────────────
   const feed = notifications.slice(0, 5).map(n => ({
@@ -156,7 +182,7 @@ export default function DashboardPage() {
       const record = weekAttendance.find(r => r.date?.startsWith(dateStr ?? ''));
       const isToday = diff === 0;
       const isFuture = diff < 0;
-      const h = record?.workingHours ?? (isFuture ? 0 : 0);
+      const h = Number(record?.workingHours ?? 0);
       return { d, h, today: isToday, future: isFuture };
     });
   }, [weekAttendance]);
@@ -170,6 +196,7 @@ export default function DashboardPage() {
   const expiringLeaves = leavesAvailable;
 
   return (
+    <>
     <div className="space-y-8 w-full animate-fade-up">
       {/* Header row */}
       <div className="flex items-end justify-between gap-6 flex-wrap">
@@ -217,24 +244,58 @@ export default function DashboardPage() {
               <span className="w-1.5 h-1.5 bg-white" /> GEOFENCE OK
             </span>
             <span className="font-display font-bold text-[10px] tracking-[0.16em] flex items-center gap-1.5 px-2 py-1.5 bg-brutal-surface brutal-border">
-              <Wifi size={10} /> NXGN-LAB-B
+              <Wifi size={10} /> PRINCE CUBE
             </span>
             <span className="font-display font-bold text-[10px] tracking-[0.16em] flex items-center gap-1.5 px-2 py-1.5 bg-brutal-surface brutal-border">
-              <MapPin size={10} /> TOWER B · LAB FLOOR
+              <MapPin size={10} /> GOTRI · VADODARA
             </span>
           </div>
 
           <div className="mt-7 flex items-end gap-4 flex-wrap">
-            <Link
-              href="/attendance/biometric"
-              className="brutal-btn-primary px-6 py-4 text-[13px] flex items-center gap-2"
-            >
-              <Fingerprint size={18} /> INITIALIZE FACE PUNCH-IN <ArrowRight size={14} />
-            </Link>
+            {me === undefined ? (
+              <div className="px-6 py-4 brutal-border bg-brutal-surface font-display font-bold text-[13px] opacity-50">
+                LOADING…
+              </div>
+            ) : !me?.faceEnrolled ? (
+              <Link
+                href="/attendance/biometric"
+                className="brutal-btn-primary px-6 py-4 text-[13px] flex items-center gap-2 bg-brutal-yellow text-brutal-ink border-brutal-ink"
+              >
+                <UserCheck size={18} /> ENROLL FACE FIRST <ArrowRight size={14} />
+              </Link>
+            ) : todayRecord?.punchOutTime ? (
+              <div className="px-4 py-3 bg-[#0F8F3A] text-white font-display font-bold text-[11px] tracking-[0.18em] border-2 border-[#0F8F3A]">
+                ✓ SHIFT COMPLETE
+              </div>
+            ) : todayRecord?.punchInTime ? (
+              <button
+                onClick={() => setPunchModal('out')}
+                className="brutal-btn-primary px-6 py-4 text-[13px] flex items-center gap-2 bg-brutal-red text-white border-brutal-red"
+              >
+                <Camera size={18} /> PUNCH OUT <ArrowRight size={14} />
+              </button>
+            ) : (
+              <button
+                onClick={() => setPunchModal('in')}
+                className="brutal-btn-primary px-6 py-4 text-[13px] flex items-center gap-2"
+              >
+                <Camera size={18} /> PUNCH IN <ArrowRight size={14} />
+              </button>
+            )}
             {todayRecord?.punchInTime && (
-              <div className="brutal-border-l pl-4 font-display font-bold text-[11px] tracking-[0.14em]">
-                <div className="text-brutal-ink/60">TODAY PUNCHED IN</div>
-                <div className="text-[15px] text-brutal-ink">{todayRecord.punchInTime}</div>
+              <div className="border-l-[3px] border-brutal-ink pl-4 font-display font-bold text-[11px] tracking-[0.14em]">
+                <div className="text-brutal-ink/60">PUNCHED IN</div>
+                <div className="text-[18px] text-brutal-ink">
+                  {new Date(todayRecord.punchInTime).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })}
+                </div>
+                {todayRecord.punchOutTime && (
+                  <>
+                    <div className="text-brutal-ink/60 mt-1">PUNCHED OUT</div>
+                    <div className="text-[18px] text-brutal-ink">
+                      {new Date(todayRecord.punchOutTime).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })}
+                    </div>
+                  </>
+                )}
               </div>
             )}
           </div>
@@ -294,6 +355,7 @@ export default function DashboardPage() {
           {kpis.map((k) => {
             const sparkColor = k.accent === 'red' ? '#e63b2e' : k.accent === 'blue' ? '#0055ff' : '#1a1a1a';
             const headerBg   = k.accent === 'red' ? 'bg-brutal-red text-white' : k.accent === 'blue' ? 'bg-brutal-blue text-white' : 'bg-brutal-yellow text-brutal-ink';
+            const isAttendance = k.unit === '%';
             return (
               <div key={k.label} className="brutal-border brutal-shadow bg-brutal-cream">
                 <div className={`flex items-center justify-between px-4 py-2 brutal-border-b ${headerBg}`}>
@@ -301,8 +363,23 @@ export default function DashboardPage() {
                   <span className="font-display font-bold text-[10px] tracking-[0.18em]">{k.unit}</span>
                 </div>
                 <div className="p-5 flex items-end justify-between">
-                  <div>
-                    <div className="font-display font-bold text-[52px] leading-[0.9] tracking-tight">{k.value}</div>
+                  <div className="flex-1">
+                    <div className="font-display font-bold text-[52px] leading-[0.9] tracking-tight">
+                      {k.value}{isAttendance ? '%' : ''}
+                    </div>
+                    {k.sub && (
+                      <div className="mt-2 font-display font-bold text-[10px] tracking-[0.16em] text-brutal-ink/60">
+                        {k.sub}
+                      </div>
+                    )}
+                    {isAttendance && (
+                      <div className="mt-3 h-2 border-2 border-brutal-ink bg-brutal-surface">
+                        <div
+                          className={`h-full ${k.value >= 90 ? 'bg-[#0F8F3A]' : k.value >= 75 ? 'bg-brutal-blue' : 'bg-brutal-red'}`}
+                          style={{ width: `${k.value}%` }}
+                        />
+                      </div>
+                    )}
                     {k.trend !== 0 && (
                       <div className={`mt-3 font-display font-bold text-[11px] tracking-[0.16em] inline-flex items-center gap-1 px-1.5 py-0.5 border-2 border-brutal-ink ${
                         k.dir === 'up' ? 'bg-[#0F8F3A] text-white' : 'bg-brutal-red text-white'
@@ -397,6 +474,80 @@ export default function DashboardPage() {
                   </div>
                 </div>
               </div>
+
+              {/* Monthly attendance percentage bar */}
+              {attendanceStats && (
+                <div className="mt-3 border-t-[3px] border-brutal-ink pt-3">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="font-display font-bold text-[9px] tracking-[0.2em] text-brutal-ink/60">{attendanceStats.month}</span>
+                    <span className="font-display font-bold text-[13px]">
+                      {attendanceStats.attendedDays} / {attendanceStats.totalWorkingDays} DAYS
+                    </span>
+                  </div>
+                  <div className="h-3 border-[3px] border-brutal-ink bg-brutal-surface">
+                    <div
+                      className={`h-full transition-all ${
+                        attendanceStats.attendancePercent >= 90 ? 'bg-[#0F8F3A]'
+                        : attendanceStats.attendancePercent >= 75 ? 'bg-brutal-blue'
+                        : 'bg-brutal-red'
+                      }`}
+                      style={{ width: `${attendanceStats.attendancePercent}%` }}
+                    />
+                  </div>
+                  <div className="mt-1 flex justify-between font-display font-bold text-[9px] tracking-[0.14em] text-brutal-ink/50">
+                    <span>{attendanceStats.daysPresent}P · {attendanceStats.daysHalfDay}HD · {attendanceStats.daysOnLeave}L · {attendanceStats.daysAbsent}A</span>
+                    <span>{attendanceStats.attendancePercent}%</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* My Leaves */}
+          <div className="brutal-border brutal-shadow bg-brutal-cream">
+            <div className="px-4 py-2 brutal-border-b bg-brutal-yellow text-brutal-ink flex items-center justify-between">
+              <span className="font-display font-bold text-[10px] tracking-[0.22em]">MY LEAVES</span>
+              <Link href="/leaves" className="font-display font-bold text-[10px] tracking-[0.18em] hover:underline flex items-center gap-1">
+                VIEW ALL <ArrowRight size={10} />
+              </Link>
+            </div>
+            {myLeaves.length === 0 ? (
+              <div className="px-4 py-6 text-center font-display font-bold text-[10px] tracking-[0.18em] text-brutal-ink/40">
+                NO LEAVE REQUESTS
+              </div>
+            ) : (
+              <div className="divide-y-[2px] divide-brutal-surface">
+                {myLeaves.slice(0, 4).map((l) => {
+                  const tone =
+                    l.status === 'APPROVED' ? 'bg-[#0F8F3A] text-white' :
+                    l.status === 'REJECTED' || l.status === 'CANCELLED' ? 'bg-brutal-red text-white' :
+                    'bg-brutal-yellow text-brutal-ink';
+                  return (
+                    <div key={l.id} className="flex items-center gap-3 px-4 py-2.5">
+                      <div className="w-7 h-7 grid place-items-center bg-brutal-ink text-brutal-yellow font-display font-bold text-[10px] flex-shrink-0">
+                        {l.leaveType.slice(0, 2)}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-display font-bold text-[12px] truncate">{l.leaveType}</div>
+                        <div className="font-display font-bold text-[10px] tracking-[0.1em] text-brutal-ink/60 truncate">
+                          {new Date(l.fromDate).toLocaleDateString('en-GB')} → {new Date(l.toDate).toLocaleDateString('en-GB')}
+                        </div>
+                      </div>
+                      <span className={`font-display font-bold text-[9px] tracking-[0.12em] px-1.5 py-0.5 border-2 border-brutal-ink flex-shrink-0 ${tone}`}>
+                        {l.status.slice(0, 3)}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            <div className="px-4 py-2 brutal-border-t">
+              <Link
+                href="/leaves"
+                className="w-full brutal-btn-primary py-2 text-[11px] flex items-center justify-center gap-2"
+              >
+                <Calendar size={12} /> APPLY FOR LEAVE
+              </Link>
             </div>
           </div>
 
@@ -488,5 +639,12 @@ export default function DashboardPage() {
         )}
       </div>
     </div>
+    {punchModal && (
+      <PunchModal
+        punchType={punchModal}
+        onClose={() => setPunchModal(null)}
+      />
+    )}
+    </>
   );
 }

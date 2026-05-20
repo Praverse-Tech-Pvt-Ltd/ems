@@ -21,6 +21,7 @@ import { CommentsModule } from './modules/comments/comments.module';
 import { CorporateModule } from './modules/corporate/corporate.module';
 import { KeepAliveModule } from './common/keep-alive/keep-alive.module';
 import { FaceRecognitionModule } from './modules/face-recognition/face-recognition.module';
+import { ChatModule } from './modules/chat/chat.module';
 
 @Module({
   imports: [
@@ -63,6 +64,7 @@ import { FaceRecognitionModule } from './modules/face-recognition/face-recogniti
     CorporateModule,
     KeepAliveModule,
     FaceRecognitionModule,
+    ChatModule,
   ],
 })
 export class AppModule {}

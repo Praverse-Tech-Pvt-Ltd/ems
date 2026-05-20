@@ -13,6 +13,7 @@ const TONE_CYCLE = ['blue', null, null, 'yellow', null, null, 'red'] as const;
 export default function EmployeesPage() {
   const [q, setQ] = useState('');
   const me = useAuthStore(s => s.user);
+  const isAdmin = me?.role === 'ADMIN' || me?.role === 'SUPER_ADMIN';
 
   const { data: employees = [], isLoading } = useQuery<Employee[]>({
     queryKey: ['employees'],
@@ -57,9 +58,11 @@ export default function EmployeesPage() {
               className="px-3 py-2 bg-transparent focus:outline-none font-display font-bold text-[12px] tracking-[0.12em] w-48"
             />
           </div>
-          <button className="brutal-btn-primary px-5 py-3 text-[13px] flex items-center gap-2">
-            <Plus size={15} /> ADD EMPLOYEE
-          </button>
+          {isAdmin && (
+            <button className="brutal-btn-primary px-5 py-3 text-[13px] flex items-center gap-2">
+              <Plus size={15} /> ADD EMPLOYEE
+            </button>
+          )}
         </div>
       </div>
 

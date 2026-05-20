@@ -2,6 +2,7 @@ import base64
 import io
 import logging
 from typing import Optional
+import uuid
 
 import numpy as np
 import torch
@@ -78,14 +79,15 @@ def register(employee_id: str, image: Image.Image) -> None:
     conn = _get_conn()
     try:
         with conn.cursor() as cur:
+            record_id = str(uuid.uuid4())
             cur.execute(
                 """
-                INSERT INTO face_embeddings (employee_id, embedding)
-                VALUES (%s, %s)
+                INSERT INTO face_embeddings (id, employee_id, embedding, updated_at)
+                VALUES (%s, %s, %s, NOW())
                 ON CONFLICT (employee_id)
                 DO UPDATE SET embedding = EXCLUDED.embedding, updated_at = NOW()
                 """,
-                (employee_id, embedding),
+                (record_id, employee_id, embedding),
             )
             conn.commit()
     except Exception as exc:

@@ -63,6 +63,9 @@ export default function CompanyPage() {
   });
 
   const workingHours = settings.find((s) => s.key === 'working_hours')?.value ?? { label: '9:30 AM - 6:00 PM IST' };
+  const companyAddress = (settings.find((s) => s.key === 'company_address')?.value as any) ?? {
+    full: '413 & 420, Prince Cube, Beside Gangotri Exotica, Laxmipura Char Rasta, Nayaran Garden, 30 Mtr Road, Gotri, Vadodara, Gujarat 390023, India',
+  };
   const postPolicy = useMutation({ mutationFn: () => apiClient.post('/corporate/policies', { title: policyTitle, category: 'HR', body: policyBody, status: 'PUBLISHED' }), onSuccess: refresh });
   const ackPolicy = useMutation({ mutationFn: (id: string) => apiClient.post(`/corporate/policies/${id}/acknowledge`), onSuccess: refresh });
   const postHoliday = useMutation({ mutationFn: () => apiClient.post('/corporate/holidays', { date: holidayDate, title: holidayTitle, isPaid: true }), onSuccess: refresh });
@@ -106,10 +109,23 @@ export default function CompanyPage() {
             Company<br /><span className="text-brutal-yellow" style={{ WebkitTextStroke: '2px #1a1a1a' }}>OS</span>
           </h1>
         </div>
-        <div className="brutal-border brutal-shadow bg-brutal-ink text-white p-5 min-w-[280px]">
-          <p className="font-display font-bold text-[10px] uppercase tracking-[0.25em] text-white/60">Working Hours</p>
-          <p className="font-display font-bold text-2xl text-brutal-yellow">{workingHours.label}</p>
-          <p className="font-display font-bold text-[10px] uppercase tracking-[0.2em] text-white/60">Asia/Kolkata</p>
+        <div className="space-y-3">
+          <div className="brutal-border brutal-shadow bg-brutal-ink text-white p-5 min-w-[280px]">
+            <p className="font-display font-bold text-[10px] uppercase tracking-[0.25em] text-white/60">Working Hours</p>
+            <p className="font-display font-bold text-2xl text-brutal-yellow">{workingHours.label}</p>
+            <p className="font-display font-bold text-[10px] uppercase tracking-[0.2em] text-white/60">Asia/Kolkata</p>
+          </div>
+          <div className="brutal-border brutal-shadow bg-brutal-yellow p-4 min-w-[280px]">
+            <p className="font-display font-bold text-[10px] uppercase tracking-[0.25em] text-brutal-ink/60 mb-1">Office Address</p>
+            <p className="font-display font-bold text-[12px] text-brutal-ink leading-relaxed">
+              413 &amp; 420, Prince Cube<br />
+              Beside Gangotri Exotica<br />
+              Laxmipura Char Rasta, Nayaran Garden<br />
+              30 Mtr Road, Gotri<br />
+              {companyAddress.city ?? 'Vadodara'}, {companyAddress.state ?? 'Gujarat'} {companyAddress.pincode ?? '390023'}<br />
+              {companyAddress.country ?? 'India'}
+            </p>
+          </div>
         </div>
       </div>
 

@@ -661,10 +661,11 @@ model ChatChannel {
 }
 
 model ChatChannelMember {
-  id         String   @id @default(uuid())
-  channelId  String   @map("channel_id")
-  employeeId String   @map("employee_id")
-  createdAt  DateTime @default(now()) @map("created_at")
+  id          String    @id @default(uuid())
+  channelId   String    @map("channel_id")
+  employeeId  String    @map("employee_id")
+  lastReadAt  DateTime? @map("last_read_at") @db.Timestamptz
+  createdAt   DateTime  @default(now()) @map("created_at")
 
   channel  ChatChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
   employee Employee    @relation(fields: [employeeId], references: [id], onDelete: Cascade)

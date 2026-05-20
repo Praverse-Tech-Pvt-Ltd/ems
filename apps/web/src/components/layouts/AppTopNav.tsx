@@ -1,9 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Bell, Search, Menu } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Bell, Search, Menu, X } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api-client';
+import type { Employee } from '@/types';
+import Link from 'next/link';
 
 const TICKER_ITEMS = [
   'SYS STATUS · NOMINAL',
@@ -11,7 +13,7 @@ const TICKER_ITEMS = [
   'NEW POLICY 14-B · TRAVEL CAPS REVISED',
   'BIOMETRIC SVC · ONLINE',
   'COMPLIANCE WINDOW CLOSES IN 06D 12H',
-  'OFFICE NETWORK · NXGN-LAB-B',
+  'OFFICE · PRINCE CUBE, GOTRI, VADODARA',
 ];
 
 function useClock() {
@@ -55,6 +57,44 @@ export function AppTopNav({ onMenuOpen, onBell }: Props) {
   const clock = useClock();
   const time = clock ? clock.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '--:--';
 
+  const [rawQuery, setRawQuery]     = useState('');
+  const [query, setQuery]           = useState('');
+  const [focused, setFocused]       = useState(false);
+  const debounceRef                 = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchRef                   = useRef<HTMLDivElement>(null);
+
+  // Debounce raw input → committed query
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      setQuery(rawQuery.trim());
+    }, 280);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, [rawQuery]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
+        setFocused(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
+
+  const showDropdown = focused && query.length >= 2;
+
+  const { data: searchResults = [], isFetching } = useQuery<Employee[]>({
+    queryKey: ['employees-search', query],
+    queryFn: () =>
+      apiClient.get('/employees', { params: { search: query } })
+        .then(r => (Array.isArray(r.data) ? r.data : []))
+        .catch(() => []),
+    enabled: showDropdown,
+    staleTime: 20_000,
+  });
+
   const { data: unreadData } = useQuery<{ count: number }>({
     queryKey: ['notifications-unread'],
     queryFn: () => apiClient.get('/notifications/unread-count').then(r => r.data).catch(() => ({ count: 0 })),
@@ -65,7 +105,7 @@ export function AppTopNav({ onMenuOpen, onBell }: Props) {
   return (
     <>
       <Ticker />
-      <header className="bg-brutal-cream brutal-border-b flex items-stretch flex-shrink-0">
+      <header className="bg-brutal-cream brutal-border-b flex items-stretch flex-shrink-0 relative z-30">
         {/* Mobile hamburger */}
         <button
           onClick={onMenuOpen}
@@ -76,18 +116,79 @@ export function AppTopNav({ onMenuOpen, onBell }: Props) {
         </button>
 
         {/* Search area */}
-        <div className="hidden sm:flex items-center gap-2 px-4 brutal-border-r">
-          <Search size={14} className="text-brutal-ink/60" />
-          <span className="font-display font-bold text-[10px] tracking-[0.18em] text-brutal-ink/60">FIND</span>
+        <div ref={searchRef} className="relative flex-1 flex items-stretch min-w-0">
+          <div className="hidden sm:flex items-center gap-2 px-4 brutal-border-r pointer-events-none">
+            <Search size={14} className="text-brutal-ink/60" />
+            <span className="font-display font-bold text-[10px] tracking-[0.18em] text-brutal-ink/60">FIND</span>
+          </div>
+          <div className="sm:hidden grid place-items-center px-4 brutal-border-r pointer-events-none">
+            <Search size={14} className="text-brutal-ink/60" />
+          </div>
+          <input
+            type="search"
+            value={rawQuery}
+            onChange={e => setRawQuery(e.target.value)}
+            onFocus={() => setFocused(true)}
+            placeholder="People · Requests · Vault entries · Policies"
+            className="flex-1 min-w-0 w-0 bg-transparent px-3 sm:px-4 py-3 focus:outline-none text-[13px] sm:text-[14px] placeholder:text-brutal-ink/40 font-medium"
+          />
+          {rawQuery && (
+            <button
+              onClick={() => { setRawQuery(''); setQuery(''); setFocused(false); }}
+              className="px-3 flex items-center text-brutal-ink/50 hover:text-brutal-ink"
+            >
+              <X size={14} />
+            </button>
+          )}
+
+          {/* Search Results Dropdown */}
+          {showDropdown && (
+            <div className="absolute top-full left-0 right-0 mt-0 bg-brutal-cream brutal-border brutal-shadow-lg z-50 max-h-[320px] overflow-y-auto">
+              {isFetching && (
+                <div className="px-5 py-4 font-display font-bold text-[10px] tracking-[0.22em] text-brutal-ink/50 text-center">
+                  SEARCHING…
+                </div>
+              )}
+              {!isFetching && searchResults.length === 0 && (
+                <div className="px-5 py-4 font-display font-bold text-[11px] tracking-[0.18em] text-brutal-ink/50 text-center">
+                  NO RESULTS FOR &ldquo;{query}&rdquo;
+                </div>
+              )}
+              {!isFetching && searchResults.slice(0, 8).map((emp, idx) => (
+                <Link
+                  key={emp.id}
+                  href={`/employees/${emp.id}`}
+                  onClick={() => { setRawQuery(''); setQuery(''); setFocused(false); }}
+                  className={`flex items-center gap-4 px-5 py-3 hover:bg-brutal-yellow transition-colors ${
+                    idx !== Math.min(searchResults.length, 8) - 1 ? 'brutal-border-b' : ''
+                  }`}
+                >
+                  <div className="w-9 h-9 flex-shrink-0 grid place-items-center bg-brutal-ink text-brutal-yellow font-display font-bold text-[13px] border-2 border-brutal-ink">
+                    {emp.firstName[0]}{emp.lastName[0]}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-display font-bold text-[13px] tracking-tight truncate">
+                      {emp.firstName} {emp.lastName}
+                    </div>
+                    <div className="font-display font-bold text-[10px] tracking-[0.14em] text-brutal-ink/60 truncate">
+                      {emp.employeeCode}{emp.designation ? ` · ${emp.designation}` : ''}{emp.department ? ` · ${emp.department.name}` : ''}
+                    </div>
+                  </div>
+                  <span className={`font-display font-bold text-[9px] tracking-[0.14em] px-1.5 py-0.5 border-2 border-brutal-ink flex-shrink-0 ${
+                    emp.status === 'ACTIVE' ? 'bg-[#0F8F3A] text-white' : 'bg-brutal-red text-white'
+                  }`}>
+                    {emp.status}
+                  </span>
+                </Link>
+              ))}
+              {!isFetching && searchResults.length > 8 && (
+                <div className="px-5 py-2.5 brutal-border-t font-display font-bold text-[10px] tracking-[0.18em] text-brutal-ink/50 text-center">
+                  + {searchResults.length - 8} MORE
+                </div>
+              )}
+            </div>
+          )}
         </div>
-        <div className="sm:hidden grid place-items-center px-4 brutal-border-r">
-          <Search size={14} className="text-brutal-ink/60" />
-        </div>
-        <input
-          type="search"
-          placeholder="People · Requests · Vault entries · Policies"
-          className="flex-1 min-w-0 w-0 bg-transparent px-3 sm:px-4 py-3 focus:outline-none text-[13px] sm:text-[14px] placeholder:text-brutal-ink/40 font-medium"
-        />
 
         {/* ⌘K hint — desktop */}
         <div className="hidden md:flex items-center gap-1 px-4 brutal-border-l bg-brutal-surface">

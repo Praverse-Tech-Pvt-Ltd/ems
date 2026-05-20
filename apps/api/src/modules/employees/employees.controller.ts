@@ -87,7 +87,6 @@ export class EmployeesController {
   }
 
   @Get()
-  @Roles('ADMIN', 'SUPER_ADMIN', 'MANAGER')
   @ApiOperation({ summary: 'List all employees' })
   findAll(
     @Query('search') search?: string,

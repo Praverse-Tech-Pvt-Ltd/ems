@@ -8,11 +8,11 @@ import type { LeaveRequest, LeaveBalance, LeaveType } from '@/types';
 import { Calendar, ChevronRight, Plus } from 'lucide-react';
 
 const LEAVE_META: Record<LeaveType, { label: string; bg: string }> = {
-  CL: { label: 'CASUAL',    bg: 'bg-brutal-yellow text-brutal-ink' },
-  SL: { label: 'SICK',      bg: 'bg-brutal-red text-white'          },
-  PL: { label: 'PAID',       bg: 'bg-brutal-blue text-white'         },
-  UL: { label: 'UNPAID',    bg: 'bg-brutal-surface text-brutal-ink' },
-  CO: { label: 'ON DUTY',   bg: 'bg-brutal-ink text-brutal-yellow'  },
+  CL: { label: 'CASUAL', bg: 'bg-brutal-yellow text-brutal-ink' },
+  SL: { label: 'SICK',   bg: 'bg-brutal-red text-white'         },
+  PL: { label: 'PAID',   bg: 'bg-brutal-blue text-white'        },
+  UL: { label: 'UNPAID', bg: 'bg-brutal-surface text-brutal-ink' },
+  CO: { label: 'ON DUTY',bg: 'bg-brutal-ink text-brutal-yellow'  },
 };
 
 const TONE: Record<string, string> = {
@@ -46,7 +46,7 @@ export default function LeavesPage() {
 
   const { data: leaves = [] } = useQuery<LeaveRequest[]>({
     queryKey: ['leaves'],
-    queryFn: () => apiClient.get('/leaves').then(r => r.data).catch(() => []),
+    queryFn: () => apiClient.get('/leaves/my').then(r => r.data).catch(() => []),
   });
 
   const { data: balances = [] } = useQuery<LeaveBalance[]>({
@@ -56,7 +56,11 @@ export default function LeavesPage() {
 
   const applyMutation = useMutation({
     mutationFn: (data: typeof form) => apiClient.post('/leaves', data),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['leaves', 'leave-balances'] }); setShowForm(false); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['leaves'] });
+      qc.invalidateQueries({ queryKey: ['leave-balances'] });
+      setShowForm(false);
+    },
   });
 
   // Map API balances; fall back to zeros for missing leave types

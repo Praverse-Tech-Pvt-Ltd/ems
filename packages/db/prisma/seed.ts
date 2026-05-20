@@ -581,6 +581,60 @@ async function main() {
   }
   console.log(`✓ Employee 4    →  shifa.mobh@nexgenharmasolutions.com   /  ${shifaPassword}`);
 
+  // ── Office Location (Geo-fence) ──────────────────────────────────────────────
+  console.log(`\n── Seeding Office Location ──────────────────────`);
+  const existingOffice = await prisma.officeLocation.findFirst({
+    where: { name: 'Nexgen Pharma Solutions — Gotri Office' },
+  });
+  if (!existingOffice) {
+    await prisma.officeLocation.create({
+      data: {
+        name:         'Nexgen Pharma Solutions — Gotri Office',
+        latitude:     22.3097,   // Prince Cube, 30 Mtr Road, Gotri, Vadodara
+        longitude:    73.1376,
+        radiusMeters: 150,
+        isActive:     true,
+      },
+    });
+    console.log(`✓ Office location created (lat 22.3097, lng 73.1376, radius 150 m)`);
+  } else {
+    console.log(`✓ Office location already exists — skipped`);
+  }
+
+  // ── Company Address Setting ───────────────────────────────────────────────────
+  console.log(`\n── Seeding Company Settings ─────────────────────`);
+  await prisma.companySetting.upsert({
+    where: { key: 'company_address' },
+    update: {
+      value: {
+        line1:   '413 & 420, Prince Cube',
+        line2:   'Beside Gangotri Exotica, Laxmipura Char Rasta, Nayaran Garden',
+        line3:   '30 Mtr Road, Gotri',
+        city:    'Vadodara',
+        state:   'Gujarat',
+        pincode: '390023',
+        country: 'India',
+        full:    '413 & 420, Prince Cube, Beside Gangotri Exotica, Laxmipura Char Rasta, Nayaran Garden, 30 Mtr Road, Gotri, Vadodara, Gujarat 390023, India',
+      } as any,
+      updatedBy: superAdmin?.id ?? '',
+    },
+    create: {
+      key:       'company_address',
+      value: {
+        line1:   '413 & 420, Prince Cube',
+        line2:   'Beside Gangotri Exotica, Laxmipura Char Rasta, Nayaran Garden',
+        line3:   '30 Mtr Road, Gotri',
+        city:    'Vadodara',
+        state:   'Gujarat',
+        pincode: '390023',
+        country: 'India',
+        full:    '413 & 420, Prince Cube, Beside Gangotri Exotica, Laxmipura Char Rasta, Nayaran Garden, 30 Mtr Road, Gotri, Vadodara, Gujarat 390023, India',
+      } as any,
+      updatedBy: superAdmin?.id ?? '',
+    },
+  });
+  console.log(`✓ Company address setting saved`);
+
   console.log(`\n── Done ─────────────────────────────────────────\n`);
 }
 

@@ -6,6 +6,7 @@ import { apiClient } from '@/lib/api-client';
 import type { AttendanceRecord } from '@/types';
 import {
   Camera, MapPin, Wifi, ArrowRight, X, Check, AlertTriangle, UserCheck,
+  ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -13,15 +14,6 @@ function useClock() {
   const [t, setT] = useState<Date | null>(null);
   useEffect(() => { setT(new Date()); const id = setInterval(() => setT(new Date()), 1000); return () => clearInterval(id); }, []);
   return t;
-}
-
-/** DD/MM/YYYY in IST */
-function fmtDate(iso: string | null | undefined): string {
-  if (!iso) return '—';
-  return new Date(iso).toLocaleDateString('en-GB', {
-    timeZone: 'Asia/Kolkata',
-    day: '2-digit', month: '2-digit', year: 'numeric',
-  }); // Returns DD/MM/YYYY
 }
 
 /** HH:MM (24-hour) in IST */
@@ -48,18 +40,13 @@ function PunchInModal({ onClose, punchType = 'in' }: { onClose: () => void; punc
   const streamRef = useRef<MediaStream | null>(null);
 
   useEffect(() => {
-    // Pre-warm face service while user positions their face
     apiClient.get('/attendance/face/health').catch(() => {});
-
     let active = true;
     navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: 480, height: 480 } })
       .then(stream => {
         if (!active) { stream.getTracks().forEach(t => t.stop()); return; }
         streamRef.current = stream;
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          videoRef.current.play();
-        }
+        if (videoRef.current) { videoRef.current.srcObject = stream; videoRef.current.play(); }
       })
       .catch(() => { if (active) setPhase('no-camera'); });
     return () => {
@@ -83,8 +70,6 @@ function PunchInModal({ onClose, punchType = 'in' }: { onClose: () => void; punc
     if (!frame) return;
     setProgress(0);
     setPhase('verifying');
-
-    // Get geolocation (fall back to 0,0 if denied or unavailable)
     const coords = await new Promise<{ latitude: number; longitude: number }>(resolve => {
       if (!navigator.geolocation) return resolve({ latitude: 0, longitude: 0 });
       navigator.geolocation.getCurrentPosition(
@@ -93,7 +78,6 @@ function PunchInModal({ onClose, punchType = 'in' }: { onClose: () => void; punc
         { timeout: 5000 },
       );
     });
-
     const ticker = setInterval(() => setProgress(p => Math.min(p + 4, 90)), 80);
     try {
       const endpoint = punchType === 'in' ? '/attendance/punch-in' : '/attendance/punch-out';
@@ -107,7 +91,7 @@ function PunchInModal({ onClose, punchType = 'in' }: { onClose: () => void; punc
       setConfidence(Math.round((res.data?.frConfidence ?? 0.99) * 100));
       setPhase('success');
       await qc.invalidateQueries({ queryKey: ['attendance-today'] });
-      await qc.invalidateQueries({ queryKey: ['attendance-recent'] });
+      await qc.invalidateQueries({ queryKey: ['attendance-all-year'] });
       setTimeout(onClose, 1800);
     } catch (err: unknown) {
       clearInterval(ticker);
@@ -115,14 +99,13 @@ function PunchInModal({ onClose, punchType = 'in' }: { onClose: () => void; punc
       setErrorMsg(msg);
       setPhase('error');
     }
-  }, [captureFrame, punchType, qc]);
+  }, [captureFrame, punchType, qc, onClose]);
 
   const label = punchType === 'in' ? 'PUNCH-IN' : 'PUNCH-OUT';
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center p-6" style={{ background: 'rgba(15,15,15,0.65)', backdropFilter: 'blur(3px)' }}>
       <div className="relative w-full max-w-[520px] brutal-border brutal-shadow-lg animate-fade-up bg-brutal-cream">
-
         <div className="flex items-center justify-between px-5 py-3 bg-brutal-ink text-brutal-cream brutal-border-b">
           <div className="flex items-center gap-3">
             <span className="font-display font-bold text-[10px] tracking-[0.2em] bg-brutal-yellow text-brutal-ink px-2 py-0.5">FACE ID</span>
@@ -132,7 +115,6 @@ function PunchInModal({ onClose, punchType = 'in' }: { onClose: () => void; punc
             <X size={14} />
           </button>
         </div>
-
         <div className="p-5">
           <h2 className="text-[26px] leading-[0.95] font-bold tracking-tight">
             {phase === 'success'   && <>{label} <span className="bg-[#0F8F3A] text-white px-2">CONFIRMED</span>.</>}
@@ -147,17 +129,11 @@ function PunchInModal({ onClose, punchType = 'in' }: { onClose: () => void; punc
             {phase === 'error'     && errorMsg}
             {phase === 'no-camera' && 'Camera permission denied or no camera found.'}
           </div>
-
-          {/* Camera viewport */}
           <div className="mt-5 relative aspect-square brutal-border bg-brutal-ink overflow-hidden">
-            <video
-              ref={videoRef}
-              muted
-              playsInline
+            <video ref={videoRef} muted playsInline
               className={`absolute inset-0 w-full h-full object-cover scale-x-[-1] ${phase === 'success' || phase === 'error' ? 'opacity-30' : 'opacity-100'}`}
             />
             <canvas ref={canvasRef} className="hidden" />
-
             {phase === 'no-camera' && (
               <div className="absolute inset-0 grid place-items-center">
                 <div className="text-center text-brutal-cream/60">
@@ -166,7 +142,6 @@ function PunchInModal({ onClose, punchType = 'in' }: { onClose: () => void; punc
                 </div>
               </div>
             )}
-
             {(phase === 'camera' || phase === 'verifying') && (
               <div className="absolute inset-5 border-2 border-brutal-yellow pointer-events-none">
                 {['top-[-2px] left-[-2px] border-t-[3px] border-l-[3px]','top-[-2px] right-[-2px] border-t-[3px] border-r-[3px]','bottom-[-2px] left-[-2px] border-b-[3px] border-l-[3px]','bottom-[-2px] right-[-2px] border-b-[3px] border-r-[3px]'].map((p,i) => (
@@ -174,24 +149,19 @@ function PunchInModal({ onClose, punchType = 'in' }: { onClose: () => void; punc
                 ))}
               </div>
             )}
-
             {phase === 'verifying' && (
               <div className="absolute inset-x-5 top-5 bottom-5 overflow-hidden pointer-events-none">
                 <div className="absolute inset-x-0 h-[3px] bg-brutal-yellow animate-scan" />
               </div>
             )}
-
             {phase !== 'no-camera' && (
               <div className="absolute top-3 left-3 font-display font-bold text-[10px] tracking-[0.2em] bg-brutal-cream/95 text-brutal-ink px-2 py-1 border-2 border-brutal-cream">
                 <span className={`inline-block w-2 h-2 mr-1.5 align-middle ${
-                  phase === 'success' ? 'bg-[#0F8F3A]' :
-                  phase === 'error'   ? 'bg-brutal-red' :
-                  'bg-brutal-red animate-blink'
+                  phase === 'success' ? 'bg-[#0F8F3A]' : phase === 'error' ? 'bg-brutal-red' : 'bg-brutal-red animate-blink'
                 }`} />
                 {phase === 'camera' ? 'LIVE' : phase === 'verifying' ? 'MATCHING' : phase === 'success' ? `MATCH ${confidence}%` : 'FAILED'}
               </div>
             )}
-
             {phase === 'success' && (
               <div className="absolute inset-0 grid place-items-center bg-[#0F8F3A]/80 pointer-events-none">
                 <div className="w-20 h-20 grid place-items-center bg-brutal-yellow brutal-border brutal-shadow">
@@ -199,7 +169,6 @@ function PunchInModal({ onClose, punchType = 'in' }: { onClose: () => void; punc
                 </div>
               </div>
             )}
-
             {phase === 'error' && (
               <div className="absolute inset-0 grid place-items-center bg-brutal-red/80 pointer-events-none">
                 <div className="w-20 h-20 grid place-items-center bg-brutal-cream brutal-border brutal-shadow">
@@ -208,13 +177,11 @@ function PunchInModal({ onClose, punchType = 'in' }: { onClose: () => void; punc
               </div>
             )}
           </div>
-
           {phase === 'verifying' && (
             <div className="mt-4 border-2 border-brutal-ink h-3">
               <div className="h-full bg-brutal-blue transition-all duration-75" style={{ width: `${progress}%` }} />
             </div>
           )}
-
           <div className="mt-6 flex items-center justify-end gap-3">
             {phase === 'success' ? (
               <button onClick={onClose} className="brutal-btn-primary px-5 py-3 text-[13px] flex items-center gap-2 bg-brutal-blue text-white border-brutal-ink">
@@ -245,10 +212,186 @@ function PunchInModal({ onClose, punchType = 'in' }: { onClose: () => void; punc
   );
 }
 
+// ── Calendar helpers ──────────────────────────────────────────────────────────
+
+type DayStatus = 'PRESENT' | 'LATE' | 'HALF_DAY' | 'ABSENT' | 'WFH' | 'LEAVE' | 'HOLIDAY' | 'WEEKEND' | 'FUTURE' | 'NONE';
+
+interface DayInfo {
+  bg: string;
+  text: string;
+  label: string;
+}
+
+function getDayInfo(status: DayStatus): DayInfo {
+  switch (status) {
+    case 'PRESENT':  return { bg: 'bg-green-100 border-green-400',   text: 'text-green-800',   label: 'P' };
+    case 'LATE':     return { bg: 'bg-orange-100 border-orange-400', text: 'text-orange-800',  label: 'L' };
+    case 'HALF_DAY': return { bg: 'bg-sky-100 border-sky-400',       text: 'text-sky-800',     label: 'HD' };
+    case 'ABSENT':   return { bg: 'bg-red-100 border-red-400',       text: 'text-red-800',     label: 'A' };
+    case 'WFH':      return { bg: 'bg-teal-100 border-teal-400',     text: 'text-teal-800',    label: 'WFH' };
+    case 'LEAVE':    return { bg: 'bg-indigo-100 border-indigo-400', text: 'text-indigo-800',  label: 'LV' };
+    case 'HOLIDAY':  return { bg: 'bg-purple-100 border-purple-400', text: 'text-purple-800',  label: 'HOL' };
+    case 'WEEKEND':  return { bg: 'bg-gray-100 border-gray-300',     text: 'text-gray-400',    label: '' };
+    default:         return { bg: 'bg-brutal-cream border-brutal-ink/20', text: 'text-brutal-ink/30', label: '' };
+  }
+}
+
+const LEGEND: { status: DayStatus; name: string }[] = [
+  { status: 'PRESENT',  name: 'Present' },
+  { status: 'LATE',     name: 'Late' },
+  { status: 'HALF_DAY', name: 'Half Day' },
+  { status: 'ABSENT',   name: 'Absent' },
+  { status: 'WFH',      name: 'WFH / Remote' },
+  { status: 'LEAVE',    name: 'On Leave' },
+  { status: 'HOLIDAY',  name: 'Holiday' },
+  { status: 'WEEKEND',  name: 'Weekend' },
+];
+
+const MONTH_NAMES = ['JANUARY','FEBRUARY','MARCH','APRIL','MAY','JUNE','JULY','AUGUST','SEPTEMBER','OCTOBER','NOVEMBER','DECEMBER'];
+const DAY_HEADERS = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
+
+interface Holiday { id: string; date: string; title: string; }
+interface LeaveRequest { id: string; fromDate: string; toDate: string; status: string; }
+
+function AttendanceCalendar({
+  year, month,
+  records,
+  holidays,
+  leaves,
+}: {
+  year: number;
+  month: number; // 0-indexed
+  records: AttendanceRecord[];
+  holidays: Holiday[];
+  leaves: LeaveRequest[];
+}) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  // Build lookup maps
+  const recordsByDate: Record<string, AttendanceRecord> = {};
+  for (const r of records) {
+    const key = new Date(r.date).toISOString().split('T')[0] ?? '';
+    if (key) recordsByDate[key] = r;
+  }
+
+  const holidayDates = new Set<string>(
+    holidays.map(h => new Date(h.date).toISOString().split('T')[0] ?? '').filter(Boolean)
+  );
+
+  const leaveDates = new Set<string>();
+  for (const l of leaves) {
+    if (l.status !== 'APPROVED') continue;
+    const from = new Date(l.fromDate);
+    const to   = new Date(l.toDate);
+    const cur  = new Date(from);
+    while (cur <= to) {
+      leaveDates.add(cur.toISOString().split('T')[0] ?? '');
+      cur.setDate(cur.getDate() + 1);
+    }
+  }
+
+  function classifyDay(date: Date): DayStatus {
+    const isoKey = date.toISOString().split('T')[0] ?? '';
+    const dow    = date.getDay(); // 0=Sun, 6=Sat
+    if (date > today)           return 'FUTURE';
+    if (holidayDates.has(isoKey)) return 'HOLIDAY';
+    if (leaveDates.has(isoKey))   return 'LEAVE';
+    if (dow === 0 || dow === 6)   return 'WEEKEND';
+    const rec = recordsByDate[isoKey];
+    if (!rec) return 'NONE';
+    return rec.status as DayStatus;
+  }
+
+  // Build calendar cells
+  const firstDay = new Date(year, month, 1);
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const startDow = firstDay.getDay(); // 0=Sun
+
+  const cells: Array<{ day: number; date: Date } | null> = [];
+  for (let i = 0; i < startDow; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) {
+    cells.push({ day: d, date: new Date(year, month, d) });
+  }
+  // Pad to complete last row
+  while (cells.length % 7 !== 0) cells.push(null);
+
+  return (
+    <div>
+      {/* Day-of-week headers */}
+      <div className="grid grid-cols-7 brutal-border-b">
+        {DAY_HEADERS.map(d => (
+          <div key={d} className={`py-2 text-center font-display font-bold text-[10px] tracking-[0.18em] brutal-border-r last:border-r-0 ${
+            d === 'SUN' || d === 'SAT' ? 'text-brutal-ink/40 bg-brutal-surface' : 'text-brutal-ink/70'
+          }`}>
+            {d}
+          </div>
+        ))}
+      </div>
+
+      {/* Weeks */}
+      {Array.from({ length: cells.length / 7 }, (_, wk) => (
+        <div key={wk} className="grid grid-cols-7 brutal-border-b last:border-b-0">
+          {cells.slice(wk * 7, wk * 7 + 7).map((cell, ci) => {
+            if (!cell) {
+              return (
+                <div key={ci} className="min-h-[64px] brutal-border-r last:border-r-0 bg-brutal-surface/30" />
+              );
+            }
+            const status  = classifyDay(cell.date);
+            const info    = getDayInfo(status);
+            const isoKey  = cell.date.toISOString().split('T')[0] ?? '';
+            const rec     = recordsByDate[isoKey];
+            const isToday = cell.date.getTime() === today.getTime();
+            const holName = holidays.find(h => new Date(h.date).toISOString().split('T')[0] === isoKey)?.title;
+
+            return (
+              <div
+                key={ci}
+                className={`min-h-[64px] brutal-border-r last:border-r-0 p-1.5 relative border ${info.bg} ${
+                  isToday ? 'ring-[3px] ring-brutal-ink ring-inset z-10' : ''
+                }`}
+              >
+                <div className={`font-display font-bold text-[13px] leading-none mb-1 ${info.text} ${isToday ? 'underline underline-offset-2' : ''}`}>
+                  {cell.day}
+                </div>
+                {info.label && (
+                  <div className={`font-display font-bold text-[9px] tracking-[0.14em] ${info.text}`}>
+                    {info.label}
+                  </div>
+                )}
+                {holName && (
+                  <div className="font-display font-bold text-[8px] tracking-tight text-purple-700 leading-tight mt-0.5 line-clamp-2">
+                    {holName}
+                  </div>
+                )}
+                {rec?.punchInTime && (
+                  <div className={`font-display font-bold text-[8px] tracking-tight ${info.text} opacity-70 mt-0.5`}>
+                    {fmtTime(rec.punchInTime)}
+                    {rec.punchOutTime ? `–${fmtTime(rec.punchOutTime)}` : ''}
+                  </div>
+                )}
+                {isToday && (
+                  <div className="absolute top-0.5 right-0.5 w-1.5 h-1.5 bg-brutal-ink" />
+                )}
+              </div>
+            );
+          })}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── Main page ─────────────────────────────────────────────────────────────────
+
 export default function AttendancePage() {
   const clock = useClock();
   const [showModal, setShowModal] = useState(false);
   const [punchType, setPunchType] = useState<'in' | 'out'>('in');
+
+  const now = new Date();
+  const [calMonth, setCalMonth] = useState({ year: now.getFullYear(), month: now.getMonth() });
 
   const dateStr = clock
     ? clock.toLocaleDateString('en-GB', {
@@ -268,19 +411,64 @@ export default function AttendancePage() {
     refetchInterval: 30_000,
   });
 
-  const { data: recentActivity = [] } = useQuery<AttendanceRecord[]>({
-    queryKey: ['attendance-recent'],
-    queryFn: () => apiClient.get('/attendance/my?limit=20').then(r => {
-      const data = r.data;
-      return Array.isArray(data) ? data : [];
+  // Fetch all records from Jan 1 of current year so any calendar month has data
+  const yearStart = `${now.getFullYear()}-01-01`;
+  const { data: allRecords = [] } = useQuery<AttendanceRecord[]>({
+    queryKey: ['attendance-all-year', now.getFullYear()],
+    queryFn: () => apiClient.get(`/attendance/my?from=${yearStart}`).then(r => {
+      const d = r.data;
+      return Array.isArray(d) ? d : [];
     }).catch(() => []),
-    refetchOnMount: true,
+    staleTime: 60_000,
   });
+
+  const { data: holidays = [] } = useQuery<Holiday[]>({
+    queryKey: ['holidays'],
+    queryFn: () => apiClient.get('/corporate/holidays').then(r => r.data).catch(() => []),
+    staleTime: 300_000,
+  });
+
+  const { data: myLeaves = [] } = useQuery<LeaveRequest[]>({
+    queryKey: ['my-leaves'],
+    queryFn: () => apiClient.get('/leaves/my').then(r => r.data).catch(() => []),
+    staleTime: 60_000,
+  });
+
+  interface PolicyAllowance { used: number; allowed: number; remaining: number; }
+  interface PolicyUsage {
+    latePunchIns:   PolicyAllowance;
+    earlyPunchOuts: PolicyAllowance;
+    halfDays:       PolicyAllowance;
+    policy: { presentCutoff: string; lateCutoff: string; earlyOutCutoff: string; regularPunchOut: string; };
+  }
+
+  const { data: policyUsage } = useQuery<PolicyUsage>({
+    queryKey: ['attendance-policy-usage'],
+    queryFn: () => apiClient.get('/attendance/my/policy-usage').then(r => r.data).catch(() => null),
+    staleTime: 60_000,
+  });
+
+  function prevMonth() {
+    setCalMonth(cm => {
+      if (cm.month === 0) return { year: cm.year - 1, month: 11 };
+      return { year: cm.year, month: cm.month - 1 };
+    });
+  }
+
+  function nextMonth() {
+    setCalMonth(cm => {
+      const nextM = { year: cm.year, month: cm.month + 1 };
+      if (cm.month === 11) return { year: cm.year + 1, month: 0 };
+      return nextM;
+    });
+  }
+
+  const isCurrentMonth = calMonth.year === now.getFullYear() && calMonth.month === now.getMonth();
 
   return (
     <div className="space-y-8 max-w-[1320px] animate-fade-up">
 
-      {/* Enrollment banner for first-time users */}
+      {/* Enrollment banner */}
       {me && !me.faceEnrolled && (
         <div className="brutal-border brutal-shadow bg-brutal-yellow flex items-center justify-between gap-4 px-5 py-4 flex-wrap">
           <div className="flex items-center gap-3">
@@ -315,25 +503,31 @@ export default function AttendancePage() {
               <span className="w-2 h-2 bg-white" /> GEOFENCE OK
             </span>
             <span className="font-display font-bold text-[11px] tracking-[0.18em] flex items-center gap-2 px-2 py-1.5 bg-brutal-surface brutal-border">
-              <Wifi size={11} /> NXGN-LAB-B
+              <Wifi size={11} /> PRINCE CUBE
             </span>
             <span className="font-display font-bold text-[11px] tracking-[0.18em] flex items-center gap-2 px-2 py-1.5 bg-brutal-surface brutal-border">
-              <MapPin size={11} /> TOWER B · LAB FLOOR
+              <MapPin size={11} /> GOTRI · VADODARA
             </span>
           </div>
           <div className="mt-7 flex items-end gap-4 flex-wrap">
-            {!todayRecord?.punchInTime ? (
-              <button onClick={() => { setPunchType('in'); setShowModal(true); }} className="brutal-btn-primary px-6 py-4 text-[13px] flex items-center gap-2">
-                <Camera size={18} /> PUNCH IN <ArrowRight size={16} />
-              </button>
-            ) : !todayRecord?.punchOutTime ? (
-              <button onClick={() => { setPunchType('out'); setShowModal(true); }} className="brutal-btn-primary px-6 py-4 text-[13px] flex items-center gap-2 bg-brutal-red text-white border-brutal-red">
-                <Camera size={18} /> PUNCH OUT <ArrowRight size={16} />
-              </button>
-            ) : (
+            {me === undefined ? (
+              <div className="px-6 py-4 brutal-border bg-brutal-surface font-display font-bold text-[13px] tracking-wide opacity-50">LOADING…</div>
+            ) : !me?.faceEnrolled ? (
+              <Link href="/attendance/biometric" className="brutal-btn-primary px-6 py-4 text-[13px] flex items-center gap-2 bg-brutal-yellow text-brutal-ink border-brutal-ink">
+                <UserCheck size={18} /> ENROLL FACE FIRST <ArrowRight size={16} />
+              </Link>
+            ) : todayRecord?.punchOutTime ? (
               <div className="px-4 py-3 bg-[#0F8F3A] text-white font-display font-bold text-[11px] tracking-[0.18em] border-2 border-[#0F8F3A]">
                 ✓ SHIFT COMPLETE
               </div>
+            ) : !todayRecord?.punchInTime ? (
+              <button onClick={() => { setPunchType('in'); setShowModal(true); }} className="brutal-btn-primary px-6 py-4 text-[13px] flex items-center gap-2">
+                <Camera size={18} /> PUNCH IN <ArrowRight size={16} />
+              </button>
+            ) : (
+              <button onClick={() => { setPunchType('out'); setShowModal(true); }} className="brutal-btn-primary px-6 py-4 text-[13px] flex items-center gap-2 bg-brutal-red text-white border-brutal-red">
+                <Camera size={18} /> PUNCH OUT <ArrowRight size={16} />
+              </button>
             )}
             {todayRecord?.punchInTime && (
               <div className="border-l-[3px] border-brutal-ink pl-4 font-display font-bold text-[11px] tracking-[0.14em]">
@@ -381,37 +575,150 @@ export default function AttendancePage() {
         </div>
       </section>
 
-      {/* Recent attendance */}
-      <div className="brutal-border brutal-shadow">
-        <div className="px-5 py-3 brutal-border-b flex items-center justify-between bg-brutal-ink text-brutal-cream">
-          <span className="font-display font-bold text-[11px] tracking-[0.22em]">RECENT ATTENDANCE</span>
+      {/* ── Monthly Policy Usage ─────────────────────────────────────────── */}
+      <section className="brutal-border brutal-shadow">
+        <div className="px-5 py-3 brutal-border-b bg-brutal-ink text-brutal-cream flex items-center gap-3">
+          <span className="font-display font-bold text-[11px] tracking-[0.22em]">MONTHLY POLICY USAGE</span>
+          <span className="font-display font-bold text-[10px] tracking-[0.16em] bg-brutal-yellow text-brutal-ink px-2 py-0.5">
+            {new Date().toLocaleString('en-GB', { month: 'long', year: 'numeric' }).toUpperCase()}
+          </span>
         </div>
-        {recentActivity.length === 0 ? (
-          <div className="p-12 text-center">
-            <div className="font-display font-bold text-[11px] tracking-[0.22em] text-brutal-ink/50">NO RECORDS YET · PUNCH IN TO BEGIN</div>
-          </div>
-        ) : (
-          <div className="divide-y-[3px] divide-brutal-surface">
-            {recentActivity.map(r => (
-              <div key={r.id} className="px-5 py-3 flex items-center justify-between hover:bg-brutal-surface transition-colors">
-                <div>
-                  <p className="font-display font-bold text-[13px] uppercase">{fmtDate(r.date)}</p>
-                  <p className="font-display font-bold text-[11px] text-brutal-ink/60 mt-0.5">
-                    {fmtTime(r.punchInTime)} → {fmtTime(r.punchOutTime)}
-                  </p>
+        <div className="grid grid-cols-1 sm:grid-cols-3 divide-y-[3px] sm:divide-y-0 sm:divide-x-[3px] divide-brutal-ink">
+          {[
+            {
+              label:     'LATE PUNCH-INS',
+              sub:       '9:45–10:00 AM WINDOW',
+              used:      policyUsage?.latePunchIns.used    ?? 0,
+              allowed:   policyUsage?.latePunchIns.allowed ?? 4,
+              remaining: policyUsage?.latePunchIns.remaining ?? 4,
+              accentFull: 'bg-brutal-red text-white',
+              accentBar:  'bg-orange-400',
+            },
+            {
+              label:     'EARLY EXITS',
+              sub:       'BEFORE 5:45 PM',
+              used:      policyUsage?.earlyPunchOuts.used    ?? 0,
+              allowed:   policyUsage?.earlyPunchOuts.allowed ?? 4,
+              remaining: policyUsage?.earlyPunchOuts.remaining ?? 4,
+              accentFull: 'bg-brutal-red text-white',
+              accentBar:  'bg-brutal-blue',
+            },
+            {
+              label:     'HALF DAYS',
+              sub:       '>4 CONVERTS TO LEAVE',
+              used:      policyUsage?.halfDays.used    ?? 0,
+              allowed:   policyUsage?.halfDays.allowed ?? 4,
+              remaining: policyUsage?.halfDays.remaining ?? 4,
+              accentFull: 'bg-brutal-red text-white',
+              accentBar:  'bg-brutal-red',
+            },
+          ].map(item => {
+            const pct = Math.round((item.used / item.allowed) * 100);
+            const exhausted = item.remaining === 0;
+            return (
+              <div key={item.label} className="p-5">
+                <div className="flex items-center justify-between mb-1">
+                  <div>
+                    <div className="font-display font-bold text-[11px] tracking-[0.2em]">{item.label}</div>
+                    <div className="font-display font-bold text-[9px] tracking-[0.16em] text-brutal-ink/50 mt-0.5">{item.sub}</div>
+                  </div>
+                  <div className={`font-display font-bold text-[11px] tracking-[0.14em] px-2 py-1 border-2 border-brutal-ink ${
+                    exhausted ? item.accentFull : 'bg-brutal-surface text-brutal-ink'
+                  }`}>
+                    {exhausted ? 'EXHAUSTED' : `${item.remaining} LEFT`}
+                  </div>
                 </div>
-                <span className={`px-2.5 py-1 text-[11px] font-display font-bold uppercase border-2 border-brutal-ink ${
-                  r.status === 'PRESENT' ? 'bg-brutal-yellow' :
-                  r.status === 'ABSENT'  ? 'bg-brutal-red text-white' :
-                  r.status === 'LATE'    ? 'bg-brutal-blue text-white' :
-                  'bg-brutal-surface'
-                }`}>
-                  {r.status}
-                </span>
+                <div className="mt-3 flex items-baseline gap-2">
+                  <span className="font-display font-bold text-[36px] leading-none">{item.used}</span>
+                  <span className="font-display font-bold text-[12px] text-brutal-ink/50">/ {item.allowed}</span>
+                </div>
+                <div className="mt-3 h-2.5 border-2 border-brutal-ink bg-brutal-surface">
+                  <div
+                    className={`h-full transition-all ${exhausted ? 'bg-brutal-red' : item.accentBar}`}
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
               </div>
-            ))}
+            );
+          })}
+        </div>
+        {/* Policy rule summary */}
+        <div className="px-5 py-3 brutal-border-t bg-brutal-surface flex flex-wrap gap-x-6 gap-y-1">
+          {[
+            { k: 'ON TIME', v: '≤ 9:45 AM → PRESENT' },
+            { k: 'LATE',    v: '9:45–10:00 AM · 4×/month' },
+            { k: 'HALF DAY', v: '> 10:00 AM or 4 lates used' },
+            { k: 'EARLY OUT', v: '< 5:45 PM · 4×/month allowed' },
+            { k: 'HALF DAY CAP', v: '4/month → 5th = LEAVE' },
+          ].map(r => (
+            <div key={r.k} className="flex items-center gap-1.5">
+              <span className="font-display font-bold text-[9px] tracking-[0.18em] text-brutal-ink/50">{r.k}:</span>
+              <span className="font-display font-bold text-[9px] tracking-[0.14em]">{r.v}</span>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ── Attendance Calendar ──────────────────────────────────────────── */}
+      <div className="brutal-border brutal-shadow">
+
+        {/* Calendar header with month navigation */}
+        <div className="px-5 py-3 brutal-border-b flex items-center justify-between bg-brutal-ink text-brutal-cream">
+          <div className="flex items-center gap-3">
+            <span className="font-display font-bold text-[11px] tracking-[0.22em]">ATTENDANCE CALENDAR</span>
+            <span className="font-display font-bold text-[10px] tracking-[0.16em] bg-brutal-yellow text-brutal-ink px-2 py-0.5">
+              {MONTH_NAMES[calMonth.month]} {calMonth.year}
+            </span>
           </div>
-        )}
+          <div className="flex items-center gap-1">
+            <button
+              onClick={prevMonth}
+              className="w-8 h-8 grid place-items-center border-2 border-brutal-cream hover:bg-brutal-yellow hover:text-brutal-ink transition"
+            >
+              <ChevronLeft size={14} />
+            </button>
+            {!isCurrentMonth && (
+              <button
+                onClick={() => setCalMonth({ year: now.getFullYear(), month: now.getMonth() })}
+                className="px-3 h-8 font-display font-bold text-[10px] tracking-[0.16em] border-2 border-brutal-cream hover:bg-brutal-yellow hover:text-brutal-ink transition"
+              >
+                TODAY
+              </button>
+            )}
+            <button
+              onClick={nextMonth}
+              className="w-8 h-8 grid place-items-center border-2 border-brutal-cream hover:bg-brutal-yellow hover:text-brutal-ink transition"
+            >
+              <ChevronRight size={14} />
+            </button>
+          </div>
+        </div>
+
+        {/* Calendar grid */}
+        <AttendanceCalendar
+          year={calMonth.year}
+          month={calMonth.month}
+          records={allRecords}
+          holidays={holidays}
+          leaves={myLeaves}
+        />
+
+        {/* Legend */}
+        <div className="px-5 py-4 brutal-border-t bg-brutal-surface">
+          <div className="font-display font-bold text-[10px] tracking-[0.2em] text-brutal-ink/60 mb-3">LEGEND</div>
+          <div className="flex flex-wrap gap-2">
+            {LEGEND.map(({ status, name }) => {
+              const info = getDayInfo(status);
+              return (
+                <div key={status} className={`flex items-center gap-1.5 px-2 py-1 border ${info.bg}`}>
+                  <span className={`font-display font-bold text-[10px] tracking-[0.12em] ${info.text}`}>
+                    {name}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </div>
 
       {showModal && <PunchInModal onClose={() => setShowModal(false)} punchType={punchType} />}

@@ -13,13 +13,11 @@ export class ReportsController {
   constructor(private service: ReportsService) {}
 
   @Get('dashboard')
-  @Roles('ADMIN', 'SUPER_ADMIN', 'MANAGER')
   dashboard() {
     return this.service.dashboardStats();
   }
 
   @Get('attendance')
-  @Roles('ADMIN', 'SUPER_ADMIN', 'MANAGER')
   attendance(
     @Query('from') from: string,
     @Query('to') to: string,
@@ -29,7 +27,6 @@ export class ReportsController {
   }
 
   @Get('expenses')
-  @Roles('ADMIN', 'SUPER_ADMIN')
   expenses(@Query('from') from: string, @Query('to') to: string) {
     return this.service.expenseSummary(from, to);
   }

@@ -1,3 +1,14 @@
+# ── DLL search path fix for Windows Store Python ──────────────────────────
+# torch_python.dll links against python313.dll which lives inside the Windows
+# Store AppX sandbox folder.  That folder is NOT on the default DLL search path,
+# so os.add_dll_directory() must register it before any torch import happens.
+import os, sys
+if sys.platform == "win32":
+    _python_dir = getattr(sys, "base_prefix", "")
+    if _python_dir and os.path.isdir(_python_dir):
+        os.add_dll_directory(_python_dir)
+# ────────────────────────────────────────────────────────────────────────────
+
 import logging
 
 from fastapi import FastAPI

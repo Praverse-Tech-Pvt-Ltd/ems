@@ -52,6 +52,10 @@ export const EmailLayout: React.FC<EmailLayoutProps> = ({
             <Text style={styles.footerText}>
               This is an automated notification from <strong>NexGen Pharma Solutions Pvt. Ltd.</strong> Internal Use Only.
             </Text>
+            <Text style={styles.footerAddress}>
+              413 &amp; 420, Prince Cube, Beside Gangotri Exotica, Laxmipura Char Rasta,{'\n'}
+              Nayaran Garden, 30 Mtr Road, Gotri, Vadodara, Gujarat 390023, India
+            </Text>
             <Text style={styles.footerText}>
               Need assistance? Email us at{' '}
               <Link href="mailto:inquiry@nexgenpharmasolutions.com" style={styles.link}>
@@ -133,6 +137,13 @@ const styles = {
     fontSize: '12px',
     lineHeight: '1.5',
     margin: '4px 0',
+  },
+  footerAddress: {
+    color: '#777777',
+    fontSize: '11px',
+    lineHeight: '1.5',
+    margin: '6px 0',
+    fontStyle: 'italic' as const,
   },
   link: {
     color: '#1a1a1a',

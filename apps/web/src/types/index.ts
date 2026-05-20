@@ -67,6 +67,17 @@ export interface AttendanceRecord {
   isRegularized: boolean;
 }
 
+export interface AttendanceStats {
+  month: string;
+  totalWorkingDays: number;
+  daysPresent: number;
+  daysHalfDay: number;
+  daysOnLeave: number;
+  daysAbsent: number;
+  attendedDays: number;
+  attendancePercent: number;
+}
+
 export interface Expense {
   id: string;
   category: ExpenseCategory;
@@ -145,4 +156,34 @@ export interface Notification {
   body: string;
   isRead: boolean;
   createdAt: string;
+}
+
+// ── Chat ─────────────────────────────────────────────────────────────────────
+
+export type ChatChannelType = 'GENERAL' | 'GROUP' | 'DIRECT';
+
+export interface ChatAuthor {
+  id: string;
+  firstName: string;
+  lastName: string;
+  employeeCode: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  channelId: string;
+  body: string;
+  createdAt: string;
+  author: ChatAuthor;
+}
+
+export interface ChatChannel {
+  id: string;
+  name: string;
+  type: ChatChannelType;
+  members: ChatAuthor[];
+  lastMessage: ChatMessage | null;
+  unread: number;
+  lastReadAt: string | null;
+  otherMember: ChatAuthor | null;
 }

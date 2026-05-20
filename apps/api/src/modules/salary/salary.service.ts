@@ -260,15 +260,19 @@ export class SalaryService {
     if (fs.existsSync(logoPath)) {
       doc.image(logoPath, 42, 28, { width: 150 });
     }
-    doc.fontSize(18).font('Helvetica-Bold').text('NEXGEN PHARMA SOLUTIONS PVT LTD', 210, 42, { align: 'right' });
-    doc.fontSize(10).font('Helvetica').text('Salary Slip', 210, 66, { align: 'right' });
-    doc.moveTo(42, 100).lineTo(553, 100).stroke('#1a1a1a');
+    doc.fontSize(16).font('Helvetica-Bold').text('NEXGEN PHARMA SOLUTIONS PVT LTD', 210, 36, { align: 'right' });
+    doc.fontSize(8).font('Helvetica').text(
+      '413 & 420, Prince Cube, Beside Gangotri Exotica\nLaxmipura Char Rasta, Nayaran Garden, 30 Mtr Road, Gotri\nVadodara, Gujarat 390023, India',
+      210, 58, { align: 'right' },
+    );
+    doc.fontSize(10).font('Helvetica').text('Salary Slip', 210, 90, { align: 'right' });
+    doc.moveTo(42, 108).lineTo(553, 108).stroke('#1a1a1a');
 
-    doc.fontSize(16).font('Helvetica-Bold').text(this.period(slip.month, slip.year), 42, 120);
-    doc.fontSize(10).font('Helvetica').text(`Employee: ${this.employeeName(slip.employee)} (${slip.employee.employeeCode})`, 42, 146);
-    doc.text(`Designation: ${slip.employee.designation ?? '-'}`, 42, 162);
-    doc.text(`Status: ${slip.status}`, 380, 146);
-    doc.text(`Payment Ref: ${slip.paymentRef ?? '-'}`, 380, 162);
+    doc.fontSize(16).font('Helvetica-Bold').text(this.period(slip.month, slip.year), 42, 128);
+    doc.fontSize(10).font('Helvetica').text(`Employee: ${this.employeeName(slip.employee)} (${slip.employee.employeeCode})`, 42, 154);
+    doc.text(`Designation: ${slip.employee.designation ?? '-'}`, 42, 170);
+    doc.text(`Status: ${slip.status}`, 380, 154);
+    doc.text(`Payment Ref: ${slip.paymentRef ?? '-'}`, 380, 170);
 
     const rows = [
       ['Base Salary', this.money(slip.baseSalary)],
@@ -279,7 +283,7 @@ export class SalaryService {
       ['Net Payable', this.money(slip.netPayable)],
     ];
 
-    let y = 210;
+    let y = 218;
     doc.rect(42, y - 24, 511, 24).fill('#1a1a1a');
     doc.fillColor('#ffffff').font('Helvetica-Bold').fontSize(10).text('COMPONENT', 54, y - 17).text('AMOUNT', 430, y - 17);
     doc.fillColor('#1a1a1a');

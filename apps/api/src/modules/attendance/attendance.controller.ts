@@ -54,6 +54,16 @@ export class AttendanceController {
     return this.service.getToday(user.id);
   }
 
+  @Get('my/stats')
+  getMyStats(@CurrentUser() user: { id: string }) {
+    return this.service.getMyStats(user.id);
+  }
+
+  @Get('my/policy-usage')
+  getPolicyUsage(@CurrentUser() user: { id: string }) {
+    return this.service.getPolicyUsage(user.id);
+  }
+
   @Get('my')
   getMy(
     @CurrentUser() user: { id: string },
