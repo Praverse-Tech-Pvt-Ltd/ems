@@ -43,7 +43,9 @@ export default function LoginPage() {
     setError('');
     try {
       const res = await apiClient.post('/auth/login', data);
-      setAuth(res.data.accessToken, res.data.refreshToken, res.data.user);
+      // refreshToken is now set as an httpOnly cookie by the server.
+      // We only keep the short-lived accessToken in memory.
+      setAuth(res.data.accessToken, res.data.user);
       router.push('/dashboard');
     } catch (err: unknown) {
       const msg = err && typeof err === 'object' && 'response' in err

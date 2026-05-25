@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { ScheduleModule } from '@nestjs/schedule';
 import { BullModule } from '@nestjs/bull';
 import { PrismaModule } from './common/prisma/prisma.module';
@@ -26,7 +27,12 @@ import { ChatModule } from './modules/chat/chat.module';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
-    ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }]),
+    // Default: 100 requests per 60 s per IP.
+    // Auth endpoints override this with a stricter 'auth' named throttler (5/60s).
+    ThrottlerModule.forRoot([
+      { name: 'default', ttl: 60_000, limit: 100 },
+      { name: 'auth', ttl: 60_000, limit: 5 },
+    ]),
     ScheduleModule.forRoot(),
     BullModule.forRootAsync({
       imports: [ConfigModule],
@@ -66,5 +72,8 @@ import { ChatModule } from './modules/chat/chat.module';
     FaceRecognitionModule,
     ChatModule,
   ],
+  // Apply ThrottlerGuard globally so every route is rate-limited by default.
+  // Individual routes/controllers can override limits with @Throttle().
+  providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
 export class AppModule {}

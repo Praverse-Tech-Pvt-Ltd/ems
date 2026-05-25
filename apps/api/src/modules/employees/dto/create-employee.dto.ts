@@ -1,5 +1,5 @@
 import {
-  IsEmail, IsString, IsOptional, IsEnum, IsUUID, IsDateString,
+  IsEmail, IsString, IsOptional, IsEnum, IsUUID, IsDateString, MaxLength,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
@@ -11,15 +11,18 @@ export class CreateEmployeeDto {
 
   @ApiProperty()
   @IsString()
+  @MaxLength(100)
   firstName: string;
 
   @ApiProperty()
   @IsString()
+  @MaxLength(100)
   lastName: string;
 
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
+  @MaxLength(20)
   phone?: string;
 
   @ApiPropertyOptional()
@@ -30,6 +33,7 @@ export class CreateEmployeeDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
+  @MaxLength(150)
   designation?: string;
 
   @ApiPropertyOptional({ enum: Role, default: Role.EMPLOYEE })

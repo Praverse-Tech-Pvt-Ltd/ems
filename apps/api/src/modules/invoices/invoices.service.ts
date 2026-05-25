@@ -1,5 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { InvoiceStatus } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
+
+const VALID_INVOICE_STATUSES = new Set<string>(Object.values(InvoiceStatus));
 
 export interface CreateInvoiceData {
   invoiceNumber: string;
@@ -28,7 +31,10 @@ export class InvoicesService {
   }
 
   async findAll(status?: string) {
-    const where = status ? { status: status as never } : {};
+    if (status && !VALID_INVOICE_STATUSES.has(status)) {
+      throw new BadRequestException(`Invalid status value: ${status}`);
+    }
+    const where = status ? { status: status as InvoiceStatus } : {};
     return this.prisma.invoice.findMany({
       where,
       include: {

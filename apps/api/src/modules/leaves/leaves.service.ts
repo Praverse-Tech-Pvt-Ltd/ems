@@ -1,5 +1,9 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
+
+// Validated against the DB constraint — Prisma does not export a LeaveRequest
+// status enum; these are the only values the schema accepts.
+const VALID_LEAVE_STATUSES = new Set(['PENDING', 'APPROVED', 'REJECTED']);
 
 export interface CreateLeaveData {
   leaveType: 'CL' | 'SL' | 'PL' | 'UL' | 'CO';
@@ -56,7 +60,10 @@ export class LeavesService {
   }
 
   async findAll(status?: string) {
-    const where = status ? { status: status as never } : {};
+    if (status && !VALID_LEAVE_STATUSES.has(status)) {
+      throw new BadRequestException(`Invalid status value: ${status}`);
+    }
+    const where = status ? { status: status as 'PENDING' | 'APPROVED' | 'REJECTED' } : {};
     return this.prisma.leaveRequest.findMany({
       where,
       include: {
@@ -76,6 +83,9 @@ export class LeavesService {
   async approve(id: string, approverId: string, action: 'approve' | 'reject', rejectionReason?: string) {
     const leave = await this.prisma.leaveRequest.findUnique({ where: { id } });
     if (!leave) throw new NotFoundException('Leave request not found');
+    if (leave.employeeId === approverId) {
+      throw new ForbiddenException('You cannot approve your own leave request');
+    }
 
     const updated = await this.prisma.leaveRequest.update({
       where: { id },

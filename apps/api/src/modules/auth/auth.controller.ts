@@ -1,42 +1,106 @@
-import { Controller, Post, Patch, Body, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Patch,
+  Body,
+  Req,
+  Res,
+  UseGuards,
+  HttpCode,
+  HttpStatus,
+  UnauthorizedException,
+} from '@nestjs/common';
+import type { Request, Response } from 'express';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { LoginDto } from './dto/login.dto';
-import { RefreshDto } from './dto/refresh.dto';
 import { ForgotPasswordDto, ChangePasswordDto } from './dto/password.dto';
+
+/** Cookie configuration shared by login and refresh. */
+const REFRESH_COOKIE_OPTIONS = {
+  httpOnly: true,
+  secure: process.env['NODE_ENV'] === 'production',
+  sameSite: 'strict' as const,
+  maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days in ms
+  path: '/api/v1/auth',
+};
 
 @ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
   constructor(private authService: AuthService) {}
 
+  /**
+   * Login: returns accessToken in the response body (short-lived, 15 min)
+   * and sets the refreshToken as an httpOnly cookie so it is never
+   * accessible to JavaScript running on the page.
+   *
+   * Rate-limited to 5 attempts per minute to mitigate brute-force.
+   */
   @Post('login')
   @HttpCode(HttpStatus.OK)
+  @Throttle({ auth: { limit: 5, ttl: 60_000 } })
   @ApiOperation({ summary: 'Login with email and password' })
-  login(@Body() dto: LoginDto) {
-    return this.authService.login(dto.email, dto.password);
+  async login(
+    @Body() dto: LoginDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const result = await this.authService.login(dto.email, dto.password);
+    res.cookie('refresh_token', result.refreshToken, REFRESH_COOKIE_OPTIONS);
+    return { accessToken: result.accessToken, user: result.user };
   }
 
+  /**
+   * Refresh: reads the httpOnly refresh-token cookie, rotates it, and
+   * returns a new short-lived accessToken in the response body.
+   */
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
+  @Throttle({ auth: { limit: 10, ttl: 60_000 } })
   @ApiOperation({ summary: 'Refresh access token' })
-  refresh(@Body() dto: RefreshDto) {
-    return this.authService.refresh(dto.refreshToken);
+  async refresh(
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const token = (req.cookies as Record<string, string> | undefined)?.['refresh_token'];
+    if (!token) throw new UnauthorizedException('No refresh token');
+    const result = await this.authService.refresh(token);
+    res.cookie('refresh_token', result.refreshToken, REFRESH_COOKIE_OPTIONS);
+    return { accessToken: result.accessToken };
   }
 
   @Post('logout')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @HttpCode(HttpStatus.NO_CONTENT)
-  logout(@Body() dto: RefreshDto) {
-    return this.authService.logout(dto.refreshToken);
+  async logout(
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const token = (req.cookies as Record<string, string> | undefined)?.['refresh_token'];
+    if (token) await this.authService.logout(token);
+    res.clearCookie('refresh_token', { path: '/api/v1/auth' });
   }
 
+  /**
+   * Admin-only password reset.
+   * Requires an active admin session — this endpoint MUST NOT be publicly
+   * accessible without authentication, as it allows setting any employee's
+   * password without the current password.
+   * For self-service password changes, authenticated users should use PATCH /change-password.
+   */
   @Post('forgot-password')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN', 'SUPER_ADMIN')
+  @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Reset password using email (internal — no email required)' })
+  @Throttle({ auth: { limit: 3, ttl: 60_000 } })
+  @ApiOperation({ summary: 'Admin: reset an employee password by email' })
   forgotPassword(@Body() dto: ForgotPasswordDto) {
     return this.authService.forgotPassword(dto.email, dto.newPassword);
   }
@@ -50,6 +114,10 @@ export class AuthController {
     @CurrentUser() user: { id: string },
     @Body() dto: ChangePasswordDto,
   ) {
-    return this.authService.changePassword(user.id, dto.currentPassword, dto.newPassword);
+    return this.authService.changePassword(
+      user.id,
+      dto.currentPassword,
+      dto.newPassword,
+    );
   }
 }

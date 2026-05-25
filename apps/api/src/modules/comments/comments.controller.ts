@@ -1,10 +1,9 @@
 import { Controller, Get, Post, Body, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { CommentsService } from './comments.service';
+import { CreateCommentDto, GetCommentsDto, CommentResourceType } from './dto/create-comment.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-
-type ResourceType = 'expense' | 'invoice' | 'leaveRequest' | 'employeeRequest';
 
 @ApiTags('Comments')
 @ApiBearerAuth()
@@ -16,16 +15,21 @@ export class CommentsController {
   @Post()
   create(
     @CurrentUser() user: { id: string },
-    @Body() body: { body: string; resourceType: ResourceType; resourceId: string },
+    @Body() dto: CreateCommentDto,
   ) {
-    return this.service.create(user.id, body.body, body.resourceType, body.resourceId);
+    return this.service.create(
+      user.id,
+      dto.body,
+      dto.resourceType as string as Parameters<CommentsService['create']>[2],
+      dto.resourceId,
+    );
   }
 
   @Get()
-  findByResource(
-    @Query('resourceType') resourceType: ResourceType,
-    @Query('resourceId') resourceId: string,
-  ) {
-    return this.service.findByResource(resourceType, resourceId);
+  findByResource(@Query() query: GetCommentsDto) {
+    return this.service.findByResource(
+      query.resourceType as string as Parameters<CommentsService['findByResource']>[0],
+      query.resourceId,
+    );
   }
 }

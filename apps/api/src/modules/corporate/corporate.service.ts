@@ -1,7 +1,12 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
-
-type JsonBody = Record<string, unknown>;
+import {
+  CreateChannelDto,
+  CreateHolidayDto,
+  CreateLifecycleDto,
+  CreatePolicyDto,
+  CreateTaskDto,
+} from './dto/corporate.dto';
 
 @Injectable()
 export class CorporateService {
@@ -11,7 +16,7 @@ export class CorporateService {
     return this.prisma.companySetting.findMany({ orderBy: { key: 'asc' } });
   }
 
-  async upsertSetting(userId: string, key: string, value: JsonBody) {
+  async upsertSetting(userId: string, key: string, value: Record<string, unknown>) {
     const setting = await this.prisma.companySetting.upsert({
       where: { key },
       update: { value: value as any, updatedBy: userId },
@@ -33,13 +38,13 @@ export class CorporateService {
     return this.prisma.holiday.findMany({ orderBy: { date: 'asc' } });
   }
 
-  async createHoliday(userId: string, body: JsonBody) {
+  async createHoliday(userId: string, dto: CreateHolidayDto) {
     const holiday = await this.prisma.holiday.create({
       data: {
-        date: new Date(String(body['date'])),
-        title: String(body['title'] ?? 'Holiday'),
-        description: body['description'] ? String(body['description']) : undefined,
-        isPaid: body['isPaid'] == null ? true : Boolean(body['isPaid']),
+        date: new Date(dto.date),
+        title: dto.title,
+        description: dto.description ?? undefined,
+        isPaid: dto.isPaid ?? true,
         createdBy: userId,
       },
     });
@@ -72,19 +77,24 @@ export class CorporateService {
   policies(employeeId: string, includeDrafts = false) {
     return this.prisma.policy.findMany({
       where: includeDrafts ? {} : { status: 'PUBLISHED' },
-      include: { acknowledgements: { where: { employeeId }, select: { acknowledgedAt: true } } },
+      include: {
+        acknowledgements: {
+          where: { employeeId },
+          select: { acknowledgedAt: true },
+        },
+      },
       orderBy: [{ status: 'asc' }, { updatedAt: 'desc' }],
     });
   }
 
-  async createPolicy(userId: string, body: JsonBody) {
-    const status = String(body['status'] ?? 'PUBLISHED') as 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
+  async createPolicy(userId: string, dto: CreatePolicyDto) {
+    const status = dto.status ?? 'PUBLISHED';
     const policy = await this.prisma.policy.create({
       data: {
-        title: String(body['title'] ?? 'Policy'),
-        category: String(body['category'] ?? 'GENERAL'),
-        body: String(body['body'] ?? ''),
-        version: String(body['version'] ?? '1.0'),
+        title: dto.title,
+        category: dto.category,
+        body: dto.body,
+        version: dto.version ?? '1.0',
         status,
         createdBy: userId,
         publishedAt: status === 'PUBLISHED' ? new Date() : undefined,
@@ -124,7 +134,9 @@ export class CorporateService {
   myTasks(employeeId: string) {
     return this.prisma.taskAssignment.findMany({
       where: { employeeId },
-      include: { task: { include: { creator: { select: { firstName: true, lastName: true } } } } },
+      include: {
+        task: { include: { creator: { select: { firstName: true, lastName: true } } } },
+      },
       orderBy: { createdAt: 'desc' },
     });
   }
@@ -134,29 +146,34 @@ export class CorporateService {
       include: {
         creator: { select: { firstName: true, lastName: true } },
         assignments: {
-          include: { employee: { select: { firstName: true, lastName: true, employeeCode: true } } },
+          include: {
+            employee: {
+              select: { firstName: true, lastName: true, employeeCode: true },
+            },
+          },
         },
       },
       orderBy: { createdAt: 'desc' },
     });
   }
 
-  async createTask(userId: string, body: JsonBody) {
-    const employeeIds = Array.isArray(body['employeeIds']) ? body['employeeIds'].map(String) : [];
+  async createTask(userId: string, dto: CreateTaskDto) {
     const task = await this.prisma.task.create({
       data: {
-        title: String(body['title'] ?? 'Task'),
-        description: body['description'] ? String(body['description']) : undefined,
-        priority: String(body['priority'] ?? 'NORMAL'),
-        dueAt: body['dueAt'] ? new Date(String(body['dueAt'])) : undefined,
+        title: dto.title,
+        description: dto.description ?? undefined,
+        priority: dto.priority ?? 'NORMAL',
+        dueAt: dto.dueAt ? new Date(dto.dueAt) : undefined,
         createdBy: userId,
-        assignments: { create: employeeIds.map((employeeId) => ({ employeeId })) },
+        assignments: {
+          create: dto.employeeIds.map((employeeId) => ({ employeeId })),
+        },
       },
       include: { assignments: true },
     });
 
     await this.prisma.notification.createMany({
-      data: employeeIds.map((employeeId) => ({
+      data: dto.employeeIds.map((employeeId) => ({
         employeeId,
         type: 'GENERAL',
         title: 'New task assigned',
@@ -172,7 +189,7 @@ export class CorporateService {
         action: 'TASK_ASSIGNED',
         resourceType: 'task',
         resourceId: task.id,
-        newValue: { title: task.title, employeeIds },
+        newValue: { title: task.title, employeeIds: dto.employeeIds },
       },
     });
 
@@ -193,7 +210,9 @@ export class CorporateService {
   async channels(user: { id: string; role?: string }) {
     const existing = await this.prisma.chatChannel.findFirst({ where: { type: 'GENERAL' } });
     if (!existing) {
-      await this.prisma.chatChannel.create({ data: { name: 'General Organisation', type: 'GENERAL' } });
+      await this.prisma.chatChannel.create({
+        data: { name: 'General Organisation', type: 'GENERAL' },
+      });
     }
     const isAdmin = user.role === 'ADMIN' || user.role === 'SUPER_ADMIN';
     return this.prisma.chatChannel.findMany({
@@ -207,33 +226,40 @@ export class CorporateService {
           },
       include: {
         members: {
-          include: { employee: { select: { id: true, firstName: true, lastName: true, employeeCode: true } } },
+          include: {
+            employee: {
+              select: { id: true, firstName: true, lastName: true, employeeCode: true },
+            },
+          },
         },
       },
       orderBy: { createdAt: 'asc' },
     });
   }
 
-  async createChannel(userId: string, body: JsonBody) {
-    const employeeIds = Array.isArray(body['employeeIds']) ? body['employeeIds'].map(String) : [];
-    const memberIds = Array.from(new Set([userId, ...employeeIds]));
+  async createChannel(userId: string, dto: CreateChannelDto) {
+    const memberIds = Array.from(new Set([userId, ...dto.employeeIds]));
     const type = memberIds.length === 2 ? 'DIRECT' : 'GROUP';
     const channel = await this.prisma.chatChannel.create({
       data: {
-        name: String(body['name'] ?? (type === 'DIRECT' ? 'Direct Chat' : 'Team Chat')),
+        name: dto.name ?? (type === 'DIRECT' ? 'Direct Chat' : 'Team Chat'),
         type,
         createdBy: userId,
         members: { create: memberIds.map((employeeId) => ({ employeeId })) },
       },
       include: {
         members: {
-          include: { employee: { select: { id: true, firstName: true, lastName: true, employeeCode: true } } },
+          include: {
+            employee: {
+              select: { id: true, firstName: true, lastName: true, employeeCode: true },
+            },
+          },
         },
       },
     });
 
     await this.prisma.notification.createMany({
-      data: employeeIds.map((employeeId) => ({
+      data: dto.employeeIds.map((employeeId) => ({
         employeeId,
         type: 'GENERAL',
         title: 'New chat started',
@@ -246,7 +272,10 @@ export class CorporateService {
     return channel;
   }
 
-  private async canAccessChannel(user: { id: string; role?: string }, channelId: string) {
+  private async canAccessChannel(
+    user: { id: string; role?: string },
+    channelId: string,
+  ): Promise<boolean> {
     if (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN') return true;
     const channel = await this.prisma.chatChannel.findFirst({
       where: {
@@ -263,13 +292,21 @@ export class CorporateService {
     }
     return this.prisma.chatMessage.findMany({
       where: { channelId },
-      include: { author: { select: { firstName: true, lastName: true, employeeCode: true, role: true } } },
+      include: {
+        author: {
+          select: { firstName: true, lastName: true, employeeCode: true, role: true },
+        },
+      },
       orderBy: { createdAt: 'asc' },
       take: 200,
     });
   }
 
-  async sendMessage(user: { id: string; role?: string }, channelId: string, body: JsonBody) {
+  async sendMessage(
+    user: { id: string; role?: string },
+    channelId: string,
+    messageBody: string,
+  ) {
     if (!(await this.canAccessChannel(user, channelId))) {
       throw new NotFoundException('Chat channel not found');
     }
@@ -277,9 +314,13 @@ export class CorporateService {
       data: {
         channelId,
         authorId: user.id,
-        body: String(body['body'] ?? ''),
+        body: messageBody,
       },
-      include: { author: { select: { firstName: true, lastName: true, employeeCode: true, role: true } } },
+      include: {
+        author: {
+          select: { firstName: true, lastName: true, employeeCode: true, role: true },
+        },
+      },
     });
   }
 
@@ -294,15 +335,15 @@ export class CorporateService {
     });
   }
 
-  createLifecycle(userId: string, body: JsonBody) {
+  createLifecycle(userId: string, dto: CreateLifecycleDto) {
     return this.prisma.employeeLifecycleEvent.create({
       data: {
-        employeeId: String(body['employeeId']),
-        eventType: String(body['eventType'] ?? 'JOINING'),
-        title: String(body['title'] ?? 'Lifecycle item'),
-        description: body['description'] ? String(body['description']) : undefined,
-        status: String(body['status'] ?? 'OPEN'),
-        dueAt: body['dueAt'] ? new Date(String(body['dueAt'])) : undefined,
+        employeeId: dto.employeeId,
+        eventType: dto.eventType,
+        title: dto.title,
+        description: dto.description ?? undefined,
+        status: dto.status ?? 'OPEN',
+        dueAt: dto.dueAt ? new Date(dto.dueAt) : undefined,
         createdBy: userId,
       },
     });

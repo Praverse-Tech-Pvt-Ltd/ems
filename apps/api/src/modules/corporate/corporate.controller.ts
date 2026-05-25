@@ -1,10 +1,30 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { CorporateService } from './corporate.service';
+import {
+  CreateChannelDto,
+  CreateHolidayDto,
+  CreateLifecycleDto,
+  CreatePolicyDto,
+  CreateTaskDto,
+  SendMessageDto,
+  UpsertSettingDto,
+} from './dto/corporate.dto';
 
 @ApiTags('Corporate')
 @ApiBearerAuth()
@@ -20,8 +40,12 @@ export class CorporateController {
 
   @Post('settings/:key')
   @Roles('ADMIN', 'SUPER_ADMIN')
-  upsertSetting(@CurrentUser() user: { id: string }, @Param('key') key: string, @Body() body: Record<string, unknown>) {
-    return this.service.upsertSetting(user.id, key, body);
+  upsertSetting(
+    @CurrentUser() user: { id: string },
+    @Param('key') key: string,
+    @Body() dto: UpsertSettingDto,
+  ) {
+    return this.service.upsertSetting(user.id, key, dto.value);
   }
 
   @Get('holidays')
@@ -31,29 +55,38 @@ export class CorporateController {
 
   @Post('holidays')
   @Roles('ADMIN', 'SUPER_ADMIN')
-  createHoliday(@CurrentUser() user: { id: string }, @Body() body: Record<string, unknown>) {
-    return this.service.createHoliday(user.id, body);
+  createHoliday(@CurrentUser() user: { id: string }, @Body() dto: CreateHolidayDto) {
+    return this.service.createHoliday(user.id, dto);
   }
 
   @Delete('holidays/:id')
   @Roles('ADMIN', 'SUPER_ADMIN')
-  deleteHoliday(@CurrentUser() user: { id: string }, @Param('id') id: string) {
+  deleteHoliday(
+    @CurrentUser() user: { id: string },
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
     return this.service.deleteHoliday(user.id, id);
   }
 
   @Get('policies')
-  policies(@CurrentUser() user: { id: string }, @Query('includeDrafts') includeDrafts?: string) {
+  policies(
+    @CurrentUser() user: { id: string },
+    @Query('includeDrafts') includeDrafts?: string,
+  ) {
     return this.service.policies(user.id, includeDrafts === 'true');
   }
 
   @Post('policies')
   @Roles('ADMIN', 'SUPER_ADMIN')
-  createPolicy(@CurrentUser() user: { id: string }, @Body() body: Record<string, unknown>) {
-    return this.service.createPolicy(user.id, body);
+  createPolicy(@CurrentUser() user: { id: string }, @Body() dto: CreatePolicyDto) {
+    return this.service.createPolicy(user.id, dto);
   }
 
   @Post('policies/:id/acknowledge')
-  acknowledgePolicy(@CurrentUser() user: { id: string }, @Param('id') id: string) {
+  acknowledgePolicy(
+    @CurrentUser() user: { id: string },
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
     return this.service.acknowledgePolicy(user.id, id);
   }
 
@@ -70,12 +103,15 @@ export class CorporateController {
 
   @Post('tasks')
   @Roles('ADMIN', 'SUPER_ADMIN')
-  createTask(@CurrentUser() user: { id: string }, @Body() body: Record<string, unknown>) {
-    return this.service.createTask(user.id, body);
+  createTask(@CurrentUser() user: { id: string }, @Body() dto: CreateTaskDto) {
+    return this.service.createTask(user.id, dto);
   }
 
   @Patch('tasks/my/:assignmentId/complete')
-  completeTask(@CurrentUser() user: { id: string }, @Param('assignmentId') assignmentId: string) {
+  completeTask(
+    @CurrentUser() user: { id: string },
+    @Param('assignmentId', ParseUUIDPipe) assignmentId: string,
+  ) {
     return this.service.completeTask(user.id, assignmentId);
   }
 
@@ -85,18 +121,25 @@ export class CorporateController {
   }
 
   @Post('chat/channels')
-  createChannel(@CurrentUser() user: { id: string }, @Body() body: Record<string, unknown>) {
-    return this.service.createChannel(user.id, body);
+  createChannel(@CurrentUser() user: { id: string }, @Body() dto: CreateChannelDto) {
+    return this.service.createChannel(user.id, dto);
   }
 
   @Get('chat/channels/:id/messages')
-  messages(@CurrentUser() user: { id: string; role?: string }, @Param('id') id: string) {
+  messages(
+    @CurrentUser() user: { id: string; role?: string },
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
     return this.service.messages(user, id);
   }
 
   @Post('chat/channels/:id/messages')
-  sendMessage(@CurrentUser() user: { id: string; role?: string }, @Param('id') id: string, @Body() body: Record<string, unknown>) {
-    return this.service.sendMessage(user, id, body);
+  sendMessage(
+    @CurrentUser() user: { id: string; role?: string },
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: SendMessageDto,
+  ) {
+    return this.service.sendMessage(user, id, dto.body);
   }
 
   @Get('lifecycle')
@@ -112,7 +155,7 @@ export class CorporateController {
 
   @Post('lifecycle')
   @Roles('ADMIN', 'SUPER_ADMIN')
-  createLifecycle(@CurrentUser() user: { id: string }, @Body() body: Record<string, unknown>) {
-    return this.service.createLifecycle(user.id, body);
+  createLifecycle(@CurrentUser() user: { id: string }, @Body() dto: CreateLifecycleDto) {
+    return this.service.createLifecycle(user.id, dto);
   }
 }

@@ -1,7 +1,7 @@
-import { IsString, IsInt, IsNumber, Min, Max, IsOptional } from 'class-validator';
+import { IsString, IsInt, IsNumber, IsUUID, Min, Max, IsOptional } from 'class-validator';
 
 export class CreateSalarySlipDto {
-  @IsString()
+  @IsUUID()
   employeeId: string;
 
   @IsInt() @Min(1) @Max(12)
@@ -28,6 +28,9 @@ export class CreateSalarySlipDto {
   @IsNumber()
   deductions: number;
 
+  @IsNumber()
+  netPayable: number;
+
   @IsInt() @Min(0)
   lopDays: number;
 
@@ -35,8 +38,7 @@ export class CreateSalarySlipDto {
   daysPresent: number;
 
   @IsString()
-  @IsOptional()
-  slipPdfS3Key?: string;
+  slipPdfS3Key: string;
 
   @IsOptional()
   @IsString()
@@ -92,7 +94,7 @@ export class UpsertSalaryStructureDto {
 }
 
 export class GenerateSalarySlipDto {
-  @IsString()
+  @IsUUID()
   employeeId: string;
 
   @IsInt() @Min(1) @Max(12)

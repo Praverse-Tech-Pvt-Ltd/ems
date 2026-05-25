@@ -1,6 +1,17 @@
+/**
+ * AttendanceFaceService
+ *
+ * NOTE: The face microservice supports only 1:1 verification (given an
+ * employee ID, does this face match?). It does NOT support 1:N recognition
+ * (who is this person?).  The check-in flow therefore requires the employee
+ * to be identified by their JWT before the face can be verified — see the
+ * attendance controller's punch-in endpoint for the correct flow.
+ *
+ * This service is retained as a thin convenience wrapper used by the
+ * face-recognition module's internal tests and admin tooling.
+ */
 import {
   Injectable,
-  ConflictException,
   UnauthorizedException,
   NotFoundException,
   Logger,
@@ -17,52 +28,11 @@ export class AttendanceFaceService {
     private readonly faceService: FaceRecognitionService,
   ) {}
 
-  async checkInByFace(imageBase64: string) {
-    const result = await this.faceService.recognize(imageBase64);
-
-    if (!result.success || !result.employeeId) {
-      throw new UnauthorizedException(result.message ?? 'Face not recognized');
-    }
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const existing = await this.prisma.attendanceRecord.findUnique({
-      where: { employeeId_date: { employeeId: result.employeeId, date: today } },
-    });
-
-    if (existing?.punchInTime) {
-      throw new ConflictException('Attendance already marked for today');
-    }
-
-    const now = new Date();
-    const record = await this.prisma.attendanceRecord.upsert({
-      where: { employeeId_date: { employeeId: result.employeeId, date: today } },
-      create: {
-        employeeId: result.employeeId,
-        date: today,
-        punchInTime: now,
-        frConfidenceIn: result.confidence ?? null,
-        status: 'PRESENT',
-      },
-      update: {
-        punchInTime: now,
-        frConfidenceIn: result.confidence ?? null,
-        status: 'PRESENT',
-      },
-    });
-
-    this.logger.log(`Check-in: employee=${result.employeeId} confidence=${result.confidence}`);
-
-    return {
-      success: true,
-      employeeId: result.employeeId,
-      confidence: result.confidence,
-      checkIn: record.punchInTime,
-      message: 'Attendance marked successfully',
-    };
-  }
-
+  /**
+   * Verify and record check-out for a known employee.
+   * Check-in uses the attendance module's punch-in endpoint directly (JWT
+   * identifies the employee; face verification confirms presence).
+   */
   async checkOutByFace(employeeId: string, imageBase64: string) {
     const result = await this.faceService.verify(employeeId, imageBase64);
 
@@ -106,7 +76,9 @@ export class AttendanceFaceService {
     return this.prisma.attendanceRecord.findMany({
       where: { date },
       include: {
-        employee: { select: { id: true, firstName: true, lastName: true, email: true } },
+        employee: {
+          select: { id: true, firstName: true, lastName: true, email: true },
+        },
       },
       orderBy: { punchInTime: 'asc' },
     });

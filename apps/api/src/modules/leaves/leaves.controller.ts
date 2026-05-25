@@ -1,6 +1,18 @@
-import { Controller, Get, Post, Patch, Body, Param, Query, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Body,
+  Param,
+  ParseUUIDPipe,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { LeavesService } from './leaves.service';
+import { CreateLeaveDto } from './dto/create-leave.dto';
+import { ApproveLeaveDto } from './dto/approve-leave.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -16,9 +28,9 @@ export class LeavesController {
   @Post()
   create(
     @CurrentUser() user: { id: string },
-    @Body() body: Parameters<LeavesService['create']>[1],
+    @Body() dto: CreateLeaveDto,
   ) {
-    return this.service.create(user.id, body);
+    return this.service.create(user.id, dto);
   }
 
   @Get('my')
@@ -40,10 +52,10 @@ export class LeavesController {
   @Patch(':id/approve')
   @Roles('MANAGER', 'ADMIN', 'SUPER_ADMIN')
   approve(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: { id: string },
-    @Body() body: { action: 'approve' | 'reject'; rejectionReason?: string },
+    @Body() dto: ApproveLeaveDto,
   ) {
-    return this.service.approve(id, user.id, body.action, body.rejectionReason);
+    return this.service.approve(id, user.id, dto.action, dto.rejectionReason);
   }
 }

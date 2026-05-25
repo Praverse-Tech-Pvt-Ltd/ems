@@ -1,4 +1,4 @@
-import { IsEnum, IsNumber, IsDateString, IsOptional, IsString, IsPositive } from 'class-validator';
+import { IsEnum, IsNumber, IsDateString, IsOptional, IsString, IsPositive, MaxLength } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { ExpenseCategory, PaymentMode } from '@prisma/client';
 
@@ -16,9 +16,10 @@ export class CreateExpenseDto {
   @IsDateString()
   expenseDate: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ maxLength: 1000 })
   @IsOptional()
   @IsString()
+  @MaxLength(1000)
   description?: string;
 
   @ApiPropertyOptional({ enum: PaymentMode })

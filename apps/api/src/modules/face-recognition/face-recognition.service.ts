@@ -1,17 +1,10 @@
 import { Injectable, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import axios, { AxiosError } from 'axios';
+import axios, { AxiosError, AxiosInstance } from 'axios';
 
 export interface RegisterFaceResult {
   success: boolean;
   employeeId: string;
-  message: string;
-}
-
-export interface RecognizeResult {
-  success: boolean;
-  employeeId?: string;
-  confidence?: number;
   message: string;
 }
 
@@ -25,63 +18,58 @@ export interface VerifyResult {
 @Injectable()
 export class FaceRecognitionService {
   private readonly logger = new Logger(FaceRecognitionService.name);
-  private readonly faceServiceUrl: string;
+  private readonly client: AxiosInstance;
 
   constructor(private readonly config: ConfigService) {
-    this.faceServiceUrl =
+    const baseURL =
       this.config.get<string>('FACE_SERVICE_URL') ?? 'http://localhost:8000';
+    const apiKey = this.config.getOrThrow<string>('FACE_SERVICE_API_KEY');
+
+    // Shared instance — every request carries the internal auth header.
+    this.client = axios.create({
+      baseURL,
+      headers: { 'X-Internal-Token': apiKey },
+    });
   }
 
-  async registerFace(employeeId: string, imageBase64: string): Promise<RegisterFaceResult> {
+  async registerFace(employeeId: string, frames: string[]): Promise<RegisterFaceResult> {
     try {
-      const { data } = await axios.post<RegisterFaceResult>(
-        `${this.faceServiceUrl}/register`,
-        { employee_id: employeeId, image_base64: imageBase64 },
-        { timeout: 15000 },
+      const { data } = await this.client.post<{ success: boolean; message: string }>(
+        '/enroll',
+        { employee_id: employeeId, frames },
+        { timeout: 60000 },
       );
-      return data;
+      return { success: data.success, employeeId, message: data.message };
     } catch (err) {
       this.handleError(err, 'registerFace');
     }
   }
 
-  async recognize(imageBase64: string): Promise<RecognizeResult> {
-    try {
-      const { data } = await axios.post<RecognizeResult>(
-        `${this.faceServiceUrl}/recognize`,
-        { image_base64: imageBase64 },
-        { timeout: 15000 },
-      );
-      return data;
-    } catch (err) {
-      this.handleError(err, 'recognize');
-    }
-  }
-
   async verify(employeeId: string, imageBase64: string): Promise<VerifyResult> {
     try {
-      const { data } = await axios.post<VerifyResult>(
-        `${this.faceServiceUrl}/verify`,
-        { employee_id: employeeId, image_base64: imageBase64 },
-        { timeout: 15000 },
+      const { data } = await this.client.post<{
+        verified: boolean;
+        confidence: number;
+        reason?: string;
+      }>(
+        '/verify',
+        { employee_id: employeeId, face_image: imageBase64 },
+        { timeout: 45000 },
       );
-      return data;
+      return {
+        success: data.verified,
+        match: data.verified,
+        confidence: data.confidence,
+        message: data.reason ?? 'OK',
+      };
     } catch (err) {
       this.handleError(err, 'verify');
     }
   }
 
-  async deleteFace(employeeId: string): Promise<void> {
-    try {
-      await axios.delete(`${this.faceServiceUrl}/employee/${employeeId}`, { timeout: 10000 });
-    } catch (err) {
-      this.handleError(err, 'deleteFace');
-    }
-  }
-
   async healthCheck(): Promise<boolean> {
     try {
-      await axios.get(`${this.faceServiceUrl}/health`, { timeout: 5000 });
+      await this.client.get('/health', { timeout: 5000 });
       return true;
     } catch {
       return false;
@@ -92,9 +80,13 @@ export class FaceRecognitionService {
     this.logger.error(`Face service error in ${context}:`, err);
     if (err instanceof AxiosError) {
       const status = err.response?.status ?? 502;
-      const message = err.response?.data?.detail ?? 'Face recognition service error';
+      const message =
+        err.response?.data?.detail ?? 'Face recognition service error';
       throw new HttpException(message, status);
     }
-    throw new HttpException('Face recognition service unavailable', HttpStatus.BAD_GATEWAY);
+    throw new HttpException(
+      'Face recognition service unavailable',
+      HttpStatus.BAD_GATEWAY,
+    );
   }
 }

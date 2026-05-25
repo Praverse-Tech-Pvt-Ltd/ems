@@ -1,52 +1,67 @@
 import axios from 'axios';
+import { useAuthStore } from '@/store/auth.store';
 
 export const apiClient = axios.create({
   baseURL: process.env['NEXT_PUBLIC_API_URL'] + '/api/v1',
   headers: { 'Content-Type': 'application/json' },
+  // Required so the browser sends the httpOnly refresh-token cookie
+  // and the API can set new cookies on responses.
+  withCredentials: true,
 });
 
 apiClient.interceptors.request.use((config) => {
+  // Let the browser set Content-Type for FormData (includes boundary).
   if (typeof FormData !== 'undefined' && config.data instanceof FormData) {
     delete config.headers['Content-Type'];
   }
-  if (typeof window !== 'undefined') {
-    const stored = localStorage.getItem('nexgen-auth');
-    if (stored) {
-      const { state } = JSON.parse(stored) as { state: { accessToken?: string } };
-      if (state.accessToken) {
-        config.headers.Authorization = `Bearer ${state.accessToken}`;
-      }
-    }
+
+  // Read the short-lived access token from the in-memory store (not localStorage).
+  const { accessToken } = useAuthStore.getState();
+  if (accessToken) {
+    config.headers.Authorization = `Bearer ${accessToken}`;
   }
+
   return config;
 });
 
+/** Tracks an in-flight refresh so concurrent 401s only fire one request. */
+let refreshPromise: Promise<string> | null = null;
+
 apiClient.interceptors.response.use(
   (res) => res,
-  async (error) => {
-    if (error.response?.status === 401 && typeof window !== 'undefined') {
-      const stored = localStorage.getItem('nexgen-auth');
-      if (stored) {
-        const { state } = JSON.parse(stored) as { state: { refreshToken?: string } };
-        if (state.refreshToken) {
-          try {
-            const res = await axios.post(
+  async (error: unknown) => {
+    const axiosError = error as import('axios').AxiosError;
+    const status = axiosError.response?.status;
+    const config = axiosError.config as import('axios').InternalAxiosRequestConfig & { _retry?: boolean };
+
+    if (status === 401 && !config._retry && typeof window !== 'undefined') {
+      config._retry = true;
+
+      try {
+        // Deduplicate: if a refresh is already underway reuse the same promise.
+        if (!refreshPromise) {
+          refreshPromise = axios
+            .post<{ accessToken: string }>(
               `${process.env['NEXT_PUBLIC_API_URL']}/api/v1/auth/refresh`,
-              { refreshToken: state.refreshToken },
-            );
-            const parsed = JSON.parse(stored) as { state: Record<string, unknown> };
-            parsed.state.accessToken = res.data.accessToken;
-            parsed.state.refreshToken = res.data.refreshToken;
-            localStorage.setItem('nexgen-auth', JSON.stringify(parsed));
-            error.config.headers.Authorization = `Bearer ${res.data.accessToken}`;
-            return apiClient(error.config);
-          } catch {
-            localStorage.removeItem('nexgen-auth');
-            window.location.href = '/login';
-          }
+              {},
+              { withCredentials: true }, // cookie is sent automatically
+            )
+            .then((r) => r.data.accessToken)
+            .finally(() => {
+              refreshPromise = null;
+            });
         }
+
+        const newAccessToken = await refreshPromise;
+        useAuthStore.getState().setAccessToken(newAccessToken);
+        config.headers.Authorization = `Bearer ${newAccessToken}`;
+        return apiClient(config);
+      } catch {
+        useAuthStore.getState().clearAuth();
+        window.location.href = '/login';
       }
     }
+
     return Promise.reject(error);
   },
 );

@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, ForbiddenException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as fs from 'fs/promises';
 import * as path from 'path';
@@ -20,11 +20,15 @@ export class StorageService {
 
   constructor(private config: ConfigService) {
     const endpoint = this.config.get<string>('AWS_ENDPOINT_URL');
-    this.driver = this.config.get<string>('STORAGE_DRIVER') === 'local' ? 'local' : 's3';
-    this.localDir = path.resolve(process.cwd(), '..', '..', this.config.get<string>('LOCAL_STORAGE_DIR') ?? 'uploads');
+    this.driver =
+      this.config.get<string>('STORAGE_DRIVER') === 'local' ? 'local' : 's3';
+    this.localDir = path.resolve(
+      process.cwd(),
+      '../..',
+      this.config.get<string>('LOCAL_STORAGE_DIR') ?? 'uploads',
+    );
     this.bucket = this.config.get<string>('S3_BUCKET_NAME') ?? '';
 
-    // Only initialise S3 client when actually needed
     this.s3 = new S3Client({
       region: this.config.get<string>('AWS_REGION') ?? 'auto',
       credentials: {
@@ -35,18 +39,31 @@ export class StorageService {
     });
   }
 
+  /**
+   * Resolve a storage key to an absolute path and assert it stays within
+   * the configured local storage directory.
+   * Throws ForbiddenException if the key would escape the storage root.
+   */
+  private resolveSafeLocalPath(key: string): string {
+    const storageRoot = path.resolve(this.localDir);
+    const resolved = path.resolve(storageRoot, key);
+    if (!resolved.startsWith(storageRoot + path.sep) && resolved !== storageRoot) {
+      throw new ForbiddenException('Invalid file key');
+    }
+    return resolved;
+  }
+
   async upload(
     key: string,
     body: Buffer | Uint8Array | string,
     contentType: string,
   ): Promise<string> {
     if (this.driver === 'local') {
-      const safeKey = key.replace(/\\/g, '/').replace(/\.\./g, '');
-      const filePath = path.join(this.localDir, safeKey);
+      const filePath = this.resolveSafeLocalPath(key);
       await fs.mkdir(path.dirname(filePath), { recursive: true });
       await fs.writeFile(filePath, body);
-      this.logger.log(`Stored local file ${safeKey} (${contentType})`);
-      return safeKey;
+      this.logger.log(`Stored local file ${key} (${contentType})`);
+      return key;
     }
 
     await this.s3.send(
@@ -76,7 +93,8 @@ export class StorageService {
 
   async delete(key: string): Promise<void> {
     if (this.driver === 'local') {
-      await fs.rm(path.join(this.localDir, key), { force: true });
+      const filePath = this.resolveSafeLocalPath(key);
+      await fs.rm(filePath, { force: true });
       return;
     }
     await this.s3.send(
@@ -93,7 +111,6 @@ export class StorageService {
   }
 
   getLocalPath(key: string): string {
-    const safeKey = key.replace(/\\/g, '/').replace(/\.\./g, '');
-    return path.join(this.localDir, safeKey);
+    return this.resolveSafeLocalPath(key);
   }
 }

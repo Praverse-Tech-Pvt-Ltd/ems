@@ -1,5 +1,18 @@
-import { IsString, IsNumber, Min, Max, IsOptional, IsObject } from 'class-validator';
+import {
+  IsString,
+  IsNumber,
+  Min,
+  Max,
+  IsOptional,
+  IsObject,
+  ValidateIf,
+} from 'class-validator';
+import { Transform } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { BadRequestException } from '@nestjs/common';
+
+/** Rough byte budget for the serialised deviceInfo object (4 KB). */
+const DEVICE_INFO_MAX_BYTES = 4096;
 
 export class PunchInDto {
   @ApiProperty({ description: 'Base64 encoded face image' })
@@ -18,8 +31,20 @@ export class PunchInDto {
   @Max(180)
   longitude: number;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({
+    description: 'Optional device metadata (browser, OS, etc.). Max 4 KB when serialised.',
+  })
   @IsOptional()
   @IsObject()
+  @Transform(({ value }) => {
+    if (value === undefined || value === null) return value;
+    const serialised = JSON.stringify(value);
+    if (serialised.length > DEVICE_INFO_MAX_BYTES) {
+      throw new BadRequestException(
+        `deviceInfo must not exceed ${DEVICE_INFO_MAX_BYTES} bytes when serialised`,
+      );
+    }
+    return value;
+  })
   deviceInfo?: Record<string, unknown>;
 }

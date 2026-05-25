@@ -1,4 +1,4 @@
-import { IsEnum, IsString, IsDateString, MinLength } from 'class-validator';
+import { IsEnum, IsString, IsDateString, MinLength, MaxLength } from 'class-validator';
 
 enum LeaveType { CL = 'CL', SL = 'SL', PL = 'PL', UL = 'UL', CO = 'CO' }
 
@@ -14,5 +14,6 @@ export class CreateLeaveDto {
 
   @IsString()
   @MinLength(3)
+  @MaxLength(1000)
   reason: string;
 }
