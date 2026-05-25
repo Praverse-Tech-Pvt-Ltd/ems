@@ -41,6 +41,9 @@ services:
       # Set to the nexgen-face service URL once it is deployed
       - key: FACE_SERVICE_URL
         sync: false
+      # Shared internal token sent to the face service. Must match the face service if auth is enabled there.
+      - key: FACE_SERVICE_API_KEY
+        generateValue: true
 
       # Auto-generated secrets
       - key: JWT_SECRET

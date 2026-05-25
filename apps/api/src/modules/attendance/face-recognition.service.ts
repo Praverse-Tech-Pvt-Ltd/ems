@@ -33,18 +33,22 @@ export class FaceRecognitionService {
   async verify(employeeId: string, faceImageBase64: string): Promise<FrVerifyResult> {
     try {
       const { data } = await this.client.post<{
-        verified: boolean;
+        verified?: boolean;
+        match?: boolean;
+        success?: boolean;
         confidence: number;
         reason?: string;
+        message?: string;
       }>(
         '/verify',
         { employee_id: employeeId, face_image: faceImageBase64 },
         { timeout: 45000 },
       );
+      const verified = data.verified ?? data.match ?? data.success ?? false;
       return {
-        verified: data.verified,
+        verified,
         confidence: data.confidence ?? 0,
-        reason: data.reason,
+        reason: data.reason ?? data.message,
       };
     } catch (error) {
       this.logger.error('Face recognition service unavailable', error);

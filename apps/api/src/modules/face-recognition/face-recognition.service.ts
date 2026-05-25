@@ -48,19 +48,23 @@ export class FaceRecognitionService {
   async verify(employeeId: string, imageBase64: string): Promise<VerifyResult> {
     try {
       const { data } = await this.client.post<{
-        verified: boolean;
+        verified?: boolean;
+        match?: boolean;
+        success?: boolean;
         confidence: number;
         reason?: string;
+        message?: string;
       }>(
         '/verify',
         { employee_id: employeeId, face_image: imageBase64 },
         { timeout: 45000 },
       );
+      const verified = data.verified ?? data.match ?? data.success ?? false;
       return {
-        success: data.verified,
-        match: data.verified,
+        success: verified,
+        match: verified,
         confidence: data.confidence,
-        message: data.reason ?? 'OK',
+        message: data.reason ?? data.message ?? 'OK',
       };
     } catch (err) {
       this.handleError(err, 'verify');

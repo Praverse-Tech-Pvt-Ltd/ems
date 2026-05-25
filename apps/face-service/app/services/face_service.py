@@ -66,16 +66,7 @@ def encode_face(image: Image.Image) -> Optional[list]:
 # Public service functions used by route handlers
 # ---------------------------------------------------------------------------
 
-def register(employee_id: str, image: Image.Image) -> None:
-    """
-    Encode the face in *image* and upsert its 512-d embedding in the DB.
-    Raises RuntimeError if no face is found.
-    Raises ConnectionError on DB failure.
-    """
-    embedding = encode_face(image)
-    if embedding is None:
-        raise RuntimeError("No face detected in the image")
-
+def _upsert_embedding(employee_id: str, embedding: list[float]) -> None:
     conn = _get_conn()
     try:
         with conn.cursor() as cur:
@@ -96,6 +87,42 @@ def register(employee_id: str, image: Image.Image) -> None:
         raise ConnectionError("Database error") from exc
     finally:
         conn.close()
+
+
+def register(employee_id: str, image: Image.Image) -> None:
+    """
+    Encode the face in *image* and upsert its 512-d embedding in the DB.
+    Raises RuntimeError if no face is found.
+    Raises ConnectionError on DB failure.
+    """
+    embedding = encode_face(image)
+    if embedding is None:
+        raise RuntimeError("No face detected in the image")
+
+    _upsert_embedding(employee_id, embedding)
+
+
+def enroll(employee_id: str, frames: list[str]) -> None:
+    """
+    Encode several base64 frames and store their averaged 512-d embedding.
+    At least one frame must contain a detectable face.
+    """
+    embeddings = []
+    for frame in frames:
+        image = pil_from_base64(frame)
+        embedding = encode_face(image)
+        if embedding is not None:
+            embeddings.append(embedding)
+
+    if not embeddings:
+        raise RuntimeError("No face detected in any captured frame")
+
+    averaged = np.mean(np.array(embeddings, dtype=np.float32), axis=0)
+    norm = np.linalg.norm(averaged)
+    if norm > 0:
+        averaged = averaged / norm
+
+    _upsert_embedding(employee_id, averaged.astype(float).tolist())
 
 
 def recognize(image: Image.Image) -> dict:

@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
 async function proxy(req: NextRequest, path: string[]) {
-  const endpoint = `${API_BASE}/attendance/face/${path.join('/')}`;
+  const endpoint = `${API_BASE}/api/v1/attendance/face/${path.join('/')}`;
 
   const headers: HeadersInit = { 'Content-Type': 'application/json' };
 

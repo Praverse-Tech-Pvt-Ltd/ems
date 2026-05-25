@@ -29,6 +29,7 @@ app.add_middleware(
 )
 
 app.include_router(register.router,     prefix="/register",  tags=["register"])
+app.include_router(register.compat_router, prefix="",        tags=["compat"])
 app.include_router(recognition.router,  prefix="",           tags=["recognition"])
 
 

@@ -5,11 +5,17 @@ from app.services import face_service
 from app.services.face_service import pil_from_base64, pil_from_bytes
 
 router = APIRouter()
+compat_router = APIRouter()
 
 
 class RegisterRequest(BaseModel):
     employee_id: str
     image_base64: str
+
+
+class EnrollRequest(BaseModel):
+    employee_id: str
+    frames: list[str]
 
 
 class RegisterResponse(BaseModel):
@@ -34,6 +40,23 @@ def register_face(payload: RegisterRequest) -> RegisterResponse:
                             message="Face registered successfully")
 
 
+@router.post("/enroll", response_model=RegisterResponse)
+@compat_router.post("/enroll", response_model=RegisterResponse)
+def enroll_face_compat(payload: EnrollRequest) -> RegisterResponse:
+    if not payload.frames:
+        raise HTTPException(status_code=400, detail="No frames provided")
+    try:
+        face_service.enroll(payload.employee_id, payload.frames)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    except ConnectionError as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid image data")
+    return RegisterResponse(success=True, employee_id=payload.employee_id,
+                            message="Face enrolled successfully")
+
+
 @router.post("/upload", response_model=RegisterResponse)
 async def register_face_upload(
     employee_id: str = Form(...),
@@ -55,6 +78,8 @@ async def register_face_upload(
 
 
 @router.delete("/employee/{employee_id}")
+@router.delete("/enroll/employee/{employee_id}")
+@compat_router.delete("/enroll/employee/{employee_id}")
 def delete_face(employee_id: str) -> dict:
     try:
         deleted = face_service.delete(employee_id)

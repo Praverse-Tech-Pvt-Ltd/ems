@@ -21,14 +21,17 @@ class RecognizeResponse(BaseModel):
 
 class VerifyRequest(BaseModel):
     employee_id: str
-    image_base64: str
+    image_base64: Optional[str] = None
+    face_image: Optional[str] = None
 
 
 class VerifyResponse(BaseModel):
     success: bool
     match: bool
+    verified: bool
     confidence: Optional[float] = None
     message: str
+    reason: Optional[str] = None
 
 
 @router.post("/recognize", response_model=RecognizeResponse)
@@ -46,8 +49,11 @@ def recognize_face(payload: RecognizeRequest) -> RecognizeResponse:
 
 @router.post("/verify", response_model=VerifyResponse)
 def verify_face(payload: VerifyRequest) -> VerifyResponse:
+    image_base64 = payload.image_base64 or payload.face_image
+    if not image_base64:
+        raise HTTPException(status_code=400, detail="Missing image data")
     try:
-        image = pil_from_base64(payload.image_base64)
+        image = pil_from_base64(image_base64)
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid image data")
     try:
@@ -56,4 +62,8 @@ def verify_face(payload: VerifyRequest) -> VerifyResponse:
         raise HTTPException(status_code=404, detail=str(exc))
     except ConnectionError as exc:
         raise HTTPException(status_code=500, detail=str(exc))
-    return VerifyResponse(**result)
+    return VerifyResponse(
+        **result,
+        verified=result["match"],
+        reason=None if result["match"] else result["message"],
+    )
