@@ -30,16 +30,23 @@ export class AttendanceCronService {
       data: { status: 'MISSING_PUNCH_OUT' },
     });
 
-    await this.prisma.notification.createMany({
-      data: missing.map((record) => ({
-        employeeId: record.employeeId,
-        type: 'MISSING_PUNCH_OUT' as const,
-        title: 'Missing Punch-Out',
-        body: `Your punch-out was not recorded for ${today.toDateString()}. Please contact admin.`,
-        referenceId: record.id,
-        referenceType: 'attendance',
-      })),
-    });
+    await Promise.all(
+      missing.map((record) =>
+        this.prisma.auditLog.create({
+          data: {
+            actorId: record.employeeId,
+            action: 'MISSING_PUNCH_OUT',
+            resourceType: 'attendance',
+            resourceId: record.id,
+            newValue: {
+              status: 'MISSING_PUNCH_OUT',
+              date: today.toISOString(),
+              message: `Your punch-out was not recorded for ${today.toDateString()}. Please contact admin.`,
+            },
+          },
+        })
+      )
+    );
 
     this.logger.log(`Flagged ${missing.length} missing punch-outs`);
   }

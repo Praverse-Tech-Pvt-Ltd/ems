@@ -160,7 +160,7 @@ export class AttendanceService {
 
   // ── Punch-in ───────────────────────────────────────────────────────────────
 
-  async punchIn(employeeId: string, dto: PunchInDto) {
+  async punchIn(employeeId: string, dto: PunchInDto, ip?: string, userAgent?: string) {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -249,142 +249,34 @@ export class AttendanceService {
     const timeStr = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
 
     // Basic punch-in confirmation
-    await this.prisma.notification.create({
+    // ── Audit Log ────────────────────────────────────────────────────────────
+    await this.prisma.auditLog.create({
       data: {
-        employeeId,
-        type: 'PUNCH_IN',
-        title: 'Punched In',
-        body: `You punched in at ${timeStr}`,
-        referenceId: record.id,
-        referenceType: 'attendance',
+        actorId: employeeId,
+        action: 'PUNCH_IN',
+        resourceType: 'attendance',
+        resourceId: record.id,
+        ipAddress: ip,
+        userAgent: userAgent,
+        newValue: {
+          status: punchInStatus,
+          isManual,
+          manualPunchReason: dto.manualPunchReason ?? null,
+          isGeoValidIn: isGeoValid,
+          location: isGeoValid ? 'OFFICE' : 'REMOTE',
+          time: timeStr,
+          latitude: dto.latitude,
+          longitude: dto.longitude,
+        },
       },
     });
-
-    // Policy-specific notifications
-    if (punchInStatus === 'LATE') {
-      const lateCount = await this.countLateThisMonth(employeeId); // re-count after upsert
-      const remaining = MAX_LATE_PM - lateCount;
-      await this.prisma.notification.create({
-        data: {
-          employeeId,
-          type: 'GENERAL',
-          title: 'Late Punch-In Recorded',
-          body: `You punched in at ${timeStr} (late window 9:45–10:00 AM). `
-              + `${remaining} late allowance${remaining !== 1 ? 's' : ''} remaining this month.`,
-          referenceId: record.id,
-          referenceType: 'attendance',
-        },
-      });
-    } else if (punchInStatus === 'HALF_DAY') {
-      await this.prisma.notification.create({
-        data: {
-          employeeId,
-          type: 'GENERAL',
-          title: 'Half-Day Recorded — Late Arrival',
-          body: `Punch-in at ${timeStr} is after 10:00 AM or your 4 late-punch-in allowances for this month are exhausted. Half-day has been marked.`,
-          referenceId: record.id,
-          referenceType: 'attendance',
-        },
-      });
-    } else if (punchInStatus === 'LEAVE') {
-      await this.prisma.notification.create({
-        data: {
-          employeeId,
-          type: 'GENERAL',
-          title: 'Leave Recorded — Half-Day Limit Reached',
-          body: `You have already used 4 half-days this month. Today has been marked as LEAVE. Please contact HR if this is incorrect.`,
-          referenceId: record.id,
-          referenceType: 'attendance',
-        },
-      });
-    }
-
-    // Outside geo-fence: notify admins
-    if (!isGeoValid) {
-      const admins = await this.prisma.employee.findMany({
-        where: { role: { in: ['ADMIN', 'SUPER_ADMIN'] }, status: 'ACTIVE' },
-        select: { id: true },
-      });
-      const emp = await this.prisma.employee.findUnique({
-        where: { id: employeeId },
-        select: { firstName: true, lastName: true },
-      });
-      const empName  = emp ? `${emp.firstName} ${emp.lastName}` : employeeId;
-      const dateLabel = now.toLocaleDateString('en-IN');
-      const locLabel  = dto.latitude != null && dto.longitude != null
-        ? `GPS: ${Number(dto.latitude).toFixed(5)}, ${Number(dto.longitude).toFixed(5)}`
-        : 'GPS: unavailable';
-
-      await Promise.all(admins.map(admin =>
-        this.prisma.notification.create({
-          data: {
-            employeeId: admin.id,
-            type: 'GENERAL',
-            title: 'Remote Punch-In — Review Required',
-            body: `${empName} punched in from outside the office on ${dateLabel}. ${locLabel}. Coordinates stored — review and regularize if needed.`,
-            referenceId: record.id,
-            referenceType: 'attendance',
-          },
-        }),
-      ));
-      await this.prisma.notification.create({
-        data: {
-          employeeId,
-          type: 'GENERAL',
-          title: 'Punch-In Recorded — Outside Office',
-          body: `Your punch-in was recorded at ${locLabel} outside the office geofence. Admin has been notified and will review.`,
-          referenceId: record.id,
-          referenceType: 'attendance',
-        },
-      });
-    }
-
-    // Manual punch: flag to employee and notify admins
-    if (isManual) {
-      const adminsManual = await this.prisma.employee.findMany({
-        where: { role: { in: ['ADMIN', 'SUPER_ADMIN'] }, status: 'ACTIVE' },
-        select: { id: true },
-      });
-      const empManual = await this.prisma.employee.findUnique({
-        where: { id: employeeId },
-        select: { firstName: true, lastName: true },
-      });
-      const empNameManual = empManual ? `${empManual.firstName} ${empManual.lastName}` : employeeId;
-      const locLabelManual = dto.latitude != null && dto.longitude != null
-        ? `GPS: ${Number(dto.latitude).toFixed(5)}, ${Number(dto.longitude).toFixed(5)}`
-        : 'GPS: unavailable';
-      const reasonText = dto.manualPunchReason ? ` Reason: ${dto.manualPunchReason}.` : '';
-
-      await Promise.all(adminsManual.map(admin =>
-        this.prisma.notification.create({
-          data: {
-            employeeId: admin.id,
-            type: 'GENERAL',
-            title: 'Manual Punch-In — Review Required',
-            body: `${empNameManual} used manual punch-in at ${timeStr} (face service bypassed).${reasonText} Location: ${locLabelManual}. Please verify and regularize if needed.`,
-            referenceId: record.id,
-            referenceType: 'attendance',
-          },
-        }),
-      ));
-      await this.prisma.notification.create({
-        data: {
-          employeeId,
-          type: 'GENERAL',
-          title: 'Manual Punch-In Recorded',
-          body: `Your punch-in was recorded manually at ${timeStr} using GPS location (${locLabelManual}). Admin has been notified and will review.`,
-          referenceId: record.id,
-          referenceType: 'attendance',
-        },
-      });
-    }
 
     return record;
   }
 
   // ── Punch-out ──────────────────────────────────────────────────────────────
 
-  async punchOut(employeeId: string, dto: PunchInDto) {
+  async punchOut(employeeId: string, dto: PunchInDto, ip?: string, userAgent?: string) {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -464,135 +356,28 @@ export class AttendanceService {
       },
     });
 
-    // ── Notifications ─────────────────────────────────────────────────────────
-    // Basic punch-out confirmation
-    await this.prisma.notification.create({
+    // ── Audit Log ────────────────────────────────────────────────────────────
+    await this.prisma.auditLog.create({
       data: {
-        employeeId,
-        type: 'PUNCH_OUT',
-        title: 'Punched Out',
-        body: `You punched out at ${timeStr} · ${workingHours.toFixed(1)} h worked`,
-        referenceId: updated.id,
-        referenceType: 'attendance',
+        actorId: employeeId,
+        action: 'PUNCH_OUT',
+        resourceType: 'attendance',
+        resourceId: updated.id,
+        ipAddress: ip,
+        userAgent: userAgent,
+        newValue: {
+          status: finalStatus,
+          isManual: isManualOut,
+          manualPunchReason: dto.manualPunchReason ?? null,
+          isGeoValidOut: isGeoValid,
+          location: isGeoValid ? 'OFFICE' : 'REMOTE',
+          workingHours: Math.round(workingHours * 100) / 100,
+          time: timeStr,
+          latitude: dto.latitude,
+          longitude: dto.longitude,
+        },
       },
     });
-
-    // Policy-specific notifications
-    if (finalStatus === 'HALF_DAY' && earlyExitWarning) {
-      await this.prisma.notification.create({
-        data: {
-          employeeId,
-          type: 'GENERAL',
-          title: 'Half-Day Recorded — Early Exit',
-          body: `Punch-out at ${timeStr} is before 5:45 PM and your 4 early-exit allowances for this month are exhausted. Half-day has been marked.`,
-          referenceId: updated.id,
-          referenceType: 'attendance',
-        },
-      });
-    } else if (earlyExitWarning && finalStatus !== 'HALF_DAY' && finalStatus !== 'LEAVE') {
-      await this.prisma.notification.create({
-        data: {
-          employeeId,
-          type: 'GENERAL',
-          title: 'Early Exit Recorded',
-          body: `You punched out early at ${timeStr} (before 5:45 PM). `
-              + `${earlyOutRemaining} early-exit allowance${earlyOutRemaining !== 1 ? 's' : ''} remaining this month.`,
-          referenceId: updated.id,
-          referenceType: 'attendance',
-        },
-      });
-    } else if (finalStatus === 'LEAVE') {
-      await this.prisma.notification.create({
-        data: {
-          employeeId,
-          type: 'GENERAL',
-          title: 'Leave Recorded — Half-Day Limit Reached',
-          body: `You have already used 4 half-days this month. Today has been marked as LEAVE. Please contact HR if this is incorrect.`,
-          referenceId: updated.id,
-          referenceType: 'attendance',
-        },
-      });
-    }
-
-    // Manual punch-out: flag to employee and notify admins
-    if (isManualOut) {
-      const adminsManualOut = await this.prisma.employee.findMany({
-        where: { role: { in: ['ADMIN', 'SUPER_ADMIN'] }, status: 'ACTIVE' },
-        select: { id: true },
-      });
-      const empManualOut = await this.prisma.employee.findUnique({
-        where: { id: employeeId },
-        select: { firstName: true, lastName: true },
-      });
-      const empNameManualOut = empManualOut ? `${empManualOut.firstName} ${empManualOut.lastName}` : employeeId;
-      const locLabelManualOut = dto.latitude != null && dto.longitude != null
-        ? `GPS: ${Number(dto.latitude).toFixed(5)}, ${Number(dto.longitude).toFixed(5)}`
-        : 'GPS: unavailable';
-      const reasonTextOut = dto.manualPunchReason ? ` Reason: ${dto.manualPunchReason}.` : '';
-
-      await Promise.all(adminsManualOut.map(admin =>
-        this.prisma.notification.create({
-          data: {
-            employeeId: admin.id,
-            type: 'GENERAL',
-            title: 'Manual Punch-Out — Review Required',
-            body: `${empNameManualOut} used manual punch-out at ${timeStr} (face service bypassed).${reasonTextOut} Location: ${locLabelManualOut}. Please verify if needed.`,
-            referenceId: updated.id,
-            referenceType: 'attendance',
-          },
-        }),
-      ));
-      await this.prisma.notification.create({
-        data: {
-          employeeId,
-          type: 'GENERAL',
-          title: 'Manual Punch-Out Recorded',
-          body: `Your punch-out was recorded manually at ${timeStr} using GPS location (${locLabelManualOut}). Admin has been notified.`,
-          referenceId: updated.id,
-          referenceType: 'attendance',
-        },
-      });
-    }
-
-    // Outside geo-fence: notify admins
-    if (!isGeoValid) {
-      const adminsOut = await this.prisma.employee.findMany({
-        where: { role: { in: ['ADMIN', 'SUPER_ADMIN'] }, status: 'ACTIVE' },
-        select: { id: true },
-      });
-      const empOut = await this.prisma.employee.findUnique({
-        where: { id: employeeId },
-        select: { firstName: true, lastName: true },
-      });
-      const empNameOut  = empOut ? `${empOut.firstName} ${empOut.lastName}` : employeeId;
-      const dateLabelOut = now.toLocaleDateString('en-IN');
-      const locLabelOut  = dto.latitude != null && dto.longitude != null
-        ? `GPS: ${Number(dto.latitude).toFixed(5)}, ${Number(dto.longitude).toFixed(5)}`
-        : 'GPS: unavailable';
-
-      await Promise.all(adminsOut.map(admin =>
-        this.prisma.notification.create({
-          data: {
-            employeeId: admin.id,
-            type: 'GENERAL',
-            title: 'Remote Punch-Out — Review Required',
-            body: `${empNameOut} punched out from outside the office on ${dateLabelOut}. ${locLabelOut}. Coordinates stored — review if needed.`,
-            referenceId: updated.id,
-            referenceType: 'attendance',
-          },
-        }),
-      ));
-      await this.prisma.notification.create({
-        data: {
-          employeeId,
-          type: 'GENERAL',
-          title: 'Punch-Out Recorded — Outside Office',
-          body: `Your punch-out was recorded at ${locLabelOut} outside the office geofence. Admin has been notified.`,
-          referenceId: updated.id,
-          referenceType: 'attendance',
-        },
-      });
-    }
 
     return updated;
   }

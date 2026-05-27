@@ -1,4 +1,4 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Query, UseGuards, OnModuleInit } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -13,8 +13,87 @@ const DEFAULT_PAGE_SIZE = 50;
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles('ADMIN', 'SUPER_ADMIN')
 @Controller('audit-logs')
-export class AuditController {
+export class AuditController implements OnModuleInit {
   constructor(private prisma: PrismaService) {}
+
+  async onModuleInit() {
+    try {
+      await this.migratePunchNotifications();
+    } catch (err) {
+      console.error('Failed to migrate punch notifications:', err);
+    }
+  }
+
+  private async migratePunchNotifications() {
+    const notifications = await this.prisma.notification.findMany({
+      where: {
+        type: {
+          in: ['PUNCH_IN', 'PUNCH_OUT', 'MISSING_PUNCH_OUT'],
+        },
+      },
+    });
+
+    if (notifications.length === 0) return;
+
+    for (const notif of notifications) {
+      const exists = await this.prisma.auditLog.findFirst({
+        where: {
+          actorId: notif.employeeId,
+          action: notif.type,
+          resourceId: notif.referenceId,
+        },
+      });
+
+      if (!exists) {
+        const nv: Record<string, any> = {};
+        const body = notif.body || '';
+
+        if (body.toUpperCase().includes('USED MANUAL')) {
+          nv.isManual = true;
+          nv.status = 'PRESENT';
+          nv.location = 'OFFICE';
+          const timeMatch = body.match(/AT\s+(\d{2}:\d{2}\s+[AP]M)/i);
+          if (timeMatch?.[1]) nv.time = timeMatch[1];
+          const reasonMatch = body.match(/REASON:\s*(.*)$/i);
+          if (reasonMatch?.[1]) nv.manualPunchReason = reasonMatch[1].trim();
+        } else if (body.toUpperCase().includes('OUTSIDE THE OFFICE')) {
+          nv.isManual = false;
+          nv.location = 'REMOTE';
+          nv.isGeoValidIn = false;
+          nv.isGeoValidOut = false;
+          const gpsMatch = body.match(/GPS:\s*(-?\d+\.\d+),\s*(-?\d+\.\d+)/i);
+          if (gpsMatch?.[1] && gpsMatch?.[2]) {
+            nv.latitude = parseFloat(gpsMatch[1]);
+            nv.longitude = parseFloat(gpsMatch[2]);
+          }
+        } else {
+          nv.status = notif.type;
+          nv.message = body;
+        }
+
+        await this.prisma.auditLog.create({
+          data: {
+            actorId: notif.employeeId,
+            action: notif.type,
+            resourceType: 'attendance',
+            resourceId: notif.referenceId,
+            createdAt: notif.createdAt,
+            newValue: nv,
+          },
+        });
+      }
+    }
+
+    await this.prisma.notification.deleteMany({
+      where: {
+        id: {
+          in: notifications.map((n) => n.id),
+        },
+      },
+    });
+
+    console.log(`Migrated ${notifications.length} punch notifications to audit log`);
+  }
 
   @Get()
   @ApiQuery({ name: 'cursor', required: false, description: 'ID of last record from previous page' })
@@ -33,7 +112,16 @@ export class AuditController {
       MAX_PAGE_SIZE,
     );
 
-    const where: Record<string, unknown> = {};
+    const where: Record<string, any> = {
+      actor: {
+        role: {
+          not: 'SUPER_ADMIN',
+        },
+      },
+      resourceType: {
+        notIn: ['ChatController', 'ChatMessage', 'chat_messages', 'chat_channel', 'ChatChannel'],
+      },
+    };
     if (actorId) where['actorId'] = actorId;
     if (resourceType) where['resourceType'] = resourceType;
     if (action) where['action'] = action;

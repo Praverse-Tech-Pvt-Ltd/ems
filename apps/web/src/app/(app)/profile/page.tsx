@@ -1,32 +1,32 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api-client';
 import { formatDate } from '@/lib/utils';
 import type { Employee } from '@/types';
 import {
-  BadgeIndianRupee,
-  Banknote,
   Building2,
   Calendar,
   Camera,
   CheckCircle,
   FileCheck2,
   Fingerprint,
-  IdCard,
   KeyRound,
   Mail,
+  Pencil,
   Phone,
   RefreshCw,
   Shield,
   ShieldCheck,
+  Trash2,
   Upload,
   User,
   XCircle,
 } from 'lucide-react';
 import Link from 'next/link';
 import { FaceEnrollModal } from '@/components/layouts/FaceEnrollModal';
+import { useAvatarUrl } from '@/hooks/useAvatarUrl';
 
 type Requirement = { key: string; label: string; complete: boolean };
 type Onboarding = {
@@ -39,19 +39,29 @@ type Onboarding = {
   faceEnrolled: boolean;
 };
 
-const docItems = [
-  { key: 'AADHAAR', label: 'Aadhaar Card', icon: IdCard },
-  { key: 'PAN', label: 'PAN Card', icon: BadgeIndianRupee },
-  { key: 'PHOTO', label: 'Photograph', icon: Camera },
-] as const;
+const HIDDEN_KEYS = new Set(['BANK', 'AADHAAR', 'PAN']);
+
+const COUNTRY_CODES = [
+  { code: '+91', flag: '🇮🇳', label: 'IN' },
+  { code: '+1',  flag: '🇺🇸', label: 'US' },
+  { code: '+44', flag: '🇬🇧', label: 'GB' },
+  { code: '+971',flag: '🇦🇪', label: 'AE' },
+  { code: '+65', flag: '🇸🇬', label: 'SG' },
+  { code: '+61', flag: '🇦🇺', label: 'AU' },
+  { code: '+49', flag: '🇩🇪', label: 'DE' },
+  { code: '+33', flag: '🇫🇷', label: 'FR' },
+];
+
+function splitPhone(raw: string | null | undefined): { cc: string; num: string } {
+  if (!raw) return { cc: '+91', num: '' };
+  const match = COUNTRY_CODES.find(c => raw.startsWith(c.code));
+  if (match) return { cc: match.code, num: raw.slice(match.code.length).trim() };
+  return { cc: '+91', num: raw };
+}
 
 export default function ProfilePage() {
   const queryClient = useQueryClient();
-  const [bankName, setBankName] = useState('');
-  const [accountNumber, setAccountNumber] = useState('');
-  const [ifsc, setIfsc] = useState('');
-  const [panNumber, setPanNumber] = useState('');
-  const [aadhaarLast4, setAadhaarLast4] = useState('');
+  const photoInputRef = useRef<HTMLInputElement>(null);
 
   // Change password state
   const [currentPw, setCurrentPw] = useState('');
@@ -59,6 +69,12 @@ export default function ProfilePage() {
   const [confirmPw, setConfirmPw] = useState('');
   const [pwError, setPwError] = useState('');
   const [pwSuccess, setPwSuccess] = useState('');
+
+  // Phone edit state
+  const [editingPhone, setEditingPhone] = useState(false);
+  const [phoneCC, setPhoneCC] = useState('+91');
+  const [phoneNum, setPhoneNum] = useState('');
+  const [phoneSaved, setPhoneSaved] = useState('');
 
   // Face reset state
   const [showEnrollModal, setShowEnrollModal] = useState(false);
@@ -77,6 +93,7 @@ export default function ProfilePage() {
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ['profile'] });
     queryClient.invalidateQueries({ queryKey: ['profile-onboarding'] });
+    queryClient.invalidateQueries({ queryKey: ['employees'] });
   };
 
   const changePw = useMutation({
@@ -113,27 +130,32 @@ export default function ProfilePage() {
     },
   });
 
-  const saveBank = useMutation({
-    mutationFn: () => apiClient.patch('/employees/me/bank-details', {
-      bankName,
-      accountNumber,
-      ifsc,
-      panNumber: panNumber || undefined,
-      aadhaarLast4: aadhaarLast4 || undefined,
-      accountHolderName: profile ? `${profile.firstName} ${profile.lastName}` : undefined,
-    }),
-    onSuccess: refresh,
-  });
-
-  const submitDoc = useMutation({
-    mutationFn: ({ docType, file }: { docType: string; file: File }) => {
+  const uploadPhoto = useMutation({
+    mutationFn: (file: File) => {
       const form = new FormData();
-      form.append('docType', docType);
+      form.append('docType', 'PHOTO');
       form.append('file', file);
       return apiClient.post('/employees/me/documents/upload', form);
     },
     onSuccess: refresh,
   });
+
+  const removePhoto = useMutation({
+    mutationFn: () => apiClient.delete('/employees/me/photo'),
+    onSuccess: refresh,
+  });
+
+  const savePhone = useMutation({
+    mutationFn: () => apiClient.patch('/employees/me', { phone: phoneCC + phoneNum }),
+    onSuccess: () => {
+      refresh();
+      setEditingPhone(false);
+      setPhoneSaved('Phone updated.');
+      setTimeout(() => setPhoneSaved(''), 3000);
+    },
+  });
+
+  const photoUrl = useAvatarUrl(profile?.profilePhotoUrl);
 
   if (isLoading) {
     return (
@@ -146,17 +168,16 @@ export default function ProfilePage() {
   }
   if (!profile) return null;
 
-  const requirements = onboarding?.requirements ?? [
-    { key: 'BANK', label: 'Bank details', complete: false },
-    { key: 'AADHAAR', label: 'Aadhaar card', complete: false },
-    { key: 'PAN', label: 'PAN card', complete: false },
+  const allRequirements = onboarding?.requirements ?? [
     { key: 'PHOTO', label: 'Photograph', complete: false },
     { key: 'FACE_CAPTURE', label: 'Face recognition capture', complete: profile.faceEnrolled },
   ];
+  const requirements = allRequirements.filter((r) => !HIDDEN_KEYS.has(r.key));
+  const completed = requirements.filter((item) => item.complete).length;
+  const completionPercent = Math.round((completed / Math.max(requirements.length, 1)) * 100);
 
   const infoFields = [
     { icon: Mail, label: 'Email', value: profile.email },
-    { icon: Phone, label: 'Phone', value: profile.phone ?? '-' },
     { icon: Building2, label: 'Department', value: profile.department?.name ?? '-' },
     { icon: User, label: 'Designation', value: profile.designation ?? '-' },
     { icon: Shield, label: 'Role', value: profile.role.replace('_', ' ') },
@@ -164,8 +185,6 @@ export default function ProfilePage() {
     { icon: User, label: 'Manager', value: profile.manager ? `${profile.manager.firstName} ${profile.manager.lastName}` : '-' },
   ];
 
-  const completed = requirements.filter((item) => item.complete).length;
-  const completionPercent = onboarding?.completionPercent ?? Math.round((completed / requirements.length) * 100);
 
   return (
     <div className="space-y-8 w-full">
@@ -176,7 +195,7 @@ export default function ProfilePage() {
             <span className="text-brutal-yellow" style={{ WebkitTextStroke: '2px #1a1a1a' }}>Profile</span>
           </h1>
           <p className="font-display font-bold text-sm uppercase tracking-widest text-[#4a4a4a] mt-3">
-            Account, KYC documents, bank details and face enrollment
+            Account settings, documents and face enrollment
           </p>
         </div>
         <div className="brutal-border brutal-shadow bg-brutal-ink text-white p-5 min-w-[260px]">
@@ -193,10 +212,48 @@ export default function ProfilePage() {
 
       <div className="grid grid-cols-1 xl:grid-cols-[0.9fr_1.1fr] gap-6">
         <section className="space-y-6">
+          {/* Profile photo + identity card */}
           <div className="bg-brutal-ink brutal-border brutal-shadow-lg p-8 flex items-center gap-6">
-            <div className="w-20 h-20 bg-brutal-yellow brutal-border flex items-center justify-center text-brutal-ink font-display font-bold text-2xl flex-shrink-0">
-              {profile.firstName[0]}{profile.lastName[0]}
+            <div className="relative group flex-shrink-0">
+              <div className="w-20 h-20 bg-brutal-yellow brutal-border flex items-center justify-center text-brutal-ink font-display font-bold text-2xl overflow-hidden">
+                {photoUrl ? (
+                  <img src={photoUrl} alt="Profile" className="w-full h-full object-cover" />
+                ) : (
+                  `${profile.firstName[0]}${profile.lastName[0]}`
+                )}
+              </div>
+              {/* Photo overlay controls */}
+              <div className="absolute inset-0 bg-brutal-ink/70 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
+                <button
+                  onClick={() => photoInputRef.current?.click()}
+                  className="w-7 h-7 bg-brutal-yellow text-brutal-ink flex items-center justify-center hover:bg-white transition-colors"
+                  title="Upload photo"
+                >
+                  <Pencil size={12} />
+                </button>
+                {photoUrl && (
+                  <button
+                    onClick={() => removePhoto.mutate()}
+                    disabled={removePhoto.isPending}
+                    className="w-7 h-7 bg-brutal-red text-white flex items-center justify-center hover:bg-white hover:text-brutal-red transition-colors"
+                    title="Remove photo"
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                )}
+              </div>
             </div>
+            <input
+              ref={photoInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) uploadPhoto.mutate(file);
+                e.target.value = '';
+              }}
+            />
             <div className="flex-1">
               <h2 className="font-display font-bold text-3xl uppercase text-white leading-tight">
                 {profile.firstName} {profile.lastName}
@@ -217,12 +274,117 @@ export default function ProfilePage() {
                   {profile.status}
                 </span>
               </div>
+              <p className="font-display font-bold text-[10px] uppercase tracking-widest text-white/40 mt-3">
+                Hover avatar to change photo
+              </p>
+            </div>
+          </div>
+
+          {/* Photo upload quick action */}
+          <div className="brutal-border brutal-shadow p-5 bg-brutal-white">
+            <h3 className="font-display font-bold text-lg uppercase brutal-border-b pb-3 mb-4 flex items-center gap-2">
+              <Camera size={18} /> Profile Photo
+            </h3>
+            <div className="flex items-center gap-4">
+              <div className="w-16 h-16 brutal-border overflow-hidden flex items-center justify-center bg-brutal-surface font-display font-bold text-xl text-brutal-ink flex-shrink-0">
+                {photoUrl ? (
+                  <img src={photoUrl} alt="Profile" className="w-full h-full object-cover" />
+                ) : (
+                  `${profile.firstName[0]}${profile.lastName[0]}`
+                )}
+              </div>
+              <div className="flex flex-col gap-2 flex-1">
+                <button
+                  onClick={() => photoInputRef.current?.click()}
+                  disabled={uploadPhoto.isPending}
+                  className="brutal-btn-primary px-4 py-2 text-xs flex items-center gap-2 disabled:opacity-40"
+                >
+                  <Upload size={13} />
+                  {uploadPhoto.isPending ? 'Uploading…' : photoUrl ? 'Change Photo' : 'Upload Photo'}
+                </button>
+                {photoUrl && (
+                  <button
+                    onClick={() => removePhoto.mutate()}
+                    disabled={removePhoto.isPending}
+                    className="brutal-border px-4 py-2 text-xs font-display font-bold uppercase tracking-wide bg-brutal-red text-white flex items-center gap-2 disabled:opacity-40"
+                  >
+                    <Trash2 size={13} />
+                    {removePhoto.isPending ? 'Removing…' : 'Remove Photo'}
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 
           <div className="bg-brutal-white brutal-border brutal-shadow p-6">
             <h3 className="font-display font-bold text-xl uppercase brutal-border-b pb-3 mb-5">Personal Information</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              {/* Phone — editable inline */}
+              <div className="flex items-start gap-4 md:col-span-2">
+                <div className="w-9 h-9 bg-brutal-ink text-brutal-yellow flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <Phone size={14} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-display font-bold text-xs uppercase tracking-widest text-[#4a4a4a] mb-0.5">Phone</p>
+                  {editingPhone ? (
+                    <div className="flex flex-col gap-2 mt-1">
+                      <div className="flex gap-0">
+                        <select
+                          value={phoneCC}
+                          onChange={(e) => setPhoneCC(e.target.value)}
+                          className="brutal-border bg-brutal-surface px-2 py-1.5 font-display font-bold text-xs uppercase focus:outline-none border-r-0"
+                        >
+                          {COUNTRY_CODES.map(c => (
+                            <option key={c.code} value={c.code}>{c.flag} {c.code}</option>
+                          ))}
+                        </select>
+                        <input
+                          type="tel"
+                          value={phoneNum}
+                          onChange={(e) => setPhoneNum(e.target.value)}
+                          placeholder="9876543210"
+                          className="flex-1 brutal-border bg-brutal-surface px-3 py-1.5 font-display font-bold text-sm focus:outline-none"
+                        />
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => savePhone.mutate()}
+                          disabled={savePhone.isPending || !phoneNum}
+                          className="brutal-btn-primary px-3 py-1.5 text-xs disabled:opacity-40"
+                        >
+                          {savePhone.isPending ? 'Saving…' : 'Save'}
+                        </button>
+                        <button
+                          onClick={() => setEditingPhone(false)}
+                          className="brutal-btn-secondary px-3 py-1.5 text-xs"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <p className="font-body text-sm font-bold text-brutal-ink">
+                        {profile.phone ?? '-'}
+                      </p>
+                      <button
+                        onClick={() => {
+                          const { cc, num } = splitPhone(profile.phone);
+                          setPhoneCC(cc);
+                          setPhoneNum(num);
+                          setEditingPhone(true);
+                        }}
+                        className="w-6 h-6 bg-brutal-surface brutal-border flex items-center justify-center hover:bg-brutal-yellow transition-colors"
+                        title="Edit phone"
+                      >
+                        <Pencil size={11} />
+                      </button>
+                      {phoneSaved && <span className="font-display font-bold text-[10px] text-[#0F8F3A] uppercase">{phoneSaved}</span>}
+                    </div>
+                  )}
+                </div>
+              </div>
+
               {infoFields.map(({ icon: Icon, label, value }) => (
                 <div key={label} className="flex items-start gap-4">
                   <div className="w-9 h-9 bg-brutal-ink text-brutal-yellow flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -290,60 +452,6 @@ export default function ProfilePage() {
             </div>
           </div>
 
-          <div className="bg-brutal-white brutal-border brutal-shadow p-5">
-            <h3 className="font-display font-bold text-lg uppercase brutal-border-b pb-3 mb-4 flex items-center gap-2">
-              <Banknote size={18} /> Bank + Statutory Details
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {[
-                ['Bank Name', bankName, setBankName],
-                ['Account Number', accountNumber, setAccountNumber],
-                ['IFSC', ifsc, setIfsc],
-                ['PAN Number', panNumber, setPanNumber],
-                ['Aadhaar Last 4', aadhaarLast4, setAadhaarLast4],
-              ].map(([label, value, setter]) => (
-                <label key={label as string} className={label === 'Aadhaar Last 4' ? '' : ''}>
-                  <span className="font-display font-bold text-[10px] uppercase tracking-widest text-[#4a4a4a]">{label as string}</span>
-                  <input
-                    value={value as string}
-                    onChange={(e) => (setter as (next: string) => void)(e.target.value)}
-                    className="mt-1 w-full brutal-border bg-brutal-surface px-3 py-2 font-display font-bold uppercase"
-                  />
-                </label>
-              ))}
-            </div>
-            <button
-              disabled={saveBank.isPending || !bankName || !accountNumber || !ifsc}
-              onClick={() => saveBank.mutate()}
-              className="mt-4 brutal-btn-primary px-4 py-3 text-xs disabled:opacity-40"
-            >
-              Save Bank Details
-            </button>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {docItems.map(({ key, label, icon: Icon }) => (
-              <label key={key} className="bg-brutal-white brutal-border brutal-shadow p-4 cursor-pointer hover:bg-brutal-surface transition-colors">
-                <input
-                  type="file"
-                  className="hidden"
-                  accept={key === 'PHOTO' ? 'image/*' : '.pdf,image/*'}
-                  onChange={(event) => {
-                    const file = event.target.files?.[0];
-                    if (file) submitDoc.mutate({ docType: key, file });
-                  }}
-                />
-                <div className="w-10 h-10 bg-brutal-ink text-brutal-yellow flex items-center justify-center mb-4">
-                  <Icon size={18} />
-                </div>
-                <p className="font-display font-bold uppercase text-sm">{label}</p>
-                <p className="font-display font-bold text-[10px] uppercase tracking-widest text-[#4a4a4a] mt-1 flex items-center gap-1">
-                  <Upload size={12} /> Upload file
-                </p>
-              </label>
-            ))}
-          </div>
-
           {/* Face ID card */}
           <div className={`brutal-border brutal-shadow p-5 ${profile.faceEnrolled ? 'bg-brutal-yellow' : 'bg-brutal-surface'}`}>
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -373,7 +481,6 @@ export default function ProfilePage() {
               </div>
             </div>
 
-            {/* Reset confirmation */}
             {faceResetConfirm && (
               <div className="mt-4 brutal-border border-brutal-red bg-white p-4">
                 <p className="font-display font-bold text-sm uppercase text-brutal-red mb-3">

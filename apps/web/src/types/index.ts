@@ -55,6 +55,11 @@ export interface Employee {
   department?: Department;
   manager?: Pick<Employee, 'id' | 'firstName' | 'lastName'>;
   approvalAuthority?: string[];
+  address?: string;
+  emergencyContact?: string;
+  salaryGrade?: string;
+  grossSalary?: number | string;
+  profilePhotoUrl?: string;
 }
 
 export interface AttendanceRecord {

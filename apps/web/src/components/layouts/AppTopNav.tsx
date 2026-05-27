@@ -62,6 +62,7 @@ export function AppTopNav({ onMenuOpen, onBell }: Props) {
   const [focused, setFocused]       = useState(false);
   const debounceRef                 = useRef<ReturnType<typeof setTimeout> | null>(null);
   const searchRef                   = useRef<HTMLDivElement>(null);
+  const inputRef                    = useRef<HTMLInputElement>(null);
 
   // Debounce raw input → committed query
   useEffect(() => {
@@ -81,6 +82,19 @@ export function AppTopNav({ onMenuOpen, onBell }: Props) {
     }
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
+
+  // Ctrl+K to focus search input
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if ((e.ctrlKey || e.metaKey) && e.key?.toLowerCase() === 'k') {
+        e.preventDefault();
+        inputRef.current?.focus();
+        setFocused(true);
+      }
+    }
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
   }, []);
 
   const showDropdown = focused && query.length >= 2;
@@ -125,6 +139,7 @@ export function AppTopNav({ onMenuOpen, onBell }: Props) {
             <Search size={14} className="text-brutal-ink/60" />
           </div>
           <input
+            ref={inputRef}
             type="search"
             value={rawQuery}
             onChange={e => setRawQuery(e.target.value)}
@@ -190,11 +205,7 @@ export function AppTopNav({ onMenuOpen, onBell }: Props) {
           )}
         </div>
 
-        {/* ⌘K hint — desktop */}
-        <div className="hidden md:flex items-center gap-1 px-4 brutal-border-l bg-brutal-surface">
-          <kbd className="font-display font-bold text-[10px] px-1.5 py-0.5 bg-brutal-ink text-brutal-cream">⌘</kbd>
-          <kbd className="font-display font-bold text-[10px] px-1.5 py-0.5 bg-brutal-ink text-brutal-cream">K</kbd>
-        </div>
+
 
         {/* Bell */}
         <button

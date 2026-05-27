@@ -1,4 +1,4 @@
-import { Controller, Post, Delete, Get, Patch, Body, Param, Query, UseGuards } from '@nestjs/common';
+import { Controller, Post, Delete, Get, Patch, Body, Param, Query, UseGuards, Ip, Headers } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { AttendanceService } from './attendance.service';
 import { FaceRecognitionService } from './face-recognition.service';
@@ -20,13 +20,23 @@ export class AttendanceController {
   ) {}
 
   @Post('punch-in')
-  punchIn(@CurrentUser() user: { id: string }, @Body() dto: PunchInDto) {
-    return this.service.punchIn(user.id, dto);
+  punchIn(
+    @CurrentUser() user: { id: string },
+    @Body() dto: PunchInDto,
+    @Ip() ip: string,
+    @Headers('user-agent') userAgent?: string,
+  ) {
+    return this.service.punchIn(user.id, dto, ip, userAgent);
   }
 
   @Post('punch-out')
-  punchOut(@CurrentUser() user: { id: string }, @Body() dto: PunchInDto) {
-    return this.service.punchOut(user.id, dto);
+  punchOut(
+    @CurrentUser() user: { id: string },
+    @Body() dto: PunchInDto,
+    @Ip() ip: string,
+    @Headers('user-agent') userAgent?: string,
+  ) {
+    return this.service.punchOut(user.id, dto, ip, userAgent);
   }
 
   @Get('face/health')

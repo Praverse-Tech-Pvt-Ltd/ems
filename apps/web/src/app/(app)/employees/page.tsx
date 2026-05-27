@@ -7,6 +7,7 @@ import { apiClient } from '@/lib/api-client';
 import { initials } from '@/lib/utils';
 import type { Employee } from '@/types';
 import { Search, Plus } from 'lucide-react';
+import Link from 'next/link';
 
 const TONE_CYCLE = ['blue', null, null, 'yellow', null, null, 'red'] as const;
 
@@ -105,8 +106,8 @@ export default function EmployeesPage() {
               'bg-brutal-yellow text-brutal-ink';
             const sinceYear = e.joiningDate ? new Date(e.joiningDate).getFullYear() : '—';
             return (
-              <div key={e.id} style={{ animationDelay: `${i * 30}ms` }}
-                className={`animate-fade-up brutal-border brutal-shadow-sm hover:brutal-shadow hover:-translate-x-px hover:-translate-y-px transition-all ${e.status === 'INACTIVE' || e.status === 'TERMINATED' ? 'opacity-60' : ''}`}>
+              <Link href={`/employees/${e.id}`} key={e.id} style={{ animationDelay: `${i * 30}ms` }}
+                className={`animate-fade-up brutal-border brutal-shadow-sm hover:brutal-shadow hover:-translate-x-px hover:-translate-y-px transition-all cursor-pointer block ${e.status === 'INACTIVE' || e.status === 'TERMINATED' ? 'opacity-60' : ''}`}>
                 <div className="flex items-stretch">
                   <div className={`w-20 shrink-0 grid place-items-center text-[28px] font-bold font-display brutal-border-r ${avatarBg}`}>
                     {initials(e.firstName, e.lastName)}
@@ -134,7 +135,7 @@ export default function EmployeesPage() {
                     <div className="font-display font-bold text-[11px] tracking-[0.12em]">{e.status}</div>
                   </div>
                 </div>
-              </div>
+              </Link>
             );
           })}
           {filtered.length === 0 && !isLoading && (

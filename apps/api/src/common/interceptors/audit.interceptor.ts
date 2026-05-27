@@ -30,9 +30,16 @@ export class AuditInterceptor implements NestInterceptor {
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
     const request = context.switchToHttp().getRequest();
-    const { user, method, ip, headers } = request;
+    const { user, method, ip, headers, url } = request;
 
-    if (!user || !['POST', 'PATCH', 'DELETE', 'PUT'].includes(method)) {
+    if (
+      !user ||
+      !['POST', 'PATCH', 'DELETE', 'PUT'].includes(method) ||
+      url.includes('/chat') ||
+      url.includes('/messages') ||
+      url.includes('/punch-') ||
+      url.includes('/regularize')
+    ) {
       return next.handle();
     }
 

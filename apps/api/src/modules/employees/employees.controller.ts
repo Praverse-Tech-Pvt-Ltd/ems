@@ -23,8 +23,8 @@ export class EmployeesController {
 
   @Get('me')
   @ApiOperation({ summary: 'Get own profile' })
-  getMe(@CurrentUser() user: { id: string }) {
-    return this.service.findOne(user.id);
+  getMe(@CurrentUser() user: { id: string; role: string }) {
+    return this.service.findOne(user.id, user);
   }
 
   @Get('me/onboarding')
@@ -60,6 +60,12 @@ export class EmployeesController {
     @Body('docType') docType: string,
   ) {
     return this.service.uploadMyDocument(user.id, docType, file);
+  }
+
+  @Delete('me/photo')
+  @ApiOperation({ summary: 'Remove own profile photo' })
+  removeMyPhoto(@CurrentUser() user: { id: string }) {
+    return this.service.removeMyPhoto(user.id);
   }
 
   @Get('colleagues')
@@ -104,10 +110,9 @@ export class EmployeesController {
   }
 
   @Get(':id')
-  @Roles('ADMIN', 'SUPER_ADMIN', 'MANAGER')
   @ApiOperation({ summary: 'Get employee by ID' })
-  findOne(@Param('id') id: string) {
-    return this.service.findOne(id);
+  findOne(@Param('id') id: string, @CurrentUser() user: { id: string; role: string }) {
+    return this.service.findOne(id, user);
   }
 
   @Patch(':id')

@@ -14,6 +14,8 @@ interface AuditLog {
   userAgent?: string;
   createdAt: string;
   actor?: { firstName: string; lastName: string; employeeCode: string };
+  newValue?: any;
+  oldValue?: any;
 }
 
 const TONE_TAG: Record<string, string> = {
@@ -24,13 +26,89 @@ const TONE_TAG: Record<string, string> = {
   mute: 'bg-brutal-surface text-brutal-ink',
 };
 
-function actionTone(action: string): string {
-  const a = action.toUpperCase();
+function actionTone(r: AuditLog): string {
+  const a = r.action.toUpperCase();
+  const nv = r.newValue;
+  
+  if (a.includes('MISSING')) return 'red';
+  
+  // Highlight manual or remote punches as hold/warning (Review Required)
+  if ((a === 'PUNCH_IN' || a === 'PUNCH_OUT') && nv) {
+    if (nv.isManual || nv.location === 'REMOTE') return 'hold';
+  }
+  
   if (a.includes('APPROV') || a.includes('LOGIN') || a.includes('PUNCH')) return 'info';
   if (a.includes('CREATE') || a.includes('ENROLL') || a.includes('PAID'))  return 'ok';
   if (a.includes('REVIEW') || a.includes('SUBMIT'))                        return 'hold';
   if (a.includes('REJECT') || a.includes('DELETE') || a.includes('POLICY')) return 'red';
   return 'mute';
+}
+
+function renderDetails(r: AuditLog): string | null {
+  if (!r.newValue) return null;
+  const nv = r.newValue;
+  const actorName = r.actor ? `${r.actor.firstName} ${r.actor.lastName}`.toUpperCase() : 'EMPLOYEE';
+  const dateStr = new Date(r.createdAt).toLocaleDateString('en-GB');
+
+  if (r.action === 'PUNCH_IN') {
+    if (nv.isManual) {
+      const time = nv.time || '';
+      const reason = nv.manualPunchReason || '';
+      return `${actorName} USED MANUAL PUNCH-IN AT ${time} (FACE SERVICE BYPASSED). REASON: ${reason.toUpperCase()}`;
+    }
+    if (nv.isGeoValidIn === false || nv.location === 'REMOTE') {
+      const gps = nv.latitude && nv.longitude ? ` GPS: ${Number(nv.latitude).toFixed(5)}, ${Number(nv.longitude).toFixed(5)}` : '';
+      return `${actorName} PUNCHED IN FROM OUTSIDE THE OFFICE ON ${dateStr}.${gps}`;
+    }
+    const time = nv.time ? `at ${nv.time}` : '';
+    return `${actorName} punched in ${time} from OFFICE (${nv.status})`;
+  }
+  
+  if (r.action === 'PUNCH_OUT') {
+    if (nv.isManual) {
+      const time = nv.time || '';
+      const reason = nv.manualPunchReason || '';
+      return `${actorName} USED MANUAL PUNCH-OUT AT ${time} (FACE SERVICE BYPASSED). REASON: ${reason.toUpperCase()}`;
+    }
+    if (nv.isGeoValidOut === false || nv.location === 'REMOTE') {
+      const gps = nv.latitude && nv.longitude ? ` GPS: ${Number(nv.latitude).toFixed(5)}, ${Number(nv.longitude).toFixed(5)}` : '';
+      return `${actorName} PUNCHED OUT FROM OUTSIDE THE OFFICE ON ${dateStr}.${gps}`;
+    }
+    const time = nv.time ? `at ${nv.time}` : '';
+    const hours = nv.workingHours != null ? ` Worked: ${nv.workingHours} hrs` : '';
+    return `${actorName} punched out ${time} from OFFICE (${nv.status})${hours}`;
+  }
+
+  if (r.action === 'MISSING_PUNCH_OUT') {
+    return nv.message || `Missing punch-out recorded.`;
+  }
+  
+  if (r.action === 'REGULARIZE') {
+    const status = nv.status ? `Status: ${nv.status}` : '';
+    const hours = nv.workingHours != null ? ` Worked: ${nv.workingHours} hrs` : '';
+    return `Regularized Attendance: ${status}${hours}`;
+  }
+
+  if (r.action === 'CREATE_EMPLOYEE') {
+    return `Created employee with email: ${nv.email}, role: ${nv.role}`;
+  }
+
+  if (r.action === 'UPDATE_EMPLOYEE') {
+    const oldVal = r.oldValue || {};
+    const changes: string[] = [];
+    if (oldVal.role !== nv.role) changes.push(`role: ${oldVal.role} → ${nv.role}`);
+    if (oldVal.email !== nv.email) changes.push(`email: ${oldVal.email} → ${nv.email}`);
+    return `Updated employee: ${changes.join(', ') || 'No critical changes'}`;
+  }
+  
+  if (typeof nv === 'object' && nv !== null) {
+    const keys = Object.keys(nv).filter(k => typeof nv[k] !== 'object' && nv[k] !== null);
+    if (keys.length > 0) {
+      return keys.map(k => `${k}: ${nv[k]}`).join(' | ');
+    }
+  }
+  
+  return null;
 }
 
 function Tag({ tone, children }: { tone: string; children: React.ReactNode }) {
@@ -44,10 +122,11 @@ function Tag({ tone, children }: { tone: string; children: React.ReactNode }) {
 export default function AuditPage() {
   const [actorFilter, setActorFilter] = useState('ALL');
 
-  const { data: logs = [], isLoading } = useQuery<AuditLog[]>({
+  const { data: response, isLoading } = useQuery<{ data: AuditLog[]; nextCursor: string | null }>({
     queryKey: ['audit-logs'],
-    queryFn: () => apiClient.get('/audit-logs').then(r => r.data).catch(() => []),
+    queryFn: () => apiClient.get('/audit-logs').then(r => r.data).catch(() => ({ data: [], nextCursor: null })),
   });
+  const logs = response?.data ?? [];
 
   const actors = useMemo(() => {
     const names = logs.map(l => l.actor
@@ -139,7 +218,7 @@ export default function AuditPage() {
                 const ts    = d.toLocaleTimeString('en-GB', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
                 const date  = d.toLocaleDateString('en-GB', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short' }).toUpperCase();
                 const actor = r.actor ? `${r.actor.firstName.toLowerCase()}.${r.actor.lastName[0]?.toLowerCase()}` : 'system';
-                const tone  = actionTone(r.action);
+                const tone  = actionTone(r);
                 const ua    = r.userAgent
                   ? r.userAgent.includes('Mozilla') ? 'BROWSER' : r.userAgent.slice(0, 12).toUpperCase()
                   : 'CRON';
@@ -149,9 +228,16 @@ export default function AuditPage() {
                     <div className="px-3 py-2.5 num border-r-[2px] border-brutal-ink/20">{ts}</div>
                     <div className="px-3 py-2.5 num border-r-[2px] border-brutal-ink/20">{date}</div>
                     <div className="px-3 py-2.5 border-r-[2px] border-brutal-ink/20">{actor}</div>
-                    <div className="px-3 py-2.5 border-r-[2px] border-brutal-ink/20 flex items-center gap-2 min-w-0">
-                      <Tag tone={tone}>{r.action.replace(/_/g, ' ')}</Tag>
-                      <span className="text-brutal-ink/60 truncate text-[10px]">{r.resourceType}/{r.resourceId}</span>
+                    <div className="px-3 py-2.5 border-r-[2px] border-brutal-ink/20 flex flex-col justify-center gap-1.5 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <Tag tone={tone}>{r.action.replace(/_/g, ' ')}</Tag>
+                        <span className="text-brutal-ink/60 truncate text-[10px]">{r.resourceType}/{r.resourceId}</span>
+                      </div>
+                      {renderDetails(r) && (
+                        <div className="text-[10px] text-brutal-ink font-body tracking-normal normal-case leading-normal bg-brutal-yellow/10 border border-brutal-ink/10 px-2 py-1 max-w-full break-words">
+                          {renderDetails(r)}
+                        </div>
+                      )}
                     </div>
                     <div className="px-3 py-2.5 border-r-[2px] border-brutal-ink/20">
                       <span className="px-1.5 py-0.5 border-2 border-brutal-ink text-[10px] bg-brutal-surface">

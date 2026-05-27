@@ -11,9 +11,101 @@ import {
   Calendar, MessageSquare, Fingerprint,
   CheckCircle, XCircle, AlertTriangle, Briefcase,
   TrendingUp, MapPin, Clock, IndianRupee, ClipboardList,
-  Award, BadgeCheck,
+  Award, BadgeCheck, Star, Zap,
 } from 'lucide-react';
 import Link from 'next/link';
+
+type ProfileExtra = {
+  summary: string;
+  workMode: string;
+  workLocation: string;
+  responsibilities: string[];
+  skills: string[];
+  achievements?: string[];
+};
+
+const PROFILE_EXTRAS: Record<string, ProfileExtra> = {
+  'NEX-QA-001': {
+    summary: 'Detail-oriented QA Chemist with 3+ years of experience in pharmaceutical Quality Assurance, GMP documentation, BMR/BPR review, plant compliance, audit support, and regulatory standards.',
+    workMode: 'On-site',
+    workLocation: 'NexGen Pharma Solutions Office, Vadodara, Gujarat',
+    responsibilities: [
+      'Batch Manufacturing & Packaging Record (BMR/BPR) review for GMP compliance',
+      'Equipment cleaning record review and SOP adherence verification',
+      'Plant round inspections and GMP compliance monitoring',
+      'Documentation control — SOP issuance, version control, APQR preparation',
+      'Deviation, OOS/OOT, and complaint data collection',
+    ],
+    skills: [
+      'GMP Documentation Handling',
+      'BMR/BPR Review',
+      'APQR Support',
+      'Deviation & Compliance Handling',
+      'Instrument Calibration (pH meter, Karl Fischer, UV, polarimeter)',
+      'Microsoft Word, Excel, PowerPoint',
+    ],
+    achievements: [
+      'Part of QA team for successful ANVISA, USFDA, Korea & EU-GMP regulatory audit clearances at Ami Lifesciences Pvt. Ltd.',
+    ],
+  },
+  'NEX-SW-INT-001': {
+    summary: 'Software Development Intern in Robotics & Intelligent Systems. Focused on modular software development, logic implementation, and applied AI for intelligent automation.',
+    workMode: 'On-site only (No hybrid / No WFH)',
+    workLocation: 'NexGen Pharma Solutions Office, Vadodara, Gujarat',
+    responsibilities: [
+      'Software development and integration for intelligent and automated systems',
+      'Modular component work — logic implementation, system workflows, optimization',
+      'Testing, debugging, and documentation of software components',
+      'Collaboration with internal technical team under supervision',
+      'Project domain: Intelligent Robotic Systems, digital automation, applied AI',
+    ],
+    skills: [
+      'Software Development',
+      'Logic Implementation',
+      'Testing & Debugging',
+      'Applied Artificial Intelligence',
+      'System Workflows',
+    ],
+  },
+  'NEX-SW-INT-002': {
+    summary: 'Software Development Intern in Robotics & Intelligent Systems. Focused on modular software development, logic implementation, and applied AI for intelligent automation.',
+    workMode: 'On-site only (No hybrid / No WFH)',
+    workLocation: 'NexGen Pharma Solutions Office, Vadodara, Gujarat',
+    responsibilities: [
+      'Software development and integration for intelligent and automated systems',
+      'Modular component work — logic implementation, system workflows, optimization',
+      'Testing, debugging, and documentation of software components',
+      'Collaboration with internal technical team under supervision',
+      'Project domain: Intelligent Robotic Systems, digital automation, applied AI',
+    ],
+    skills: [
+      'Software Development',
+      'Logic Implementation',
+      'Testing & Debugging',
+      'Applied Artificial Intelligence',
+      'System Workflows',
+    ],
+  },
+  'NEX-RA-001': {
+    summary: 'Regulatory Affairs Officer supporting dossier preparation, regulatory submissions, and compliance activities for pharmaceutical products.',
+    workMode: 'On-site / Hybrid (as per project requirement)',
+    workLocation: 'Vadodara or as assigned based on business needs',
+    responsibilities: [
+      'Regulatory affairs documentation and compliance support',
+      'Preparation, review, and compilation of regulatory dossiers',
+      'Regulatory submissions coordination and follow-up',
+      'Liaison with internal QA/QC and external regulatory bodies',
+      'Maintaining regulatory tracking databases and submission timelines',
+    ],
+    skills: [
+      'Regulatory Dossier Preparation',
+      'Regulatory Submissions',
+      'Pharmaceutical Compliance',
+      'Documentation Management',
+      'Cross-functional Coordination',
+    ],
+  },
+};
 
 const AVATAR_COLORS = [
   { bg: 'bg-brutal-ink',    text: 'text-brutal-yellow' },
@@ -136,6 +228,7 @@ export default function EmployeeDetailPage() {
     );
   }
 
+  const profileExtra = PROFILE_EXTRAS[employee.employeeCode] ?? null;
   const av = avatarColor(employee.id);
   const statusOk = employee.status === 'ACTIVE';
   const fullName = `${employee.firstName} ${employee.lastName}`;
@@ -452,6 +545,66 @@ export default function EmployeeDetailPage() {
             ))}
           </div>
         </section>
+      )}
+
+      {/* ── Work Details + Responsibilities (from profile data) ─── */}
+      {profileExtra && (
+        <>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Work Info */}
+            <section className="brutal-border brutal-shadow bg-brutal-cream">
+              <SectionHeader icon={MapPin} title="Work Details" />
+              <div className="px-5 py-2">
+                <InfoRow icon={MapPin}    label="Work Location" value={profileExtra.workLocation} />
+                <InfoRow icon={Briefcase} label="Work Mode"     value={profileExtra.workMode} />
+              </div>
+              <div className="px-5 py-4 brutal-border-t bg-brutal-surface">
+                <p className="font-display font-bold text-[10px] uppercase tracking-widest text-brutal-ink/50 mb-1">Summary</p>
+                <p className="font-body text-xs text-brutal-ink/80 leading-relaxed">{profileExtra.summary}</p>
+              </div>
+            </section>
+
+            {/* Skills */}
+            <section className="brutal-border brutal-shadow bg-brutal-cream">
+              <SectionHeader icon={Zap} title="Key Skills" />
+              <div className="px-5 py-4 flex flex-wrap gap-2">
+                {profileExtra.skills.map((skill) => (
+                  <span key={skill} className="px-3 py-1.5 brutal-border bg-brutal-yellow font-display font-bold text-[10px] uppercase tracking-wide">
+                    {skill}
+                  </span>
+                ))}
+              </div>
+              {profileExtra.achievements && profileExtra.achievements.length > 0 && (
+                <div className="px-5 py-4 brutal-border-t">
+                  <p className="font-display font-bold text-[10px] uppercase tracking-widest text-brutal-ink/50 mb-2 flex items-center gap-1.5">
+                    <Star size={11} /> Achievements
+                  </p>
+                  {profileExtra.achievements.map((ach, i) => (
+                    <div key={i} className="flex items-start gap-2 mt-1.5">
+                      <span className="w-1.5 h-1.5 bg-brutal-ink flex-shrink-0 mt-1.5" />
+                      <p className="font-body text-xs text-brutal-ink/80 leading-relaxed">{ach}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+          </div>
+
+          {/* Responsibilities */}
+          <section className="brutal-border brutal-shadow bg-brutal-cream">
+            <SectionHeader icon={ClipboardList} title="Key Responsibilities" />
+            <div className="px-5 py-4 grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-0">
+              {profileExtra.responsibilities.map((resp, i) => (
+                <div key={i} className="flex items-start gap-3 py-2.5 brutal-border-b last:border-b-0">
+                  <span className="font-display font-extrabold text-brutal-ink/30 text-[13px] w-5 flex-shrink-0 leading-none mt-0.5">
+                    {String(i + 1).padStart(2, '0')}
+                  </span>
+                  <p className="font-display font-bold text-[11px] tracking-[0.06em] text-brutal-ink leading-snug">{resp}</p>
+                </div>
+              ))}
+            </div>
+          </section>
+        </>
       )}
 
       {/* ── Quick Actions ─── */}

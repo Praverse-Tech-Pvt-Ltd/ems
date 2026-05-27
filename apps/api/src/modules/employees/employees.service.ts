@@ -176,10 +176,23 @@ export class EmployeesService {
     });
   }
 
-  async findOne(id: string) {
+  async findOne(id: string, currentUser?: { id: string; role: string }) {
+    const isPrivileged = currentUser && (
+      currentUser.role === 'ADMIN' ||
+      currentUser.role === 'SUPER_ADMIN' ||
+      currentUser.role === 'MANAGER' ||
+      currentUser.id === id
+    );
+
     const employee = await this.prisma.employee.findUnique({
       where: { id },
-      select: EMPLOYEE_SELECT,
+      select: {
+        ...EMPLOYEE_SELECT,
+        ...(isPrivileged ? {
+          grossSalary: true,
+          salaryGrade: true,
+        } : {}),
+      },
     });
     if (!employee) throw new NotFoundException('Employee not found');
     return {
@@ -358,5 +371,39 @@ export class EmployeesService {
       },
     });
     return updated;
+  }
+
+  async removeMyPhoto(id: string) {
+    const employee = await this.prisma.employee.findUnique({
+      where: { id },
+      select: { profilePhotoUrl: true },
+    });
+    if (employee?.profilePhotoUrl) {
+      try {
+        await this.storage.delete(employee.profilePhotoUrl);
+      } catch (e) {
+        // ignore
+      }
+    }
+
+    await this.prisma.employee.update({
+      where: { id },
+      data: { profilePhotoUrl: null },
+    });
+    await this.prisma.employeeDocument.deleteMany({
+      where: {
+        employeeId: id,
+        docType: 'PHOTO',
+      },
+    });
+    await this.prisma.auditLog.create({
+      data: {
+        actorId: id,
+        action: 'PHOTO_REMOVED',
+        resourceType: 'employee',
+        resourceId: id,
+      },
+    });
+    return this.getMyOnboarding(id);
   }
 }
