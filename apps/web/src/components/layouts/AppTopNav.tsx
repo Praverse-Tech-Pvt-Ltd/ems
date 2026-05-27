@@ -55,7 +55,7 @@ interface Props {
 
 export function AppTopNav({ onMenuOpen, onBell }: Props) {
   const clock = useClock();
-  const time = clock ? clock.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '--:--';
+  const time = clock ? clock.toLocaleTimeString('en-GB', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false }) : '--:--';
 
   const [rawQuery, setRawQuery]     = useState('');
   const [query, setQuery]           = useState('');

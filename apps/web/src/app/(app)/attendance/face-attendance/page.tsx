@@ -160,7 +160,7 @@ export default function FaceAttendancePage() {
               )}
               {result.checkIn && (
                 <p className="text-xs opacity-80">
-                  Time: {new Date(result.checkIn).toLocaleTimeString()}
+                  Time: {new Date(result.checkIn).toLocaleTimeString('en-GB', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false })} IST
                 </p>
               )}
             </>

@@ -45,7 +45,7 @@ function fmtTime(iso: string): string {
   if (diffMins < 60)  return `${diffMins}m ago`;
   const diffHrs = Math.floor(diffMins / 60);
   if (diffHrs < 24)   return `${diffHrs}h ago`;
-  return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+  return d.toLocaleDateString('en-GB', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short' });
 }
 
 interface Props { open: boolean; onClose: () => void; }

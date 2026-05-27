@@ -289,6 +289,8 @@ model AttendanceRecord {
   isRegularized          Boolean          @default(false) @map("is_regularized")
   regularizedBy          String?          @map("regularized_by")
   regularizationReason   String?          @map("regularization_reason")
+  isManualPunch          Boolean          @default(false) @map("is_manual_punch")
+  manualPunchReason      String?          @map("manual_punch_reason")
   deviceInfo             Json?            @map("device_info")
   notes                  String?
   createdAt              DateTime         @default(now()) @map("created_at")

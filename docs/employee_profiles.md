@@ -214,7 +214,7 @@ This document contains structured, clean employee profile data for NexGen Pharma
 *   **Full Name:** Shifa Mobh
 *   **Current Location:** Vadodara, Gujarat
 *   **Contact Number:** To be collected
-*   **Email ID:** shifa.mobh@nexgenharmasolutions.com
+*   **Email ID:** shifa.mobh@nexgenpharmasolutions.com
 *   **LinkedIn:** To be collected
 *   **Languages:** To be collected
 
@@ -286,10 +286,10 @@ The following credentials have been officially generated, hashed via bcrypt, and
 | :---: | :--- | :--- | :--- | :--- | :--- |
 | **1** | Ashwani Shrivastav | `ashwani@nexgenpharmasolutions.com` | `Admin@123456` | `SUPER_ADMIN` (Includes `MANAGER`) | `ACTIVE` |
 | **2** | Pratham Shrivastav | `pratham.s@nexgenpharmasolutions.com` | `Admin@123456` | `SUPER_ADMIN` (Includes `MANAGER`) | `ACTIVE` |
-| **3** | Chandni Jha | `chandni.jha@nexgenharmasolutions.com` | `Chandni@NEX2026` | `EMPLOYEE` | `ACTIVE` |
+| **3** | Chandni Jha | `chandni.jha@nexgenpharmasolutions.com` | `Chandni@NEX2026` | `EMPLOYEE` | `ACTIVE` |
 | **4** | Dev Patel | `dev.patel@praversetech.com` | `Dev@NEX2026` | `EMPLOYEE` | `ACTIVE` |
 | **5** | Maanav Shah | `maanav.shah@praversetech.com` | `Maanav@NEX2026` | `EMPLOYEE` | `ACTIVE` |
-| **6** | Shifa Mobh | `shifa.mobh@nexgenharmasolutions.com` | `Shifa@NEX2026` | `EMPLOYEE` | `ACTIVE` |
+| **6** | Shifa Mobh | `shifa.mobh@nexgenpharmasolutions.com` | `Shifa@NEX2026` | `EMPLOYEE` | `ACTIVE` |
 
 Designation records: Ashwani Shrivastav is Managing Director. Pratham Shrivastav is Director.
 
@@ -373,7 +373,7 @@ Below are the customized compliance checklists for each employee. Use this to ve
 *   [X] Bank Account Details (Account No, IFSC, Branch)
 *   [X] Emergency Contact Information
 *   [X] Reporting Manager Assignment Confirmation (Ashwani Shrivastav)
-*   [X] System & Corporate Email Creation (`chandni.jha@nexgenharmasolutions.com`)
+*   [X] System & Corporate Email Creation (`chandni.jha@nexgenpharmasolutions.com`)
 *   [X] Attendance Biometric / Face Recognition Enrollment
 *   [X] Asset Allocation (Laptop / Desktop / Lab equipment keys)
 
@@ -425,6 +425,6 @@ Below are the customized compliance checklists for each employee. Use this to ve
 *   [X] Finalized Salary Structure Break-up Sign-off Sheet
 *   [X] Bank Account Details (Account No, IFSC, Branch)
 *   [X] Emergency Contact Information
-*   [X] System & Corporate Email Creation (`shifa.mobh@nexgenharmasolutions.com`)
+*   [X] System & Corporate Email Creation (`shifa.mobh@nexgenpharmasolutions.com`)
 *   [X] Attendance Biometric / Face Recognition Enrollment (Shift / Location config)
 *   [X] Asset Allocation (Laptop / Security Credentials)

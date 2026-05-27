@@ -1,6 +1,7 @@
 import {
   IsString,
   IsNumber,
+  IsBoolean,
   Min,
   Max,
   IsOptional,
@@ -15,9 +16,23 @@ import { BadRequestException } from '@nestjs/common';
 const DEVICE_INFO_MAX_BYTES = 4096;
 
 export class PunchInDto {
-  @ApiProperty({ description: 'Base64 encoded face image' })
+  @ApiPropertyOptional({ description: 'Base64 encoded face image (required unless manualPunch=true)' })
+  @ValidateIf(o => !o.manualPunch)
   @IsString()
-  faceImageBase64: string;
+  faceImageBase64?: string;
+
+  @ApiPropertyOptional({
+    description: 'Skip face verification (only allowed when face service is unavailable). Location is still required.',
+    default: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  manualPunch?: boolean;
+
+  @ApiPropertyOptional({ description: 'Reason for manual punch (face service down, camera unavailable, etc.)' })
+  @IsOptional()
+  @IsString()
+  manualPunchReason?: string;
 
   @ApiProperty({ example: 28.6139 })
   @IsNumber()

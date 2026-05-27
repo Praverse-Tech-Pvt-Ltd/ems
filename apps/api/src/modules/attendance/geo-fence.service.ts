@@ -1,8 +1,10 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 
 @Injectable()
 export class GeoFenceService {
+  private readonly logger = new Logger(GeoFenceService.name);
+
   constructor(private prisma: PrismaService) {}
 
   async isWithinAnyOffice(lat: number, lng: number): Promise<boolean> {
@@ -13,10 +15,17 @@ export class GeoFenceService {
     // No office locations configured → treat as valid (geo-fence not set up)
     if (locations.length === 0) return true;
 
-    return locations.some((loc) =>
-      this.haversineDistance(lat, lng, Number(loc.latitude), Number(loc.longitude)) <=
-      loc.radiusMeters,
-    );
+    let closest = Infinity;
+    const result = locations.some((loc) => {
+      const dist = this.haversineDistance(lat, lng, Number(loc.latitude), Number(loc.longitude));
+      if (dist < closest) closest = dist;
+      this.logger.log(
+        `Geo-fence: user=(${lat},${lng}) office=(${loc.latitude},${loc.longitude}) dist=${dist.toFixed(1)}m radius=${loc.radiusMeters}m → ${dist <= loc.radiusMeters ? 'IN' : 'OUT'}`,
+      );
+      return dist <= loc.radiusMeters;
+    });
+
+    return result;
   }
 
   private haversineDistance(
@@ -25,7 +34,7 @@ export class GeoFenceService {
     lat2: number,
     lng2: number,
   ): number {
-    const R = 6371000; // Earth radius in meters
+    const R = 6371000;
     const toRad = (deg: number) => (deg * Math.PI) / 180;
     const dLat = toRad(lat2 - lat1);
     const dLng = toRad(lng2 - lng1);

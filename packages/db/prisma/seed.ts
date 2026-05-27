@@ -329,14 +329,14 @@ async function main() {
   const chandniHash = await bcrypt.hash(chandniPassword, 10);
   
   let chandniRecord = await prisma.employee.findFirst({
-    where: { OR: [{ employeeCode: 'NEX-QA-001' }, { email: 'chandni.jha@nexgen.in' }, { email: 'chandni.jha@nexgenharmasolutions.com' }] }
+    where: { OR: [{ employeeCode: 'NEX-QA-001' }, { email: 'chandni.jha@nexgen.in' }, { email: 'chandni.jha@nexgenharmasolutions.com' }, { email: 'chandni.jha@nexgenpharmasolutions.com' }] }
   });
 
   if (chandniRecord) {
     await prisma.employee.update({
       where: { id: chandniRecord.id },
       data: {
-        email: 'chandni.jha@nexgenharmasolutions.com',
+        email: 'chandni.jha@nexgenpharmasolutions.com',
         passwordHash: chandniHash,
         firstName: 'Chandni',
         lastName: 'Jha',
@@ -351,7 +351,7 @@ async function main() {
     await prisma.employee.create({
       data: {
         employeeCode: 'NEX-QA-001',
-        email:        'chandni.jha@nexgenharmasolutions.com',
+        email:        'chandni.jha@nexgenpharmasolutions.com',
         passwordHash: chandniHash,
         firstName:    'Chandni',
         lastName:     'Jha',
@@ -368,7 +368,7 @@ async function main() {
   }
 
   const chandni = await prisma.employee.findUnique({
-    where: { email: 'chandni.jha@nexgenharmasolutions.com' }
+    where: { email: 'chandni.jha@nexgenpharmasolutions.com' }
   });
   if (chandni) {
     await seedLeaves(chandni.id);
@@ -380,7 +380,7 @@ async function main() {
       admin?.id,
     );
   }
-  console.log(`✓ Employee 1    →  chandni.jha@nexgenharmasolutions.com  /  ${chandniPassword}`);
+  console.log(`✓ Employee 1    →  chandni.jha@nexgenpharmasolutions.com  /  ${chandniPassword}`);
 
   // 2. Dev Patel
   const devPassword = 'Dev@NEX2026';
@@ -520,14 +520,14 @@ async function main() {
   const shifaHash = await bcrypt.hash(shifaPassword, 10);
   
   let shifaRecord = await prisma.employee.findFirst({
-    where: { OR: [{ employeeCode: 'NEX-RA-001' }, { email: 'shifa.mobh@nexgen.in' }, { email: 'shifa.mobh@nexgenharmasolutions.com' }] }
+    where: { OR: [{ employeeCode: 'NEX-RA-001' }, { email: 'shifa.mobh@nexgen.in' }, { email: 'shifa.mobh@nexgenharmasolutions.com' }, { email: 'shifa.mobh@nexgenpharmasolutions.com' }] }
   });
 
   if (shifaRecord) {
     await prisma.employee.update({
       where: { id: shifaRecord.id },
       data: {
-        email: 'shifa.mobh@nexgenharmasolutions.com',
+        email: 'shifa.mobh@nexgenpharmasolutions.com',
         passwordHash: shifaHash,
         firstName: 'Shifa',
         lastName: 'Mobh',
@@ -542,7 +542,7 @@ async function main() {
     await prisma.employee.create({
       data: {
         employeeCode: 'NEX-RA-001',
-        email:        'shifa.mobh@nexgenharmasolutions.com',
+        email:        'shifa.mobh@nexgenpharmasolutions.com',
         passwordHash: shifaHash,
         firstName:    'Shifa',
         lastName:     'Mobh',
@@ -558,7 +558,7 @@ async function main() {
   }
 
   const shifa = await prisma.employee.findUnique({
-    where: { email: 'shifa.mobh@nexgenharmasolutions.com' }
+    where: { email: 'shifa.mobh@nexgenpharmasolutions.com' }
   });
   if (shifa) {
     await seedLeaves(shifa.id);
@@ -579,7 +579,7 @@ async function main() {
       'Monthly salary, no deductions.',
     );
   }
-  console.log(`✓ Employee 4    →  shifa.mobh@nexgenharmasolutions.com   /  ${shifaPassword}`);
+  console.log(`✓ Employee 4    →  shifa.mobh@nexgenpharmasolutions.com   /  ${shifaPassword}`);
 
   // ── Office Location (Geo-fence) ──────────────────────────────────────────────
   console.log(`\n── Seeding Office Location ──────────────────────`);

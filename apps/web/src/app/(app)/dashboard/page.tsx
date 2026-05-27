@@ -78,9 +78,9 @@ export default function DashboardPage() {
   const user  = useAuthStore((s) => s.user);
   const clock = useClock();
   const [punchModal, setPunchModal] = useState<'in' | 'out' | null>(null);
-  const time  = clock ? clock.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '--:--';
+  const time  = clock ? clock.toLocaleTimeString('en-GB', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false }) : '--:--';
   const secs  = clock ? String(clock.getSeconds()).padStart(2, '0') : '00';
-  const date  = clock ? clock.toLocaleDateString('en-GB', {
+  const date  = clock ? clock.toLocaleDateString('en-GB', { timeZone: 'Asia/Kolkata',
     weekday: 'long', day: '2-digit', month: 'long', year: 'numeric',
   }).toUpperCase() : 'LOADING...';
 
@@ -165,7 +165,7 @@ export default function DashboardPage() {
     kind:  notifKind(n.type),
     title: n.title,
     meta:  n.body,
-    time:  new Date(n.createdAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
+    time:  new Date(n.createdAt).toLocaleTimeString('en-GB', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false }),
     tone:  notifTone(n.type, n.isRead),
   }));
 

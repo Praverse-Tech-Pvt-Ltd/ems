@@ -111,7 +111,7 @@ export default function ReportsPage() {
           ORG <span className="inline-block bg-brutal-yellow px-2">DASHBOARDS</span><span className="text-brutal-red">.</span>
         </h1>
         <div className="mt-3 font-display font-bold text-[11px] tracking-[0.16em] text-brutal-ink/60">
-          LIVE DATA · {new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })} IST
+          LIVE DATA · {new Date().toLocaleTimeString('en-GB', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false })} IST
         </div>
       </div>
 

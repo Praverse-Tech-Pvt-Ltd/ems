@@ -71,8 +71,8 @@ export default function AuditPage() {
     const header = 'TIMESTAMP,DATE,ACTOR,ACTION,TARGET,IP,AGENT';
     const csv = [header, ...rows.map(r => {
       const d = new Date(r.createdAt);
-      const ts = d.toLocaleTimeString('en-GB');
-      const dt = d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }).toUpperCase();
+      const ts = d.toLocaleTimeString('en-GB', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+      const dt = d.toLocaleDateString('en-GB', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short' }).toUpperCase();
       const actor = r.actor ? `${r.actor.firstName} ${r.actor.lastName}` : 'system';
       return `${ts},${dt},${actor},${r.action},${r.resourceType}/${r.resourceId},${r.ipAddress ?? '—'},${r.userAgent ?? '—'}`;
     })].join('\n');
@@ -136,8 +136,8 @@ export default function AuditPage() {
               )}
               {rows.map((r, i) => {
                 const d     = new Date(r.createdAt);
-                const ts    = d.toLocaleTimeString('en-GB');
-                const date  = d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }).toUpperCase();
+                const ts    = d.toLocaleTimeString('en-GB', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+                const date  = d.toLocaleDateString('en-GB', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short' }).toUpperCase();
                 const actor = r.actor ? `${r.actor.firstName.toLowerCase()}.${r.actor.lastName[0]?.toLowerCase()}` : 'system';
                 const tone  = actionTone(r.action);
                 const ua    = r.userAgent

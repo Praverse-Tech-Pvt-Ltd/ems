@@ -75,8 +75,18 @@ export class AttendanceService {
       if (err instanceof BadRequestException) throw err;
       this.logger.warn(`FR service unavailable for ${employeeId}: ${(err as Error).message}`);
       throw new BadRequestException(
-        'Face recognition service is offline. Please contact admin to punch in manually.',
+        'Face recognition service is offline. Please use the manual punch option.',
       );
+    }
+  }
+
+  /** Returns true if the face recognition service is currently reachable. */
+  async isFaceServiceOnline(): Promise<boolean> {
+    try {
+      await this.fr.ping();
+      return true;
+    } catch {
+      return false;
     }
   }
 
@@ -166,7 +176,19 @@ export class AttendanceService {
       throw new ConflictException('Already punched in today');
     }
 
-    await this.verifyFaceOrThrow(employeeId, dto.faceImageBase64);
+    const isManual = dto.manualPunch === true;
+
+    if (isManual) {
+      // Manual punch: location is mandatory, face image is skipped.
+      // Require non-zero coordinates so the client can't silently omit location.
+      if (!dto.latitude && !dto.longitude) {
+        throw new BadRequestException(
+          'Location is required for manual punch-in. Please enable GPS and try again.',
+        );
+      }
+    } else {
+      await this.verifyFaceOrThrow(employeeId, dto.faceImageBase64 ?? '');
+    }
 
     const isGeoValid = await this.geoFence.isWithinAnyOffice(dto.latitude, dto.longitude);
     const now        = new Date();
@@ -206,6 +228,8 @@ export class AttendanceService {
         punchInLng:  dto.longitude,
         isGeoValidIn: isGeoValid,
         frConfidenceIn: null,
+        isManualPunch: isManual,
+        manualPunchReason: dto.manualPunchReason ?? null,
         status: punchInStatus,
         deviceInfo: (dto.deviceInfo ?? {}) as any,
       },
@@ -215,6 +239,8 @@ export class AttendanceService {
         punchInLng:  dto.longitude,
         isGeoValidIn: isGeoValid,
         frConfidenceIn: null,
+        isManualPunch: isManual,
+        manualPunchReason: dto.manualPunchReason ?? null,
         status: punchInStatus,
       },
     });
@@ -313,6 +339,46 @@ export class AttendanceService {
       });
     }
 
+    // Manual punch: flag to employee and notify admins
+    if (isManual) {
+      const adminsManual = await this.prisma.employee.findMany({
+        where: { role: { in: ['ADMIN', 'SUPER_ADMIN'] }, status: 'ACTIVE' },
+        select: { id: true },
+      });
+      const empManual = await this.prisma.employee.findUnique({
+        where: { id: employeeId },
+        select: { firstName: true, lastName: true },
+      });
+      const empNameManual = empManual ? `${empManual.firstName} ${empManual.lastName}` : employeeId;
+      const locLabelManual = dto.latitude != null && dto.longitude != null
+        ? `GPS: ${Number(dto.latitude).toFixed(5)}, ${Number(dto.longitude).toFixed(5)}`
+        : 'GPS: unavailable';
+      const reasonText = dto.manualPunchReason ? ` Reason: ${dto.manualPunchReason}.` : '';
+
+      await Promise.all(adminsManual.map(admin =>
+        this.prisma.notification.create({
+          data: {
+            employeeId: admin.id,
+            type: 'GENERAL',
+            title: 'Manual Punch-In — Review Required',
+            body: `${empNameManual} used manual punch-in at ${timeStr} (face service bypassed).${reasonText} Location: ${locLabelManual}. Please verify and regularize if needed.`,
+            referenceId: record.id,
+            referenceType: 'attendance',
+          },
+        }),
+      ));
+      await this.prisma.notification.create({
+        data: {
+          employeeId,
+          type: 'GENERAL',
+          title: 'Manual Punch-In Recorded',
+          body: `Your punch-in was recorded manually at ${timeStr} using GPS location (${locLabelManual}). Admin has been notified and will review.`,
+          referenceId: record.id,
+          referenceType: 'attendance',
+        },
+      });
+    }
+
     return record;
   }
 
@@ -332,7 +398,17 @@ export class AttendanceService {
       throw new ConflictException('Already punched out today');
     }
 
-    await this.verifyFaceOrThrow(employeeId, dto.faceImageBase64);
+    const isManualOut = dto.manualPunch === true;
+
+    if (isManualOut) {
+      if (!dto.latitude && !dto.longitude) {
+        throw new BadRequestException(
+          'Location is required for manual punch-out. Please enable GPS and try again.',
+        );
+      }
+    } else {
+      await this.verifyFaceOrThrow(employeeId, dto.faceImageBase64 ?? '');
+    }
 
     const isGeoValid    = await this.geoFence.isWithinAnyOffice(dto.latitude, dto.longitude);
     const now           = new Date();
@@ -383,6 +459,8 @@ export class AttendanceService {
         frConfidenceOut: null,
         workingHours:   Math.round(workingHours * 100) / 100,
         status:         finalStatus as any,
+        // Mark as manual if punch-out is manual (preserve existing true if already set)
+        ...(isManualOut ? { isManualPunch: true, manualPunchReason: dto.manualPunchReason ?? record.manualPunchReason } : {}),
       },
     });
 
@@ -430,6 +508,46 @@ export class AttendanceService {
           type: 'GENERAL',
           title: 'Leave Recorded — Half-Day Limit Reached',
           body: `You have already used 4 half-days this month. Today has been marked as LEAVE. Please contact HR if this is incorrect.`,
+          referenceId: updated.id,
+          referenceType: 'attendance',
+        },
+      });
+    }
+
+    // Manual punch-out: flag to employee and notify admins
+    if (isManualOut) {
+      const adminsManualOut = await this.prisma.employee.findMany({
+        where: { role: { in: ['ADMIN', 'SUPER_ADMIN'] }, status: 'ACTIVE' },
+        select: { id: true },
+      });
+      const empManualOut = await this.prisma.employee.findUnique({
+        where: { id: employeeId },
+        select: { firstName: true, lastName: true },
+      });
+      const empNameManualOut = empManualOut ? `${empManualOut.firstName} ${empManualOut.lastName}` : employeeId;
+      const locLabelManualOut = dto.latitude != null && dto.longitude != null
+        ? `GPS: ${Number(dto.latitude).toFixed(5)}, ${Number(dto.longitude).toFixed(5)}`
+        : 'GPS: unavailable';
+      const reasonTextOut = dto.manualPunchReason ? ` Reason: ${dto.manualPunchReason}.` : '';
+
+      await Promise.all(adminsManualOut.map(admin =>
+        this.prisma.notification.create({
+          data: {
+            employeeId: admin.id,
+            type: 'GENERAL',
+            title: 'Manual Punch-Out — Review Required',
+            body: `${empNameManualOut} used manual punch-out at ${timeStr} (face service bypassed).${reasonTextOut} Location: ${locLabelManualOut}. Please verify if needed.`,
+            referenceId: updated.id,
+            referenceType: 'attendance',
+          },
+        }),
+      ));
+      await this.prisma.notification.create({
+        data: {
+          employeeId,
+          type: 'GENERAL',
+          title: 'Manual Punch-Out Recorded',
+          body: `Your punch-out was recorded manually at ${timeStr} using GPS location (${locLabelManualOut}). Admin has been notified.`,
           referenceId: updated.id,
           referenceType: 'attendance',
         },
@@ -601,7 +719,7 @@ export class AttendanceService {
       ? Math.round((attendedDays / totalWorkingDays) * 100)
       : 0;
 
-    const monthName = today.toLocaleString('en-GB', { month: 'long', year: 'numeric' }).toUpperCase();
+    const monthName = today.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', month: 'long', year: 'numeric' }).toUpperCase();
     return {
       month: monthName,
       totalWorkingDays,
