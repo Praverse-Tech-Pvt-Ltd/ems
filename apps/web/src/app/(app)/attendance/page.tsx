@@ -219,6 +219,7 @@ export default function AttendancePage() {
   const clock = useClock();
   const [showModal, setShowModal] = useState(false);
   const [punchType, setPunchType] = useState<'in' | 'out'>('in');
+  const [manualPunch, setManualPunch] = useState(false);
 
   const now = new Date();
   const [calMonth, setCalMonth] = useState({ year: now.getFullYear(), month: now.getMonth() });
@@ -351,12 +352,25 @@ export default function AttendancePage() {
                 ✓ SHIFT COMPLETE
               </div>
             ) : !todayRecord?.punchInTime ? (
-              <button onClick={() => { setPunchType('in'); setShowModal(true); }} className="brutal-btn-primary px-6 py-4 text-[13px] flex items-center gap-2">
+              <button onClick={() => { setManualPunch(false); setPunchType('in'); setShowModal(true); }} className="brutal-btn-primary px-6 py-4 text-[13px] flex items-center gap-2">
                 <Camera size={18} /> PUNCH IN <ArrowRight size={16} />
               </button>
             ) : (
-              <button onClick={() => { setPunchType('out'); setShowModal(true); }} className="brutal-btn-primary px-6 py-4 text-[13px] flex items-center gap-2 bg-brutal-red text-white border-brutal-red">
+              <button onClick={() => { setManualPunch(false); setPunchType('out'); setShowModal(true); }} className="brutal-btn-primary px-6 py-4 text-[13px] flex items-center gap-2 bg-brutal-red text-white border-brutal-red">
                 <Camera size={18} /> PUNCH OUT <ArrowRight size={16} />
+              </button>
+            )}
+            {/* Manual punch — bypass face recognition */}
+            {me?.faceEnrolled && !todayRecord?.punchOutTime && (
+              <button
+                onClick={() => {
+                  setManualPunch(true);
+                  setPunchType(todayRecord?.punchInTime ? 'out' : 'in');
+                  setShowModal(true);
+                }}
+                className="px-5 py-4 border-[3px] border-brutal-ink font-display font-bold text-[13px] tracking-[0.1em] flex items-center gap-2 hover:bg-brutal-surface transition-colors"
+              >
+                <MapPin size={16} /> MANUAL PUNCH
               </button>
             )}
             {todayRecord?.punchInTime && (
@@ -554,7 +568,13 @@ export default function AttendancePage() {
         </div>
       </div>
 
-      {showModal && <PunchModal onClose={() => setShowModal(false)} punchType={punchType} />}
+      {showModal && (
+        <PunchModal
+          punchType={punchType}
+          startManual={manualPunch}
+          onClose={() => { setShowModal(false); setManualPunch(false); }}
+        />
+      )}
     </div>
   );
 }

@@ -78,6 +78,7 @@ export default function DashboardPage() {
   const user  = useAuthStore((s) => s.user);
   const clock = useClock();
   const [punchModal, setPunchModal] = useState<'in' | 'out' | null>(null);
+  const [punchManual, setPunchManual] = useState(false);
   const time  = clock ? clock.toLocaleTimeString('en-GB', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false }) : '--:--';
   const secs  = clock ? String(clock.getSeconds()).padStart(2, '0') : '00';
   const date  = clock ? clock.toLocaleDateString('en-GB', { timeZone: 'Asia/Kolkata',
@@ -269,17 +270,29 @@ export default function DashboardPage() {
               </div>
             ) : todayRecord?.punchInTime ? (
               <button
-                onClick={() => setPunchModal('out')}
+                onClick={() => { setPunchManual(false); setPunchModal('out'); }}
                 className="brutal-btn-primary px-6 py-4 text-[13px] flex items-center gap-2 bg-brutal-red text-white border-brutal-red"
               >
                 <Camera size={18} /> PUNCH OUT <ArrowRight size={14} />
               </button>
             ) : (
               <button
-                onClick={() => setPunchModal('in')}
+                onClick={() => { setPunchManual(false); setPunchModal('in'); }}
                 className="brutal-btn-primary px-6 py-4 text-[13px] flex items-center gap-2"
               >
                 <Camera size={18} /> PUNCH IN <ArrowRight size={14} />
+              </button>
+            )}
+            {/* Manual punch — always visible when face enrolled and shift not complete */}
+            {me?.faceEnrolled && !todayRecord?.punchOutTime && (
+              <button
+                onClick={() => {
+                  setPunchManual(true);
+                  setPunchModal(todayRecord?.punchInTime ? 'out' : 'in');
+                }}
+                className="px-5 py-4 border-[3px] border-brutal-ink font-display font-bold text-[13px] tracking-[0.1em] flex items-center gap-2 hover:bg-brutal-surface transition-colors"
+              >
+                <MapPin size={16} /> MANUAL PUNCH
               </button>
             )}
             {todayRecord?.punchInTime && (
@@ -642,7 +655,8 @@ export default function DashboardPage() {
     {punchModal && (
       <PunchModal
         punchType={punchModal}
-        onClose={() => setPunchModal(null)}
+        startManual={punchManual}
+        onClose={() => { setPunchModal(null); setPunchManual(false); }}
       />
     )}
     </>

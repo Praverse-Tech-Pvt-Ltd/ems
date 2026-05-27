@@ -36,9 +36,11 @@ function useGeolocation() {
 export function PunchModal({
   onClose,
   punchType = 'in',
+  startManual = false,
 }: {
   onClose: () => void;
   punchType: 'in' | 'out';
+  startManual?: boolean;
 }) {
   const qc = useQueryClient();
   const [phase, setPhase] = useState<Phase>('checking');
@@ -61,6 +63,12 @@ export function PunchModal({
     let active = true;
 
     async function init() {
+      // Skip health check if user explicitly requested manual punch
+      if (startManual) {
+        if (active) setPhase('manual-ready');
+        return;
+      }
+
       // 1. Check face service
       let faceOnline = false;
       try {
@@ -103,7 +111,7 @@ export function PunchModal({
       active = false;
       streamRef.current?.getTracks().forEach(t => t.stop());
     };
-  }, []);
+  }, [startManual]);
 
   // ── Face verification path ─────────────────────────────────────────────────
   const captureFrame = useCallback((): string | null => {
@@ -187,7 +195,7 @@ export function PunchModal({
       const endpoint = punchType === 'in' ? '/attendance/punch-in' : '/attendance/punch-out';
       await apiClient.post(endpoint, {
         manualPunch: true,
-        manualPunchReason: 'Face recognition service unavailable',
+        manualPunchReason: startManual ? 'Manual punch — user initiated' : 'Face recognition service unavailable',
         latitude: coords.latitude,
         longitude: coords.longitude,
       });
@@ -260,7 +268,7 @@ export function PunchModal({
             {phase === 'success'           && (isManualPhase(phase) ? 'Location verified. Admin notified.' : `Welcome. Confidence ${confidence}%. Have a good shift.`)}
             {phase === 'error'             && errorMsg}
             {phase === 'no-camera'         && 'Camera permission denied or no camera found.'}
-            {phase === 'manual-ready'      && 'Face service unavailable. Use GPS location to punch in manually.'}
+            {phase === 'manual-ready'      && (startManual ? 'GPS location will be captured for verification. Admin will be notified.' : 'Face service unavailable. Use GPS location to punch in manually.')}
             {phase === 'manual-locating'   && 'Acquiring your GPS location…'}
             {phase === 'manual-confirm'    && coords && `Location acquired: ${coords.latitude.toFixed(5)}, ${coords.longitude.toFixed(5)}`}
             {phase === 'manual-submitting' && 'Submitting manual punch…'}
