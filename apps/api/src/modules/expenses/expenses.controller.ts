@@ -8,6 +8,7 @@ import {
   ParseUUIDPipe,
   Query,
   UseGuards,
+  ForbiddenException,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { ExpensesService } from './expenses.service';
@@ -40,8 +41,15 @@ export class ExpensesController {
 
   @Get()
   @Roles('ADMIN', 'SUPER_ADMIN', 'MANAGER')
-  findAll(@Query('status') status?: string) {
-    return this.service.findAll(status);
+  findAll(
+    @CurrentUser() user: { id: string; email: string },
+    @Query('status') status?: string,
+    @Query('employeeId') employeeId?: string,
+  ) {
+    if (employeeId && user.id !== employeeId && user.email !== 'pratham.s@nexgenpharmasolutions.com' && user.email !== 'ashwani@nexgenpharmasolutions.com') {
+      throw new ForbiddenException('Access denied');
+    }
+    return this.service.findAll(status, employeeId);
   }
 
   /** Ownership-checked: employees can only see their own expense. */

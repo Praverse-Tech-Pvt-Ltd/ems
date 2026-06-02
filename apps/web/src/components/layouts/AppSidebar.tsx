@@ -43,6 +43,7 @@ const SECTIONS = [
     roles: ['SUPER_ADMIN', 'ADMIN'] as Role[],
     items: [
       { href: '/audit', icon: ShieldCheck, label: 'Audit Log', num: '11', roles: ['SUPER_ADMIN', 'ADMIN'] as Role[] },
+      { href: '/scheduling', icon: Calendar, label: 'Client Scheduling', num: '12', roles: ['SUPER_ADMIN', 'ADMIN'] as Role[] },
     ],
   },
 ];

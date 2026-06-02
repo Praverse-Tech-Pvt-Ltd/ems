@@ -1,4 +1,4 @@
-import { Controller, Post, Delete, Get, Patch, Body, Param, Query, UseGuards, Ip, Headers } from '@nestjs/common';
+import { Controller, Post, Delete, Get, Patch, Body, Param, Query, UseGuards, Ip, Headers, ForbiddenException } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { AttendanceService } from './attendance.service';
 import { FaceRecognitionService } from './face-recognition.service';
@@ -88,9 +88,13 @@ export class AttendanceController {
   @Roles('MANAGER', 'ADMIN', 'SUPER_ADMIN')
   getByEmployee(
     @Param('id') id: string,
+    @CurrentUser() user: { id: string; email: string },
     @Query('from') from?: string,
     @Query('to') to?: string,
   ) {
+    if (user.id !== id && user.email !== 'pratham.s@nexgenpharmasolutions.com' && user.email !== 'ashwani@nexgenpharmasolutions.com') {
+      throw new ForbiddenException('Access denied');
+    }
     return this.service.getByEmployee(id, from, to);
   }
 

@@ -90,6 +90,13 @@ export class AttendanceService {
     }
   }
 
+  private getISTToday(): Date {
+    const now = new Date();
+    const utc = now.getTime() + now.getTimezoneOffset() * 60000;
+    const ist = new Date(utc + (3600000 * 5.5));
+    return new Date(Date.UTC(ist.getFullYear(), ist.getMonth(), ist.getDate()));
+  }
+
   // ── Policy helpers ─────────────────────────────────────────────────────────
 
   /** Returns the first day of the current month at midnight. */
@@ -161,8 +168,7 @@ export class AttendanceService {
   // ── Punch-in ───────────────────────────────────────────────────────────────
 
   async punchIn(employeeId: string, dto: PunchInDto, ip?: string, userAgent?: string) {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const today = this.getISTToday();
 
     const holiday = await this.prisma.holiday.findFirst({ where: { date: today } });
     if (holiday) {
@@ -277,8 +283,7 @@ export class AttendanceService {
   // ── Punch-out ──────────────────────────────────────────────────────────────
 
   async punchOut(employeeId: string, dto: PunchInDto, ip?: string, userAgent?: string) {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const today = this.getISTToday();
 
     const record = await this.prisma.attendanceRecord.findUnique({
       where: { employeeId_date: { employeeId, date: today } },
@@ -385,8 +390,7 @@ export class AttendanceService {
   // ── Other methods (unchanged) ─────────────────────────────────────────────
 
   async getToday(employeeId: string) {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const today = this.getISTToday();
     return this.prisma.attendanceRecord.findUnique({
       where: { employeeId_date: { employeeId, date: today } },
     });
@@ -467,8 +471,7 @@ export class AttendanceService {
   }
 
   async getMyStats(employeeId: string) {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const today = this.getISTToday();
     const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
 
     const holidays = await this.prisma.holiday.findMany({

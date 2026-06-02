@@ -112,12 +112,7 @@ export class AuditController implements OnModuleInit {
       MAX_PAGE_SIZE,
     );
 
-    const where: Record<string, any> = {
-      actor: {
-        role: {
-          not: 'SUPER_ADMIN',
-        },
-      },
+     const where: Record<string, any> = {
       resourceType: {
         notIn: ['ChatController', 'ChatMessage', 'chat_messages', 'chat_channel', 'ChatChannel'],
       },

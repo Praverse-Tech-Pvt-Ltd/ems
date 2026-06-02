@@ -599,10 +599,10 @@ export default function DashboardPage() {
                 </div>
                 <div className="mt-3 font-display font-bold text-[18px] leading-tight tracking-tight">
                   {expiringLeaves} LEAVE DAY{expiringLeaves !== 1 ? 'S' : ''} EXPIRE ON{' '}
-                  <span className="bg-brutal-yellow text-brutal-ink px-1.5">30 JUN</span>.
+                  <span className="bg-brutal-yellow text-brutal-ink px-1.5">31 MAR</span>.
                 </div>
                 <p className="mt-3 font-display font-bold text-[10px] tracking-[0.12em] text-white/90 uppercase">
-                  Schedule a break before Q2 close, or forfeit balance per policy.
+                  Schedule a break before financial year close, or forfeit balance per policy.
                 </p>
                 <div className="mt-4">
                   <Link

@@ -78,25 +78,69 @@ function AttendanceCalendar({
   records,
   holidays,
   leaves,
+  settings = [],
+  userEmail,
 }: {
   year: number;
   month: number; // 0-indexed
   records: AttendanceRecord[];
   holidays: Holiday[];
   leaves: LeaveRequest[];
+  settings?: any[];
+  userEmail?: string;
 }) {
+  // Helper to parse days string (e.g. "10,11", "5,16", "2,4,8,12,15-20")
+  function parseDays(daysStr: string): number[] {
+    const result: number[] = [];
+    if (!daysStr) return result;
+    const parts = daysStr.split(',');
+    for (const part of parts) {
+      const trimmed = part.trim();
+      if (!trimmed) continue;
+      if (trimmed.includes('-')) {
+        const [startStr = '', endStr = ''] = trimmed.split('-');
+        const start = parseInt(startStr, 10);
+        const end = parseInt(endStr, 10);
+        if (!isNaN(start) && !isNaN(end)) {
+          for (let i = Math.min(start, end); i <= Math.max(start, end); i++) {
+            result.push(i);
+          }
+        }
+      } else {
+        const parsed = parseInt(trimmed, 10);
+        if (!isNaN(parsed)) {
+          result.push(parsed);
+        }
+      }
+    }
+    return result;
+  }
+
+  const monthlyKey = `client_scheduling_matrix_${year}_${month}`;
+  const clientSetting = settings.find(s => s.key === monthlyKey) || settings.find(s => s.key === 'client_scheduling_matrix');
+  const clientSchedules = clientSetting?.value?.cells || [];
+  const mySchedules = clientSchedules.filter(
+    (c: any) => c.memberEmail && userEmail && c.memberEmail.toLowerCase() === userEmail.toLowerCase()
+  );
   const today = new Date();
   today.setHours(0, 0, 0, 0);
+
+  function fmtLocalYMD(d: Date): string {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
 
   // Build lookup maps
   const recordsByDate: Record<string, AttendanceRecord> = {};
   for (const r of records) {
-    const key = new Date(r.date).toISOString().split('T')[0] ?? '';
+    const key = typeof r.date === 'string' ? r.date.split('T')[0] : new Date(r.date).toISOString().split('T')[0];
     if (key) recordsByDate[key] = r;
   }
 
   const holidayDates = new Set<string>(
-    holidays.map(h => new Date(h.date).toISOString().split('T')[0] ?? '').filter(Boolean)
+    holidays.map(h => typeof h.date === 'string' ? h.date.split('T')[0] : new Date(h.date).toISOString().split('T')[0]).filter((val): val is string => !!val)
   );
 
   const leaveDates = new Set<string>();
@@ -106,13 +150,13 @@ function AttendanceCalendar({
     const to   = new Date(l.toDate);
     const cur  = new Date(from);
     while (cur <= to) {
-      leaveDates.add(cur.toISOString().split('T')[0] ?? '');
+      leaveDates.add(fmtLocalYMD(cur));
       cur.setDate(cur.getDate() + 1);
     }
   }
 
   function classifyDay(date: Date): DayStatus {
-    const isoKey = date.toISOString().split('T')[0] ?? '';
+    const isoKey = fmtLocalYMD(date);
     const dow    = date.getDay(); // 0=Sun, 6=Sat
     if (dow === 0 || dow === 6)   return 'WEEKEND';
     if (date > today)           return 'FUTURE';
@@ -160,10 +204,15 @@ function AttendanceCalendar({
             }
             const status  = classifyDay(cell.date);
             const info    = getDayInfo(status);
-            const isoKey  = cell.date.toISOString().split('T')[0] ?? '';
+            const isoKey  = fmtLocalYMD(cell.date);
             const rec     = recordsByDate[isoKey];
             const isToday = cell.date.getTime() === today.getTime();
-            const holName = holidays.find(h => new Date(h.date).toISOString().split('T')[0] === isoKey)?.title;
+            const holName = holidays.find(h => (typeof h.date === 'string' ? h.date.split('T')[0] : new Date(h.date).toISOString().split('T')[0]) === isoKey)?.title;
+
+            // Find scheduled companies for this day
+            const scheduledCompanies = mySchedules
+              .filter((s: any) => parseDays(s.days).includes(cell.day))
+              .map((s: any) => s.company);
 
             return (
               <div
@@ -194,16 +243,28 @@ function AttendanceCalendar({
                   </div>
                 )}
 
-                {/* Punch times */}
-                {rec?.punchInTime && (
-                  <div className={`font-mono text-[7px] leading-tight ${info.text} opacity-80 mt-auto`}>
-                    <span>▶ {fmtTime(rec.punchInTime)}</span>
-                    {rec.punchOutTime
-                      ? <><br /><span>■ {fmtTime(rec.punchOutTime)}</span></>
-                      : <><br /><span className="opacity-50">■ —</span></>
-                    }
-                  </div>
-                )}
+                {/* Punch times + Client Schedules */}
+                <div className="mt-auto flex flex-col gap-1">
+                  {rec?.punchInTime && (
+                    <div className={`font-mono text-[7px] leading-tight ${info.text} opacity-80`}>
+                      <span>▶ {fmtTime(rec.punchInTime)}</span>
+                      {rec.punchOutTime
+                        ? <><br /><span>■ {fmtTime(rec.punchOutTime)}</span></>
+                        : <><br /><span className="opacity-50">■ —</span></>
+                      }
+                    </div>
+                  )}
+
+                  {scheduledCompanies.map((co: string) => (
+                    <div
+                      key={co}
+                      className="bg-brutal-blue text-white font-display font-bold text-[7.5px] leading-[1.1] px-1 py-0.5 border border-brutal-ink truncate max-w-full"
+                      title={`Audit: ${co}`}
+                    >
+                      🏢 {co}
+                    </div>
+                  ))}
+                </div>
               </div>
             );
           })}
@@ -231,9 +292,15 @@ export default function AttendancePage() {
       }).toUpperCase()
     : 'LOADING...';
 
-  const { data: me } = useQuery<{ faceEnrolled: boolean }>({
-    queryKey: ['me-face'],
+  const { data: me } = useQuery<{ faceEnrolled: boolean; email: string }>({
+    queryKey: ['me-profile'],
     queryFn: () => apiClient.get('/employees/me').then(r => r.data).catch(() => null),
+  });
+
+  const { data: settings = [] } = useQuery<any[]>({
+    queryKey: ['corporate-settings'],
+    queryFn: () => apiClient.get('/corporate/settings').then(r => r.data).catch(() => []),
+    staleTime: 300_000,
   });
 
   const { data: todayRecord } = useQuery<AttendanceRecord | null>({
@@ -545,6 +612,8 @@ export default function AttendancePage() {
           records={allRecords}
           holidays={holidays}
           leaves={myLeaves}
+          settings={settings}
+          userEmail={me?.email}
         />
 
         {/* Legend */}

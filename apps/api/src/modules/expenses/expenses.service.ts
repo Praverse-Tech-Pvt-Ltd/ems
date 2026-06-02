@@ -38,11 +38,17 @@ export class ExpensesService {
     });
   }
 
-  async findAll(status?: string) {
+  async findAll(status?: string, employeeId?: string) {
     if (status && !VALID_EXPENSE_STATUSES.has(status)) {
       throw new BadRequestException(`Invalid status value: ${status}`);
     }
-    const where = status ? { status: status as ExpenseStatus } : {};
+    const where: any = {};
+    if (status) {
+      where.status = status as ExpenseStatus;
+    }
+    if (employeeId) {
+      where.employeeId = employeeId;
+    }
     return this.prisma.expense.findMany({
       where,
       include: {
