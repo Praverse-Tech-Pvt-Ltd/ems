@@ -26,6 +26,7 @@ apiClient.interceptors.request.use((config) => {
 
 /** Tracks an in-flight refresh so concurrent 401s only fire one request. */
 let refreshPromise: Promise<string> | null = null;
+let isRedirecting = false;
 
 apiClient.interceptors.response.use(
   (res) => res,
@@ -35,6 +36,9 @@ apiClient.interceptors.response.use(
     const config = axiosError.config as import('axios').InternalAxiosRequestConfig & { _retry?: boolean };
 
     if (status === 401 && !config._retry && typeof window !== 'undefined') {
+      if (isRedirecting) {
+        return Promise.reject(error);
+      }
       config._retry = true;
 
       try {
@@ -56,7 +60,8 @@ apiClient.interceptors.response.use(
         useAuthStore.getState().setAccessToken(newAccessToken);
         config.headers.Authorization = `Bearer ${newAccessToken}`;
         return apiClient(config);
-      } catch {
+      } catch (err) {
+        isRedirecting = true;
         useAuthStore.getState().clearAuth();
         window.location.href = '/login';
       }

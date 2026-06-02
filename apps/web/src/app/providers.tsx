@@ -8,7 +8,16 @@ export function Providers({ children }: { children: React.ReactNode }) {
     () =>
       new QueryClient({
         defaultOptions: {
-          queries: { staleTime: 30 * 1000, retry: 1 },
+          queries: {
+            staleTime: 30 * 1000,
+            retry: (failureCount, error: any) => {
+              const status = error?.response?.status;
+              if (status === 401 || status === 403 || status === 429) {
+                return false;
+              }
+              return failureCount < 1;
+            },
+          },
         },
       }),
   );
