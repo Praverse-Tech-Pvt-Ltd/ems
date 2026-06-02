@@ -257,34 +257,27 @@ export default function DashboardPage() {
               <div className="px-6 py-4 brutal-border bg-brutal-surface font-display font-bold text-[13px] opacity-50">
                 LOADING…
               </div>
-            ) : !me?.faceEnrolled ? (
-              <Link
-                href="/attendance/biometric"
-                className="brutal-btn-primary px-6 py-4 text-[13px] flex items-center gap-2 bg-brutal-yellow text-brutal-ink border-brutal-ink"
-              >
-                <UserCheck size={18} /> ENROLL FACE FIRST <ArrowRight size={14} />
-              </Link>
             ) : todayRecord?.punchOutTime ? (
               <div className="px-4 py-3 bg-[#0F8F3A] text-white font-display font-bold text-[11px] tracking-[0.18em] border-2 border-[#0F8F3A]">
                 ✓ SHIFT COMPLETE
               </div>
             ) : todayRecord?.punchInTime ? (
               <button
-                onClick={() => { setPunchManual(false); setPunchModal('out'); }}
+                onClick={() => { setPunchManual(!me?.faceEnrolled); setPunchModal('out'); }}
                 className="brutal-btn-primary px-6 py-4 text-[13px] flex items-center gap-2 bg-brutal-red text-white border-brutal-red"
               >
                 <Camera size={18} /> PUNCH OUT <ArrowRight size={14} />
               </button>
             ) : (
               <button
-                onClick={() => { setPunchManual(false); setPunchModal('in'); }}
+                onClick={() => { setPunchManual(!me?.faceEnrolled); setPunchModal('in'); }}
                 className="brutal-btn-primary px-6 py-4 text-[13px] flex items-center gap-2"
               >
                 <Camera size={18} /> PUNCH IN <ArrowRight size={14} />
               </button>
             )}
-            {/* Manual punch — always visible when face enrolled and shift not complete */}
-            {me?.faceEnrolled && !todayRecord?.punchOutTime && (
+            {/* Manual punch — always visible when shift not complete */}
+            {!todayRecord?.punchOutTime && (
               <button
                 onClick={() => {
                   setPunchManual(true);

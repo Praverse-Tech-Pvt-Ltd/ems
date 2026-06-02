@@ -1,12 +1,12 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '@/store/auth.store';
 import { apiClient } from '@/lib/api-client';
 import { initials } from '@/lib/utils';
 import type { Employee } from '@/types';
-import { Search, Plus } from 'lucide-react';
+import { Search, Plus, X, Copy, Check } from 'lucide-react';
 import Link from 'next/link';
 
 const TONE_CYCLE = ['blue', null, null, 'yellow', null, null, 'red'] as const;
@@ -15,11 +15,63 @@ export default function EmployeesPage() {
   const [q, setQ] = useState('');
   const me = useAuthStore(s => s.user);
   const isAdmin = me?.role === 'ADMIN' || me?.role === 'SUPER_ADMIN';
+  const queryClient = useQueryClient();
+
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [successData, setSuccessData] = useState<{ employee: Employee; tempPassword?: string } | null>(null);
+  const [errorMsg, setErrorMsg] = useState('');
+  const [form, setForm] = useState({
+    email: '',
+    firstName: '',
+    lastName: '',
+    joiningDate: new Date().toISOString().split('T')[0],
+    phone: '',
+    departmentId: '',
+    designation: '',
+    role: 'EMPLOYEE',
+    managerId: '',
+    salaryGrade: '',
+  });
 
   const { data: employees = [], isLoading } = useQuery<Employee[]>({
     queryKey: ['employees'],
     queryFn: () => apiClient.get('/employees').then(r => r.data).catch(() => []),
   });
+
+  const { data: departments = [] } = useQuery<{ id: string; name: string }[]>({
+    queryKey: ['departments'],
+    queryFn: () => apiClient.get('/employees/departments').then(r => r.data).catch(() => []),
+  });
+
+  const createEmployee = useMutation({
+    mutationFn: (data: any) => apiClient.post('/employees', data).then(r => r.data),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ['employees'] });
+      setSuccessData(res);
+      setForm({
+        email: '',
+        firstName: '',
+        lastName: '',
+        joiningDate: new Date().toISOString().split('T')[0],
+        phone: '',
+        departmentId: '',
+        designation: '',
+        role: 'EMPLOYEE',
+        managerId: '',
+        salaryGrade: '',
+      });
+      setErrorMsg('');
+    },
+    onError: (err: any) => {
+      const msg = err?.response?.data?.message || 'Failed to create employee';
+      setErrorMsg(Array.isArray(msg) ? msg.join(', ') : msg);
+    },
+  });
+
+  const managers = useMemo(() => {
+    return employees.filter(e => e.role === 'MANAGER' || e.role === 'ADMIN' || e.role === 'SUPER_ADMIN');
+  }, [employees]);
 
   const depts = useMemo(() => {
     const map = new Map<string, number>();
@@ -60,7 +112,7 @@ export default function EmployeesPage() {
             />
           </div>
           {isAdmin && (
-            <button className="brutal-btn-primary px-5 py-3 text-[13px] flex items-center gap-2">
+            <button onClick={() => setShowAddModal(true)} className="brutal-btn-primary px-5 py-3 text-[13px] flex items-center gap-2">
               <Plus size={15} /> ADD EMPLOYEE
             </button>
           )}
@@ -145,6 +197,238 @@ export default function EmployeesPage() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Add Employee Modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-brutal-ink/40 backdrop-blur-sm animate-fade-in">
+          <div className="relative w-full max-w-lg bg-brutal-cream brutal-border brutal-shadow-lg p-6 max-h-[90vh] overflow-y-auto">
+            <button
+              onClick={() => {
+                setShowAddModal(false);
+                setSuccessData(null);
+                setErrorMsg('');
+              }}
+              className="absolute top-4 right-4 p-1 brutal-border bg-brutal-surface hover:bg-brutal-red hover:text-white transition-colors"
+            >
+              <X size={16} />
+            </button>
+
+            {successData ? (
+              <div className="space-y-4 py-4 text-center">
+                <div className="w-12 h-12 bg-brutal-yellow brutal-border flex items-center justify-center mx-auto">
+                  <Check size={24} className="text-brutal-ink" />
+                </div>
+                <h3 className="font-display font-bold text-xl uppercase">Employee Onboarded Successfully!</h3>
+                <p className="font-display text-xs text-brutal-ink/70">
+                  The account has been created. Provide the following temporary password to the employee to log in.
+                </p>
+
+                <div className="p-4 brutal-border bg-brutal-surface font-mono font-bold text-lg flex items-center justify-between gap-4 mt-2">
+                  <span className="select-all">{successData.tempPassword}</span>
+                  <button
+                    onClick={() => {
+                      if (successData.tempPassword) {
+                        navigator.clipboard.writeText(successData.tempPassword);
+                        setCopied(true);
+                        setTimeout(() => setCopied(false), 2000);
+                      }
+                    }}
+                    className="p-2 brutal-border bg-brutal-yellow hover:bg-white text-xs font-display uppercase font-bold flex items-center gap-1.5 shrink-0"
+                  >
+                    <Copy size={14} /> {copied ? 'COPIED' : 'COPY'}
+                  </button>
+                </div>
+
+                <div className="pt-4">
+                  <button
+                    onClick={() => {
+                      setShowAddModal(false);
+                      setSuccessData(null);
+                    }}
+                    className="brutal-btn-primary px-6 py-2.5 text-xs w-full"
+                  >
+                    CLOSE
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  // Clean payloads for database insertion
+                  const payload = {
+                    ...form,
+                    departmentId: form.departmentId || undefined,
+                    managerId: form.managerId || undefined,
+                    phone: form.phone || undefined,
+                    salaryGrade: form.salaryGrade || undefined,
+                    designation: form.designation || undefined,
+                  };
+                  createEmployee.mutate(payload);
+                }}
+                className="space-y-4"
+              >
+                <div>
+                  <h2 className="font-display font-bold text-xl uppercase">Add New Employee</h2>
+                  <p className="font-display font-bold text-[10px] tracking-wider text-brutal-ink/50 mt-1 uppercase">
+                    Provide basic information to create employee file
+                  </p>
+                </div>
+
+                {errorMsg && (
+                  <div className="p-3 brutal-border bg-brutal-red text-white text-xs font-display font-bold uppercase">
+                    {errorMsg}
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="block col-span-2">
+                    <span className="font-display font-bold text-[10px] uppercase tracking-wider text-brutal-ink/70">Email Address *</span>
+                    <input
+                      type="email"
+                      required
+                      value={form.email}
+                      onChange={e => setForm({ ...form, email: e.target.value })}
+                      placeholder="employee@nexgen.in"
+                      className="mt-1 w-full brutal-border bg-brutal-surface px-3 py-2 font-display font-bold text-xs focus:outline-none"
+                    />
+                  </label>
+
+                  <label className="block">
+                    <span className="font-display font-bold text-[10px] uppercase tracking-wider text-brutal-ink/70">First Name *</span>
+                    <input
+                      type="text"
+                      required
+                      value={form.firstName}
+                      onChange={e => setForm({ ...form, firstName: e.target.value })}
+                      placeholder="Jane"
+                      className="mt-1 w-full brutal-border bg-brutal-surface px-3 py-2 font-display font-bold text-xs focus:outline-none"
+                    />
+                  </label>
+
+                  <label className="block">
+                    <span className="font-display font-bold text-[10px] uppercase tracking-wider text-brutal-ink/70">Last Name *</span>
+                    <input
+                      type="text"
+                      required
+                      value={form.lastName}
+                      onChange={e => setForm({ ...form, lastName: e.target.value })}
+                      placeholder="Doe"
+                      className="mt-1 w-full brutal-border bg-brutal-surface px-3 py-2 font-display font-bold text-xs focus:outline-none"
+                    />
+                  </label>
+
+                  <label className="block">
+                    <span className="font-display font-bold text-[10px] uppercase tracking-wider text-brutal-ink/70">Phone</span>
+                    <input
+                      type="text"
+                      value={form.phone}
+                      onChange={e => setForm({ ...form, phone: e.target.value })}
+                      placeholder="+919876543210"
+                      className="mt-1 w-full brutal-border bg-brutal-surface px-3 py-2 font-display font-bold text-xs focus:outline-none"
+                    />
+                  </label>
+
+                  <label className="block">
+                    <span className="font-display font-bold text-[10px] uppercase tracking-wider text-brutal-ink/70">Joining Date *</span>
+                    <input
+                      type="date"
+                      required
+                      value={form.joiningDate}
+                      onChange={e => setForm({ ...form, joiningDate: e.target.value })}
+                      className="mt-1 w-full brutal-border bg-brutal-surface px-3 py-2 font-display font-bold text-xs focus:outline-none"
+                    />
+                  </label>
+
+                  <label className="block">
+                    <span className="font-display font-bold text-[10px] uppercase tracking-wider text-brutal-ink/70">Department</span>
+                    <select
+                      value={form.departmentId}
+                      onChange={e => setForm({ ...form, departmentId: e.target.value })}
+                      className="mt-1 w-full brutal-border bg-brutal-surface px-3 py-2 font-display font-bold text-xs focus:outline-none"
+                    >
+                      <option value="">Select Department</option>
+                      {departments.map(d => (
+                        <option key={d.id} value={d.id}>{d.name}</option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className="block">
+                    <span className="font-display font-bold text-[10px] uppercase tracking-wider text-brutal-ink/70">Designation</span>
+                    <input
+                      type="text"
+                      value={form.designation}
+                      onChange={e => setForm({ ...form, designation: e.target.value })}
+                      placeholder="Software Engineer"
+                      className="mt-1 w-full brutal-border bg-brutal-surface px-3 py-2 font-display font-bold text-xs focus:outline-none"
+                    />
+                  </label>
+
+                  <label className="block">
+                    <span className="font-display font-bold text-[10px] uppercase tracking-wider text-brutal-ink/70">Role</span>
+                    <select
+                      value={form.role}
+                      onChange={e => setForm({ ...form, role: e.target.value })}
+                      className="mt-1 w-full brutal-border bg-brutal-surface px-3 py-2 font-display font-bold text-xs focus:outline-none"
+                    >
+                      <option value="EMPLOYEE">EMPLOYEE</option>
+                      <option value="MANAGER">MANAGER</option>
+                      <option value="ADMIN">ADMIN</option>
+                      <option value="SUPER_ADMIN">SUPER ADMIN</option>
+                    </select>
+                  </label>
+
+                  <label className="block">
+                    <span className="font-display font-bold text-[10px] uppercase tracking-wider text-brutal-ink/70">Manager</span>
+                    <select
+                      value={form.managerId}
+                      onChange={e => setForm({ ...form, managerId: e.target.value })}
+                      className="mt-1 w-full brutal-border bg-brutal-surface px-3 py-2 font-display font-bold text-xs focus:outline-none"
+                    >
+                      <option value="">Select Manager</option>
+                      {managers.map(m => (
+                        <option key={m.id} value={m.id}>{m.firstName} {m.lastName}</option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className="block col-span-2">
+                    <span className="font-display font-bold text-[10px] uppercase tracking-wider text-brutal-ink/70">Salary Grade</span>
+                    <input
+                      type="text"
+                      value={form.salaryGrade}
+                      onChange={e => setForm({ ...form, salaryGrade: e.target.value })}
+                      placeholder="e.g. INTERN, PERMANENT"
+                      className="mt-1 w-full brutal-border bg-brutal-surface px-3 py-2 font-display font-bold text-xs focus:outline-none"
+                    />
+                  </label>
+                </div>
+
+                <div className="pt-2 flex gap-3">
+                  <button
+                    type="submit"
+                    disabled={createEmployee.isPending}
+                    className="brutal-btn-primary px-6 py-3 text-xs flex-1 flex items-center justify-center gap-2"
+                  >
+                    {createEmployee.isPending ? 'ONBOARDING…' : 'ONBOARD EMPLOYEE'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowAddModal(false);
+                      setErrorMsg('');
+                    }}
+                    className="brutal-btn-secondary px-6 py-3 text-xs"
+                  >
+                    CANCEL
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
         </div>
       )}
     </div>

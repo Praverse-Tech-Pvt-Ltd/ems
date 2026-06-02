@@ -243,7 +243,6 @@ export class EmployeesService {
       { key: 'AADHAAR', label: 'Aadhaar card', complete: latestDocs.get('AADHAAR')?.status === 'VERIFIED' && !!employee.aadhaarLast4 },
       { key: 'PAN', label: 'PAN card', complete: latestDocs.get('PAN')?.status === 'VERIFIED' && !!employee.panEnc },
       { key: 'PHOTO', label: 'Photograph', complete: latestDocs.get('PHOTO')?.status === 'VERIFIED' || !!employee.profilePhotoUrl },
-      { key: 'FACE_CAPTURE', label: 'Face recognition capture', complete: employee.faceEnrolled },
     ];
 
     return {
@@ -405,5 +404,11 @@ export class EmployeesService {
       },
     });
     return this.getMyOnboarding(id);
+  }
+
+  async getDepartments() {
+    return this.prisma.department.findMany({
+      orderBy: { name: 'asc' },
+    });
   }
 }

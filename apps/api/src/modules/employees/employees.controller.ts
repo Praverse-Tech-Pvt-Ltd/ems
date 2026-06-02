@@ -109,6 +109,12 @@ export class EmployeesController {
     return this.service.create(dto);
   }
 
+  @Get('departments')
+  @ApiOperation({ summary: 'Get all departments' })
+  getDepartments() {
+    return this.service.getDepartments();
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get employee by ID' })
   findOne(@Param('id') id: string, @CurrentUser() user: { id: string; role: string }) {

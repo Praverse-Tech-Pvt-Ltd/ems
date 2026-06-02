@@ -64,8 +64,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     staleTime: 60_000,
   });
 
-  const showEnrollModal =
-    authReady && !meLoading && me !== null && me !== undefined && !me.faceEnrolled && !enrollDone;
+  const showEnrollModal = false;
 
   // Don't render the app shell until we know whether the user is authenticated.
   if (!authReady) {

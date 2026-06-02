@@ -410,25 +410,21 @@ export default function AttendancePage() {
           <div className="mt-7 flex items-end gap-4 flex-wrap">
             {me === undefined ? (
               <div className="px-6 py-4 brutal-border bg-brutal-surface font-display font-bold text-[13px] tracking-wide opacity-50">LOADING…</div>
-            ) : !me?.faceEnrolled ? (
-              <Link href="/attendance/biometric" className="brutal-btn-primary px-6 py-4 text-[13px] flex items-center gap-2 bg-brutal-yellow text-brutal-ink border-brutal-ink">
-                <UserCheck size={18} /> ENROLL FACE FIRST <ArrowRight size={16} />
-              </Link>
             ) : todayRecord?.punchOutTime ? (
               <div className="px-4 py-3 bg-[#0F8F3A] text-white font-display font-bold text-[11px] tracking-[0.18em] border-2 border-[#0F8F3A]">
                 ✓ SHIFT COMPLETE
               </div>
             ) : !todayRecord?.punchInTime ? (
-              <button onClick={() => { setManualPunch(false); setPunchType('in'); setShowModal(true); }} className="brutal-btn-primary px-6 py-4 text-[13px] flex items-center gap-2">
+              <button onClick={() => { setManualPunch(!me?.faceEnrolled); setPunchType('in'); setShowModal(true); }} className="brutal-btn-primary px-6 py-4 text-[13px] flex items-center gap-2">
                 <Camera size={18} /> PUNCH IN <ArrowRight size={16} />
               </button>
             ) : (
-              <button onClick={() => { setManualPunch(false); setPunchType('out'); setShowModal(true); }} className="brutal-btn-primary px-6 py-4 text-[13px] flex items-center gap-2 bg-brutal-red text-white border-brutal-red">
+              <button onClick={() => { setManualPunch(!me?.faceEnrolled); setPunchType('out'); setShowModal(true); }} className="brutal-btn-primary px-6 py-4 text-[13px] flex items-center gap-2 bg-brutal-red text-white border-brutal-red">
                 <Camera size={18} /> PUNCH OUT <ArrowRight size={16} />
               </button>
             )}
             {/* Manual punch — bypass face recognition */}
-            {me?.faceEnrolled && !todayRecord?.punchOutTime && (
+            {!todayRecord?.punchOutTime && (
               <button
                 onClick={() => {
                   setManualPunch(true);
