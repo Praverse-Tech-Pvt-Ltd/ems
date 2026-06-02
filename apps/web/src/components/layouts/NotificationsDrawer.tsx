@@ -1,9 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { X, BellOff, CheckCheck } from 'lucide-react';
+import { X, BellOff, CheckCheck, Megaphone, Send } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api-client';
+import { useIsAdmin } from '@/hooks/useIsAdmin';
 import type { Notification } from '@/types';
 
 const TONE: Record<string, string> = {
@@ -52,7 +53,23 @@ interface Props { open: boolean; onClose: () => void; }
 
 export function NotificationsDrawer({ open, onClose }: Props) {
   const qc = useQueryClient();
+  const isAdmin = useIsAdmin();
   const [activeTab, setActiveTab] = useState<'unread' | 'all'>('unread');
+  const [showBroadcast, setShowBroadcast] = useState(false);
+  const [broadcastTitle, setBroadcastTitle] = useState('');
+  const [broadcastMessage, setBroadcastMessage] = useState('');
+
+  const broadcastMutation = useMutation({
+    mutationFn: (data: { title: string; message: string }) =>
+      apiClient.post('/notifications/broadcast', data).then(r => r.data),
+    onSuccess: (data) => {
+      setBroadcastTitle('');
+      setBroadcastMessage('');
+      setShowBroadcast(false);
+      qc.invalidateQueries({ queryKey: ['notifications'] });
+      alert(`Announcement sent to ${data.sent} team member${data.sent !== 1 ? 's' : ''}.`);
+    },
+  });
 
   const { data: notifications = [], isLoading } = useQuery<Notification[]>({
     queryKey: ['notifications'],
@@ -144,10 +161,55 @@ export function NotificationsDrawer({ open, onClose }: Props) {
             <span className="font-display font-bold text-[10px] tracking-[0.22em] bg-brutal-yellow text-brutal-ink px-2 py-0.5">INBOX</span>
             <span className="font-display font-bold text-[11px] tracking-[0.22em]">NOTIFICATIONS</span>
           </div>
-          <button onClick={onClose} className="w-8 h-8 grid place-items-center border-2 border-brutal-cream hover:bg-brutal-red transition">
-            <X size={14} />
-          </button>
+          <div className="flex items-center gap-2">
+            {isAdmin && (
+              <button
+                onClick={() => setShowBroadcast(v => !v)}
+                title="Broadcast announcement to all staff"
+                className={`w-8 h-8 grid place-items-center border-2 border-brutal-cream transition ${showBroadcast ? 'bg-brutal-yellow text-brutal-ink' : 'hover:bg-brutal-yellow hover:text-brutal-ink'}`}
+              >
+                <Megaphone size={14} />
+              </button>
+            )}
+            <button onClick={onClose} className="w-8 h-8 grid place-items-center border-2 border-brutal-cream hover:bg-brutal-red transition">
+              <X size={14} />
+            </button>
+          </div>
         </div>
+
+        {/* Admin broadcast panel */}
+        {isAdmin && showBroadcast && (
+          <div className="px-4 py-4 bg-brutal-yellow brutal-border-b flex-shrink-0">
+            <div className="font-display font-bold text-[10px] tracking-[0.22em] text-brutal-ink/70 mb-2">— BROADCAST TO ALL STAFF</div>
+            <input
+              type="text"
+              placeholder="Announcement title…"
+              value={broadcastTitle}
+              onChange={e => setBroadcastTitle(e.target.value)}
+              className="w-full brutal-border bg-brutal-cream px-3 py-2 font-display font-bold text-[12px] focus:outline-none mb-2"
+            />
+            <textarea
+              placeholder="Write your message here…"
+              value={broadcastMessage}
+              onChange={e => setBroadcastMessage(e.target.value)}
+              rows={3}
+              className="w-full brutal-border bg-brutal-cream px-3 py-2 font-display font-bold text-[11px] focus:outline-none resize-none mb-2"
+            />
+            <button
+              onClick={() => {
+                if (!broadcastTitle.trim() || !broadcastMessage.trim()) return;
+                broadcastMutation.mutate({ title: broadcastTitle.trim(), message: broadcastMessage.trim() });
+              }}
+              disabled={broadcastMutation.isPending || !broadcastTitle.trim() || !broadcastMessage.trim()}
+              className="w-full brutal-btn-primary py-2.5 text-[11px] flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              {broadcastMutation.isPending
+                ? <><span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" /> SENDING…</>
+                : <><Send size={12} /> SEND TO ALL STAFF</>
+              }
+            </button>
+          </div>
+        )}
 
         {/* Tabs */}
         <div className="flex items-stretch brutal-border-b flex-shrink-0">

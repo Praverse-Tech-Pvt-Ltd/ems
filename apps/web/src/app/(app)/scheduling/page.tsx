@@ -3,7 +3,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api-client';
 import { useState, useEffect } from 'react';
-import { Calendar, Plus, Save, Trash2, Users, Building, AlertCircle } from 'lucide-react';
+import { Calendar, Plus, Save, Trash2, Users, Building, AlertCircle, CheckCircle2, XCircle, X } from 'lucide-react';
 
 interface ScheduleCell {
   company: string;
@@ -59,6 +59,9 @@ const DEFAULT_SCHEDULE: ScheduleData = {
 
 const MONTH_NAMES = ['JANUARY','FEBRUARY','MARCH','APRIL','MAY','JUNE','JULY','AUGUST','SEPTEMBER','OCTOBER','NOVEMBER','DECEMBER'];
 
+type Toast = { id: number; type: 'success' | 'error' | 'info'; message: string };
+type ConfirmDialog = { message: string; onConfirm: () => void } | null;
+
 export default function ClientSchedulingPage() {
   const qc = useQueryClient();
   const now = new Date();
@@ -66,6 +69,18 @@ export default function ClientSchedulingPage() {
   const [schedule, setSchedule] = useState<ScheduleData>(DEFAULT_SCHEDULE);
   const [newCompany, setNewCompany] = useState('');
   const [selectedMemberEmail, setSelectedMemberEmail] = useState('');
+  const [toasts, setToasts] = useState<Toast[]>([]);
+  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialog>(null);
+
+  const showToast = (type: Toast['type'], message: string) => {
+    const id = Date.now();
+    setToasts(prev => [...prev, { id, type, message }]);
+    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4500);
+  };
+
+  const showConfirm = (message: string, onConfirm: () => void) => {
+    setConfirmDialog({ message, onConfirm });
+  };
 
   // Fetch corporate settings
   const { data: settings = [], isLoading } = useQuery<any[]>({
@@ -111,10 +126,10 @@ export default function ClientSchedulingPage() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['corporate-settings'] });
-      alert(`Client Schedule Board saved successfully for ${MONTH_NAMES[selectedMonth.month]} ${selectedMonth.year}!`);
+      showToast('success', `Board locked in — ${MONTH_NAMES[selectedMonth.month]} ${selectedMonth.year} schedule is live.`);
     },
     onError: () => {
-      alert('Failed to save client schedule. Please try again.');
+      showToast('error', 'Board save failed. Check your connection and try again.');
     }
   });
 
@@ -136,7 +151,7 @@ export default function ClientSchedulingPage() {
   const handleAddCompany = () => {
     if (!newCompany.trim()) return;
     if (schedule.companies.includes(newCompany.trim())) {
-      alert('Company already exists');
+      showToast('info', 'That company is already on the board.');
       return;
     }
     setSchedule(prev => ({
@@ -147,12 +162,13 @@ export default function ClientSchedulingPage() {
   };
 
   const handleRemoveCompany = (company: string) => {
-    if (!confirm(`Are you sure you want to remove ${company}?`)) return;
-    setSchedule(prev => ({
-      ...prev,
-      companies: prev.companies.filter(c => c !== company),
-      cells: prev.cells.filter(c => c.company !== company)
-    }));
+    showConfirm(`Remove "${company}" from the board?`, () => {
+      setSchedule(prev => ({
+        ...prev,
+        companies: prev.companies.filter(c => c !== company),
+        cells: prev.cells.filter(c => c.company !== company)
+      }));
+    });
   };
 
   const handleAddMember = () => {
@@ -160,7 +176,7 @@ export default function ClientSchedulingPage() {
     const emp = employees.find(e => e.email === selectedMemberEmail);
     if (!emp) return;
     if (schedule.members.some(m => m.email === emp.email)) {
-      alert('Member already added');
+      showToast('info', 'That team member is already on the board.');
       return;
     }
     setSchedule(prev => ({
@@ -171,12 +187,13 @@ export default function ClientSchedulingPage() {
   };
 
   const handleRemoveMember = (email: string) => {
-    if (!confirm('Are you sure you want to remove this team member from the board?')) return;
-    setSchedule(prev => ({
-      ...prev,
-      members: prev.members.filter(m => m.email !== email),
-      cells: prev.cells.filter(c => c.memberEmail !== email)
-    }));
+    showConfirm('Remove this team member from the board?', () => {
+      setSchedule(prev => ({
+        ...prev,
+        members: prev.members.filter(m => m.email !== email),
+        cells: prev.cells.filter(c => c.memberEmail !== email)
+      }));
+    });
   };
 
   const handleSaveBoard = () => {
@@ -194,6 +211,45 @@ export default function ClientSchedulingPage() {
 
   return (
     <div className="max-w-7xl mx-auto p-6 space-y-8 animate-fade-up">
+      {/* Toast notifications */}
+      <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-2 pointer-events-none">
+        {toasts.map(t => (
+          <div key={t.id} className={`pointer-events-auto flex items-start gap-3 px-4 py-3 brutal-border brutal-shadow font-display font-bold text-[12px] tracking-wide max-w-[340px] animate-fade-up ${t.type === 'success' ? 'bg-brutal-yellow' : t.type === 'error' ? 'bg-brutal-red text-white' : 'bg-brutal-cream'}`}>
+            {t.type === 'success' && <CheckCircle2 size={16} className="shrink-0 mt-0.5" />}
+            {t.type === 'error' && <XCircle size={16} className="shrink-0 mt-0.5" />}
+            {t.type === 'info' && <AlertCircle size={16} className="shrink-0 mt-0.5" />}
+            <span className="flex-1">{t.message}</span>
+            <button onClick={() => setToasts(prev => prev.filter(x => x.id !== t.id))} className="shrink-0 opacity-60 hover:opacity-100">
+              <X size={14} />
+            </button>
+          </div>
+        ))}
+      </div>
+
+      {/* Confirm dialog */}
+      {confirmDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-brutal-ink/40 backdrop-blur-sm">
+          <div className="bg-brutal-cream brutal-border brutal-shadow p-6 max-w-sm w-full mx-4">
+            <div className="font-display font-bold text-[11px] tracking-[0.28em] text-brutal-ink/60 mb-3">— CONFIRM ACTION</div>
+            <p className="font-display font-bold text-[15px] leading-snug mb-6">{confirmDialog.message}</p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => { confirmDialog.onConfirm(); setConfirmDialog(null); }}
+                className="brutal-btn-primary flex-1 py-2.5 text-[12px]"
+              >
+                YES, REMOVE
+              </button>
+              <button
+                onClick={() => setConfirmDialog(null)}
+                className="flex-1 py-2.5 text-[12px] brutal-border font-display font-bold hover:bg-brutal-yellow transition-colors"
+              >
+                CANCEL
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Title */}
       <div className="flex items-end justify-between gap-4 flex-wrap">
         <div>

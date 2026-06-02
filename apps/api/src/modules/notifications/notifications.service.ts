@@ -46,4 +46,17 @@ export class NotificationsService {
       where: { employeeId, isRead: false },
     });
   }
+
+  async broadcast(title: string, body: string) {
+    const employees = await this.prisma.employee.findMany({ select: { id: true } });
+    await this.prisma.notification.createMany({
+      data: employees.map(e => ({
+        employeeId: e.id,
+        type: 'GENERAL' as NotificationType,
+        title,
+        body,
+      })),
+    });
+    return { sent: employees.length };
+  }
 }
