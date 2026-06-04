@@ -254,6 +254,22 @@ model Employee {
   lifecycleEventsCreated EmployeeLifecycleEvent[] @relation("LifecycleCreator")
   faceEmbeddingRecord    FaceEmbedding?
 
+  // Company Intelligence relations
+  companiesResponsible   ClientCompany[]          @relation("CompanyResponsible")
+  companiesCreated       ClientCompany[]          @relation("CompanyCreator")
+  companyProjects        CompanyProject[]         @relation("ProjectLead")
+  statusHistoryChanges   CompanyStatusHistory[]   @relation("StatusHistoryChanger")
+  companyVisits          CompanyVisit[]           @relation("VisitEmployee")
+  meetingNotesEntered    MeetingNote[]            @relation("MeetingNoteEntered")
+  meetingNotesReviewed   MeetingNote[]            @relation("MeetingNoteReviewer")
+  workUpdatesSubmitted   WorkUpdate[]             @relation("WorkUpdateEmployee")
+  workUpdatesReviewed    WorkUpdate[]             @relation("WorkUpdateReviewer")
+  timelineEntries        CompanyTimelineEntry[]   @relation("TimelineEmployee")
+  calendarEventsAssigned CalendarEvent[]          @relation("CalendarAssignee")
+  calendarEventsCreated  CalendarEvent[]          @relation("CalendarCreator")
+  alertsResolved         CompanyAlert[]           @relation("AlertResolver")
+  attendanceEdits        AttendanceEditHistory[]  @relation("AttendanceEditor")
+
   @@map("employees")
 }
 
@@ -296,8 +312,9 @@ model AttendanceRecord {
   createdAt              DateTime         @default(now()) @map("created_at")
   updatedAt              DateTime         @updatedAt @map("updated_at")
 
-  employee   Employee  @relation(fields: [employeeId], references: [id])
-  regularizer Employee? @relation("AttendanceRegularizer", fields: [regularizedBy], references: [id])
+  employee    Employee                @relation(fields: [employeeId], references: [id])
+  regularizer Employee?               @relation("AttendanceRegularizer", fields: [regularizedBy], references: [id])
+  editHistory AttendanceEditHistory[]
 
   @@unique([employeeId, date])
   @@map("attendance_records")
@@ -721,6 +738,333 @@ model PasswordResetToken {
   employee     Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
   @@map("password_reset_tokens")
+}
+
+// ─── Company Intelligence Enums ───────────────────────────────────────────────
+
+enum CompanyBusinessStatus {
+  ACTIVE
+  DELAYED
+  AT_RISK
+  LOST
+  DORMANT
+}
+
+enum CompanyCriticality {
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum TimelineEntryType {
+  VISIT
+  AUDIT_PREP
+  DOCUMENT_REVIEW
+  CLIENT_CALL
+  INTERNAL_MEETING
+  EMPLOYEE_UPDATE
+  MEETING_NOTE
+  PENDING_TASK
+  COMPLETED_TASK
+  AI_SUMMARY
+  NEXT_ACTION
+  STATUS_CHANGE
+  ALERT
+}
+
+enum CalendarEventType {
+  AUDIT
+  CLIENT_VISIT
+  INTERNAL_MEETING
+  DOCUMENT_DEADLINE
+  FOLLOW_UP
+  TASK_DEADLINE
+  OWNER_MEETING
+  RECURRING_REVIEW
+  AI_SUGGESTED
+}
+
+enum AlertSeverity {
+  MILD
+  MODERATE
+  CRITICAL
+}
+
+enum WorkUpdateStatus {
+  PENDING_REVIEW
+  APPROVED
+  NEEDS_CORRECTION
+}
+
+// ─── Client Company Models ────────────────────────────────────────────────────
+
+model ClientCompany {
+  id                    String                @id @default(uuid())
+  name                  String
+  shortName             String?               @map("short_name")
+  industry              String?               @default("Pharma")
+  contactEmail          String?               @map("contact_email")
+  contactPhone          String?               @map("contact_phone")
+  address               String?
+  website               String?
+  businessStatus        CompanyBusinessStatus @default(ACTIVE) @map("business_status")
+  criticality           CompanyCriticality    @default(MEDIUM)
+  currentStage          String?               @map("current_stage")
+  responsibleEmployeeId String?               @map("responsible_employee_id")
+  lastVisitDate         DateTime?             @map("last_visit_date") @db.Date
+  lastCommunicationDate DateTime?             @map("last_communication_date") @db.Date
+  nextAuditDate         DateTime?             @map("next_audit_date") @db.Date
+  isArchived            Boolean               @default(false) @map("is_archived")
+  archivedReason        String?               @map("archived_reason")
+  notes                 String?
+  riskScore             Int                   @default(0) @map("risk_score")
+  createdBy             String                @map("created_by")
+  createdAt             DateTime              @default(now()) @map("created_at")
+  updatedAt             DateTime              @updatedAt @map("updated_at")
+
+  responsibleEmployee Employee?              @relation("CompanyResponsible", fields: [responsibleEmployeeId], references: [id])
+  creator             Employee               @relation("CompanyCreator", fields: [createdBy], references: [id])
+  contacts            CompanyContact[]
+  projects            CompanyProject[]
+  statusHistory       CompanyStatusHistory[]
+  visits              CompanyVisit[]
+  meetingNotes        MeetingNote[]
+  workUpdates         WorkUpdate[]
+  timelineEntries     CompanyTimelineEntry[]
+  calendarEvents      CalendarEvent[]
+  aiSummaries         AISummary[]
+  alerts              CompanyAlert[]
+
+  @@index([businessStatus])
+  @@index([criticality])
+  @@index([lastVisitDate])
+  @@map("client_companies")
+}
+
+model CompanyContact {
+  id          String   @id @default(uuid())
+  companyId   String   @map("company_id")
+  name        String
+  designation String?
+  email       String?
+  phone       String?
+  isPrimary   Boolean  @default(false) @map("is_primary")
+  notes       String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  company ClientCompany @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@map("company_contacts")
+}
+
+model CompanyProject {
+  id             String    @id @default(uuid())
+  companyId      String    @map("company_id")
+  name           String
+  description    String?
+  startDate      DateTime? @map("start_date") @db.Date
+  endDate        DateTime? @map("end_date") @db.Date
+  status         String    @default("ACTIVE")
+  leadEmployeeId String?   @map("lead_employee_id")
+  auditType      String?   @map("audit_type")
+  auditBody      String?   @map("audit_body")
+  auditDate      DateTime? @map("audit_date") @db.Date
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  company      ClientCompany @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  leadEmployee Employee?     @relation("ProjectLead", fields: [leadEmployeeId], references: [id])
+
+  @@map("company_projects")
+}
+
+model CompanyStatusHistory {
+  id             String                @id @default(uuid())
+  companyId      String                @map("company_id")
+  businessStatus CompanyBusinessStatus @map("business_status")
+  criticality    CompanyCriticality
+  riskScore      Int                   @map("risk_score")
+  summary        String?
+  changedBy      String                @map("changed_by")
+  createdAt      DateTime              @default(now()) @map("created_at")
+
+  company           ClientCompany @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  changedByEmployee Employee      @relation("StatusHistoryChanger", fields: [changedBy], references: [id])
+
+  @@map("company_status_history")
+}
+
+model CompanyVisit {
+  id           String    @id @default(uuid())
+  companyId    String    @map("company_id")
+  visitedBy    String    @map("visited_by")
+  visitDate    DateTime  @map("visit_date") @db.Date
+  purpose      String?
+  outcome      String?
+  nextSteps    String?
+  followUpDate DateTime? @map("follow_up_date") @db.Date
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  company ClientCompany @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  visitor Employee      @relation("VisitEmployee", fields: [visitedBy], references: [id])
+
+  @@map("company_visits")
+}
+
+model MeetingNote {
+  id               String    @id @default(uuid())
+  companyId        String?   @map("company_id")
+  enteredBy        String    @map("entered_by")
+  rawText          String    @map("raw_text")
+  meetingDate      DateTime  @map("meeting_date") @db.Date
+  extractedData    Json?     @map("extracted_data")
+  companyName      String?   @map("company_name")
+  employeeName     String?   @map("employee_name")
+  workDiscussed    String?   @map("work_discussed")
+  assignedTo       String?   @map("assigned_to")
+  deadline         DateTime? @map("deadline") @db.Date
+  currentStatus    String?   @map("current_status")
+  pendingGap       String?   @map("pending_gap")
+  followUpAction   String?   @map("follow_up_action")
+  priorityLevel    String?   @map("priority_level")
+  ownerNote        String?   @map("owner_note")
+  needsAdminReview Boolean   @default(false) @map("needs_admin_review")
+  adminReviewedBy  String?   @map("admin_reviewed_by")
+  adminReviewedAt  DateTime? @map("admin_reviewed_at") @db.Timestamptz
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  company           ClientCompany? @relation(fields: [companyId], references: [id])
+  enteredByEmployee Employee       @relation("MeetingNoteEntered", fields: [enteredBy], references: [id])
+  adminReviewer     Employee?      @relation("MeetingNoteReviewer", fields: [adminReviewedBy], references: [id])
+
+  @@map("meeting_notes")
+}
+
+model WorkUpdate {
+  id               String           @id @default(uuid())
+  employeeId       String           @map("employee_id")
+  companyId        String?          @map("company_id")
+  rawText          String           @map("raw_text")
+  updateDate       DateTime         @map("update_date") @db.Date
+  extractedData    Json?            @map("extracted_data")
+  companyName      String?          @map("company_name")
+  taskCompleted    String?          @map("task_completed")
+  pendingTask      String?          @map("pending_task")
+  progress         String?
+  contribution     String?
+  workStatus       String?          @map("work_status")
+  nextAction       String?          @map("next_action")
+  status           WorkUpdateStatus @default(PENDING_REVIEW)
+  needsAdminReview Boolean          @default(false) @map("needs_admin_review")
+  reviewedBy       String?          @map("reviewed_by")
+  reviewedAt       DateTime?        @map("reviewed_at") @db.Timestamptz
+  createdAt        DateTime         @default(now()) @map("created_at")
+  updatedAt        DateTime         @updatedAt @map("updated_at")
+
+  employee Employee       @relation("WorkUpdateEmployee", fields: [employeeId], references: [id])
+  company  ClientCompany? @relation(fields: [companyId], references: [id])
+  reviewer Employee?      @relation("WorkUpdateReviewer", fields: [reviewedBy], references: [id])
+
+  @@map("work_updates")
+}
+
+model CompanyTimelineEntry {
+  id            String            @id @default(uuid())
+  companyId     String            @map("company_id")
+  entryType     TimelineEntryType @map("entry_type")
+  title         String
+  description   String?
+  employeeId    String?           @map("employee_id")
+  referenceId   String?           @map("reference_id")
+  referenceType String?           @map("reference_type")
+  entryDate     DateTime          @map("entry_date") @db.Timestamptz
+  createdAt     DateTime          @default(now()) @map("created_at")
+
+  company  ClientCompany @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  employee Employee?     @relation("TimelineEmployee", fields: [employeeId], references: [id])
+
+  @@index([companyId, entryDate])
+  @@map("company_timeline_entries")
+}
+
+model CalendarEvent {
+  id            String            @id @default(uuid())
+  title         String
+  description   String?
+  eventType     CalendarEventType @map("event_type")
+  startDate     DateTime          @map("start_date") @db.Timestamptz
+  endDate       DateTime?         @map("end_date") @db.Timestamptz
+  allDay        Boolean           @default(false) @map("all_day")
+  companyId     String?           @map("company_id")
+  assignedTo    String?           @map("assigned_to")
+  createdBy     String            @map("created_by")
+  isRecurring   Boolean           @default(false) @map("is_recurring")
+  recurringRule String?           @map("recurring_rule")
+  reminderDays  Int?              @map("reminder_days")
+  isAiSuggested Boolean           @default(false) @map("is_ai_suggested")
+  zohoEventId   String?           @map("zoho_event_id")
+  createdAt     DateTime          @default(now()) @map("created_at")
+  updatedAt     DateTime          @updatedAt @map("updated_at")
+
+  company  ClientCompany? @relation(fields: [companyId], references: [id])
+  assignee Employee?      @relation("CalendarAssignee", fields: [assignedTo], references: [id])
+  creator  Employee       @relation("CalendarCreator", fields: [createdBy], references: [id])
+
+  @@index([startDate])
+  @@index([companyId])
+  @@map("calendar_events")
+}
+
+model AISummary {
+  id          String    @id @default(uuid())
+  companyId   String?   @map("company_id")
+  summaryType String    @map("summary_type")
+  content     String
+  metadata    Json?
+  generatedAt DateTime  @default(now()) @map("generated_at")
+  expiresAt   DateTime? @map("expires_at")
+
+  company ClientCompany? @relation(fields: [companyId], references: [id])
+
+  @@index([companyId, summaryType])
+  @@map("ai_summaries")
+}
+
+model CompanyAlert {
+  id         String        @id @default(uuid())
+  companyId  String        @map("company_id")
+  severity   AlertSeverity
+  alertType  String        @map("alert_type")
+  message    String
+  isResolved Boolean       @default(false) @map("is_resolved")
+  resolvedBy String?       @map("resolved_by")
+  resolvedAt DateTime?     @map("resolved_at") @db.Timestamptz
+  createdAt  DateTime      @default(now()) @map("created_at")
+
+  company  ClientCompany @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  resolver Employee?     @relation("AlertResolver", fields: [resolvedBy], references: [id])
+
+  @@index([companyId, isResolved])
+  @@map("company_alerts")
+}
+
+model AttendanceEditHistory {
+  id           String   @id @default(uuid())
+  attendanceId String   @map("attendance_id")
+  editedBy     String   @map("edited_by")
+  fieldChanged String   @map("field_changed")
+  originalValue String? @map("original_value")
+  newValue     String?  @map("new_value")
+  reason       String
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  attendance AttendanceRecord @relation(fields: [attendanceId], references: [id], onDelete: Cascade)
+  editor     Employee         @relation("AttendanceEditor", fields: [editedBy], references: [id])
+
+  @@map("attendance_edit_history")
 }
 
 // ── Face Recognition ─────────────────────────────────────────────────────────

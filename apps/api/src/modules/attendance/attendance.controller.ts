@@ -117,4 +117,20 @@ export class AttendanceController {
   ) {
     return this.service.regularize(id, user.id, dto);
   }
+
+  @Patch(':id/edit-time')
+  @Roles('ADMIN', 'SUPER_ADMIN')
+  editTime(
+    @Param('id') id: string,
+    @CurrentUser() user: { id: string },
+    @Body() dto: { punchInTime?: string; punchOutTime?: string; reason: string },
+  ) {
+    return this.service.editAttendanceTime(id, user.id, dto);
+  }
+
+  @Get(':id/edit-history')
+  @Roles('ADMIN', 'SUPER_ADMIN')
+  getEditHistory(@Param('id') id: string) {
+    return this.service.getEditHistory(id);
+  }
 }

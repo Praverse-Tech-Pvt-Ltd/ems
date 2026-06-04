@@ -23,6 +23,12 @@ import { CorporateModule } from './modules/corporate/corporate.module';
 import { KeepAliveModule } from './common/keep-alive/keep-alive.module';
 import { FaceRecognitionModule } from './modules/face-recognition/face-recognition.module';
 import { ChatModule } from './modules/chat/chat.module';
+import { ClientCompaniesModule } from './modules/client-companies/client-companies.module';
+import { MeetingNotesModule } from './modules/meeting-notes/meeting-notes.module';
+import { WorkUpdatesModule } from './modules/work-updates/work-updates.module';
+import { AIOverviewModule } from './modules/ai-overview/ai-overview.module';
+import { CompanyCalendarModule } from './modules/company-calendar/company-calendar.module';
+import { ManagementReviewModule } from './modules/management-review/management-review.module';
 
 @Module({
   imports: [
@@ -71,6 +77,12 @@ import { ChatModule } from './modules/chat/chat.module';
     KeepAliveModule,
     FaceRecognitionModule,
     ChatModule,
+    AIOverviewModule,
+    ClientCompaniesModule,
+    MeetingNotesModule,
+    WorkUpdatesModule,
+    CompanyCalendarModule,
+    ManagementReviewModule,
   ],
   // Apply ThrottlerGuard globally so every route is rate-limited by default.
   // Individual routes/controllers can override limits with @Throttle().

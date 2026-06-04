@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard, Clock, DollarSign, FileText, Calendar,
   Send, Users, BarChart2, LogOut, Wallet, ShieldCheck, Settings, MessageSquare, X,
+  Building2, CalendarCheck, PenLine, ClipboardList, Star,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/auth.store';
 import { useQuery } from '@tanstack/react-query';
@@ -39,11 +40,23 @@ const SECTIONS = [
     ],
   },
   {
+    label: 'INTELLIGENCE',
+    roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER'] as Role[],
+    items: [
+      { href: '/companies',         icon: Building2,     label: 'Companies',     num: '11', roles: null },
+      { href: '/calendar',          icon: CalendarCheck, label: 'Calendar',      num: '12', roles: null },
+      { href: '/meeting-notes',     icon: PenLine,       label: 'Meeting Notes', num: '13', roles: null },
+      { href: '/work-updates',      icon: ClipboardList, label: 'Work Updates',  num: '14', roles: null },
+      { href: '/management-review', icon: BarChart2,     label: 'Mgmt Review',   num: '15', roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER'] as Role[] },
+      { href: '/owner',             icon: Star,          label: 'Owner AI',      num: '16', roles: ['SUPER_ADMIN'] as Role[] },
+    ],
+  },
+  {
     label: 'ADMIN',
     roles: ['SUPER_ADMIN', 'ADMIN'] as Role[],
     items: [
-      { href: '/audit', icon: ShieldCheck, label: 'Audit Log', num: '11', roles: ['SUPER_ADMIN', 'ADMIN'] as Role[] },
-      { href: '/scheduling', icon: Calendar, label: 'Client Scheduling', num: '12', roles: ['SUPER_ADMIN', 'ADMIN'] as Role[] },
+      { href: '/audit',      icon: ShieldCheck, label: 'Audit Log',         num: '17', roles: ['SUPER_ADMIN', 'ADMIN'] as Role[] },
+      { href: '/scheduling', icon: Calendar,    label: 'Client Scheduling', num: '18', roles: ['SUPER_ADMIN', 'ADMIN'] as Role[] },
     ],
   },
 ];

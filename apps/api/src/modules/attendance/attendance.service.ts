@@ -586,4 +586,66 @@ export class AttendanceService {
   private minutesSinceMidnight(date: Date): number {
     return date.getHours() * 60 + date.getMinutes();
   }
+
+  async editAttendanceTime(
+    id: string,
+    adminId: string,
+    dto: { punchInTime?: string; punchOutTime?: string; reason: string },
+  ) {
+    const record = await this.prisma.attendanceRecord.findUniqueOrThrow({ where: { id } });
+
+    const edits: Array<{ field: string; original: string | null; newVal: string | null }> = [];
+    const updateData: Record<string, any> = {
+      isRegularized: true,
+      regularizedBy: adminId,
+      regularizationReason: dto.reason,
+    };
+
+    if (dto.punchInTime) {
+      edits.push({ field: 'punchInTime', original: record.punchInTime?.toISOString() ?? null, newVal: new Date(dto.punchInTime).toISOString() });
+      updateData['punchInTime'] = new Date(dto.punchInTime);
+    }
+    if (dto.punchOutTime) {
+      edits.push({ field: 'punchOutTime', original: record.punchOutTime?.toISOString() ?? null, newVal: new Date(dto.punchOutTime).toISOString() });
+      updateData['punchOutTime'] = new Date(dto.punchOutTime);
+    }
+
+    const newIn  = dto.punchInTime  ? new Date(dto.punchInTime)  : record.punchInTime;
+    const newOut = dto.punchOutTime ? new Date(dto.punchOutTime) : record.punchOutTime;
+    if (newIn && newOut) {
+      updateData['workingHours'] =
+        Math.round(((newOut.getTime() - newIn.getTime()) / (1000 * 60 * 60)) * 100) / 100;
+    }
+
+    const updated = await this.prisma.attendanceRecord.update({ where: { id }, data: updateData });
+
+    await Promise.all(
+      edits.map(e =>
+        this.prisma.attendanceEditHistory.create({
+          data: { attendanceId: id, editedBy: adminId, fieldChanged: e.field, originalValue: e.original, newValue: e.newVal, reason: dto.reason },
+        }),
+      ),
+    );
+
+    await this.prisma.auditLog.create({
+      data: {
+        actorId: adminId,
+        action: 'EDIT_ATTENDANCE_TIME',
+        resourceType: 'attendance',
+        resourceId: id,
+        oldValue: { punchInTime: record.punchInTime, punchOutTime: record.punchOutTime } as object,
+        newValue: { punchInTime: newIn, punchOutTime: newOut } as object,
+      },
+    });
+
+    return updated;
+  }
+
+  async getEditHistory(attendanceId: string) {
+    return this.prisma.attendanceEditHistory.findMany({
+      where: { attendanceId },
+      include: { editor: { select: { id: true, firstName: true, lastName: true } } },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
 }
