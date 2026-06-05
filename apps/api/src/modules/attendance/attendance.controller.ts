@@ -85,15 +85,16 @@ export class AttendanceController {
   }
 
   @Get('employee/:id')
-  @Roles('MANAGER', 'ADMIN', 'SUPER_ADMIN')
   getByEmployee(
     @Param('id') id: string,
-    @CurrentUser() user: { id: string; email: string },
+    @CurrentUser() user: { id: string; role: string },
     @Query('from') from?: string,
     @Query('to') to?: string,
   ) {
-    if (user.id !== id && user.email !== 'pratham.s@nexgenpharmasolutions.com' && user.email !== 'ashwani@nexgenpharmasolutions.com') {
-      throw new ForbiddenException('Access denied');
+    const isSelf = user.id === id;
+    const isManager = ['MANAGER', 'ADMIN', 'SUPER_ADMIN'].includes(user.role);
+    if (!isSelf && !isManager) {
+      throw new ForbiddenException('You can only view your own attendance records');
     }
     return this.service.getByEmployee(id, from, to);
   }

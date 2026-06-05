@@ -245,10 +245,8 @@ export default function EmployeeDetailPage() {
   const me      = useAuthStore(s => s.user);
   const isAdmin = me?.role === 'ADMIN' || me?.role === 'SUPER_ADMIN' || me?.role === 'MANAGER';
   const isSelf  = me?.id === id;
-  const isAllowedAdmin = me && (
-    me.email === 'pratham.s@nexgenpharmasolutions.com' ||
-    me.email === 'ashwani@nexgenpharmasolutions.com'
-  );
+  // Any admin/manager can view any employee. Employees can only view themselves.
+  const canViewEmployee = isAdmin || isSelf;
 
   const [activeTab, setActiveTab] = useState<'overview' | 'attendance' | 'expenses'>('overview');
 
@@ -260,14 +258,18 @@ export default function EmployeeDetailPage() {
 
   const { data: attendance } = useQuery<{ daysPresent: number; total: number } | null>({
     queryKey: ['attendance-stats', id],
-    queryFn: () => apiClient.get(`/attendance/employee/${id}`).then(r => {
-      const records = Array.isArray(r.data) ? r.data : [];
-      const present = records.filter((rec: { status: string }) =>
-        ['PRESENT', 'LATE', 'WFH', 'HALF_DAY'].includes(rec.status)
-      ).length;
-      return { daysPresent: present, total: records.length };
-    }).catch(() => null),
-    enabled: !!id && (isAdmin || isSelf),
+    queryFn: () => {
+      // Employees must use /my — /employee/:id requires MANAGER+ role
+      const url = isSelf ? '/attendance/my' : `/attendance/employee/${id}`;
+      return apiClient.get(url).then(r => {
+        const records = Array.isArray(r.data) ? r.data : [];
+        const present = records.filter((rec: { status: string }) =>
+          ['PRESENT', 'LATE', 'WFH', 'HALF_DAY'].includes(rec.status)
+        ).length;
+        return { daysPresent: present, total: records.length };
+      }).catch(() => null);
+    },
+    enabled: !!id && canViewEmployee,
   });
 
   const { data: onboarding } = useQuery<OnboardingStatus>({
@@ -282,7 +284,7 @@ export default function EmployeeDetailPage() {
       const url = isSelf ? '/attendance/my' : `/attendance/employee/${id}`;
       return apiClient.get(url).then(r => Array.isArray(r.data) ? r.data : []);
     },
-    enabled: !!id && (isAllowedAdmin || isSelf),
+    enabled: !!id && canViewEmployee,
   });
 
   const { data: expenses = [], isLoading: isLoadingExpenses } = useQuery<any[]>({
@@ -291,7 +293,7 @@ export default function EmployeeDetailPage() {
       const url = isSelf ? '/expenses/my' : `/expenses?employeeId=${id}`;
       return apiClient.get(url).then(r => Array.isArray(r.data) ? r.data : []);
     },
-    enabled: !!id && (isAllowedAdmin || isSelf),
+    enabled: !!id && canViewEmployee,
   });
 
   if (isLoading) {
