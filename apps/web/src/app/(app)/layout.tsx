@@ -65,8 +65,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   // Don't render the app shell until we know whether the user is authenticated.
   if (!authReady) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-brutal-cream">
-        <div className="font-display font-bold text-sm uppercase tracking-widest text-brutal-ink/40 animate-pulse">
+      <div className="min-h-screen flex items-center justify-center bg-surface">
+        <div className="flex items-center gap-2.5 text-sm font-medium text-on-surface-variant">
+          <span className="w-5 h-5 border-2 border-primary-container border-t-transparent rounded-full animate-spin" />
           Loading…
         </div>
       </div>
@@ -74,14 +75,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-brutal-cream">
+    <div className="flex h-screen overflow-hidden bg-surface">
       <AppSidebar open={navOpen} onClose={() => setNavOpen(false)} />
       <div className="flex flex-col flex-1 overflow-hidden min-w-0">
         <AppTopNav
           onMenuOpen={() => setNavOpen(true)}
           onBell={() => setNotifOpen(true)}
         />
-        <main className="flex-1 overflow-y-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 lg:py-10 bg-brutal-cream">
+        <main className="flex-1 overflow-y-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 lg:py-10">
           {children}
         </main>
       </div>

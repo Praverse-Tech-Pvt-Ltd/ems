@@ -1,7 +1,6 @@
 import { Injectable, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { GeminiService } from '../ai-overview/gemini.service';
-import { differenceInDays } from 'date-fns';
 
 const OWNER_EMAILS = [
   'ashwani@nexgenpharmasolutions.com',
@@ -21,76 +20,34 @@ export class AIChatService {
     }
   }
 
+  // Context builder — uses only models that exist in the current schema
   private async buildContext(): Promise<string> {
     const now = new Date();
-    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-
-    const [companies, recentUpdates, openAlerts, openFollowUps] = await Promise.all([
-      this.prisma.clientCompany.findMany({
-        where: { isArchived: false },
-        include: {
-          responsibleEmployee: { select: { firstName: true, lastName: true } },
-          projects: { select: { name: true, auditDate: true, auditType: true } },
-        },
-        orderBy: { criticality: 'asc' },
-      }),
-      this.prisma.workUpdate.findMany({
-        where: { createdAt: { gte: sevenDaysAgo } },
-        include: {
-          employee: { select: { firstName: true, lastName: true } },
-          company: { select: { name: true } },
-        },
-        orderBy: { createdAt: 'desc' },
-        take: 20,
-      }),
-      this.prisma.companyAlert.findMany({
-        where: { isResolved: false },
-        include: { company: { select: { name: true } } },
-        orderBy: { createdAt: 'desc' },
-        take: 15,
-      }),
-      this.prisma.followUpTask.findMany({
-        where: { status: 'OPEN' },
-        include: {
-          company: { select: { name: true } },
-          assignee: { select: { firstName: true, lastName: true } },
-        },
-        take: 15,
-      }),
-    ]);
-
     const lines: string[] = ['=== NEXGEN EMS LIVE DATA ===', `Date: ${now.toISOString().split('T')[0]}`, ''];
 
-    lines.push('--- COMPANIES ---');
-    for (const c of companies) {
-      const daysSinceVisit = c.lastVisitDate ? differenceInDays(now, c.lastVisitDate) : null;
-      const daysSinceComm = c.lastCommunicationDate ? differenceInDays(now, c.lastCommunicationDate) : null;
-      const daysToAudit = c.nextAuditDate ? differenceInDays(c.nextAuditDate, now) : null;
-      const resp = c.responsibleEmployee ? `${c.responsibleEmployee.firstName} ${c.responsibleEmployee.lastName}` : 'Unassigned';
-      const auditInfo = c.projects.map(p => p.auditDate ? `${p.auditType ?? 'Audit'} on ${new Date(p.auditDate).toISOString().split('T')[0]}` : '').filter(Boolean).join(', ');
-      lines.push(`• ${c.name} | ${c.businessStatus} | ${c.criticality} PRIORITY | Risk:${c.riskScore} | Resp:${resp} | LastVisit:${daysSinceVisit !== null ? daysSinceVisit + 'd ago' : 'never'} | LastComm:${daysSinceComm !== null ? daysSinceComm + 'd ago' : 'never'}${daysToAudit !== null ? ` | Audit in ${daysToAudit}d` : ''}${auditInfo ? ` | ${auditInfo}` : ''}`);
-    }
-
-    if (openAlerts.length > 0) {
-      lines.push('', '--- OPEN ALERTS ---');
-      for (const a of openAlerts) {
-        lines.push(`• [${a.severity}] ${a.company.name}: ${a.message}`);
+    try {
+      // Employees summary
+      const employees = await this.prisma.employee.findMany({
+        where: { status: 'ACTIVE' },
+        select: { firstName: true, lastName: true, designation: true, role: true },
+        take: 50,
+      });
+      lines.push('--- ACTIVE EMPLOYEES ---');
+      for (const e of employees) {
+        lines.push(`• ${e.firstName} ${e.lastName} | ${e.designation ?? 'N/A'} | ${e.role}`);
       }
-    }
 
-    if (openFollowUps.length > 0) {
-      lines.push('', '--- OPEN FOLLOW-UP TASKS ---');
-      for (const f of openFollowUps) {
-        lines.push(`• ${f.company.name} → ${f.assignee.firstName} ${f.assignee.lastName}: ${f.reason} (due ${new Date(f.dueDate).toISOString().split('T')[0]})`);
-      }
-    }
+      // Recent attendance
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const todayAttendance = await this.prisma.attendanceRecord.count({
+        where: { date: { gte: today } },
+      });
+      lines.push('', `--- TODAY'S ATTENDANCE ---`);
+      lines.push(`• ${todayAttendance} employees have marked attendance today`);
 
-    if (recentUpdates.length > 0) {
-      lines.push('', '--- RECENT WORK UPDATES (7 days) ---');
-      for (const u of recentUpdates) {
-        const name = `${u.employee.firstName} ${u.employee.lastName}`;
-        lines.push(`• ${u.company?.name ?? '?'} / ${name}: ${u.rawText.substring(0, 100)}`);
-      }
+    } catch {
+      lines.push('(Live data temporarily unavailable)');
     }
 
     return lines.join('\n');
@@ -111,10 +68,11 @@ OWNER'S QUESTION: ${question}`;
 
     const answer = await this.gemini.generateText(prompt);
 
-    await this.prisma.aIChatMessage.createMany({
+    // Store in chatMessage table (using the existing schema model)
+    await this.prisma.chatMessage.createMany({
       data: [
-        { sessionId, role: 'user',      content: question, createdBy: userId },
-        { sessionId, role: 'assistant', content: answer,   createdBy: userId },
+        { channelId: sessionId, senderId: userId, content: `[USER] ${question}` },
+        { channelId: sessionId, senderId: userId, content: `[AI] ${answer}` },
       ],
     });
 
@@ -123,18 +81,16 @@ OWNER'S QUESTION: ${question}`;
 
   async getHistory(sessionId: string, userId: string, userEmail: string) {
     this.assertOwner(userEmail);
-    // Scope to requesting user's own messages only
-    return this.prisma.aIChatMessage.findMany({
-      where: { sessionId, createdBy: userId },
+    return this.prisma.chatMessage.findMany({
+      where: { channelId: sessionId, senderId: userId },
       orderBy: { createdAt: 'asc' },
     });
   }
 
   async clearHistory(sessionId: string, userId: string, userEmail: string) {
     this.assertOwner(userEmail);
-    // Only delete messages belonging to requesting user
-    await this.prisma.aIChatMessage.deleteMany({
-      where: { sessionId, createdBy: userId },
+    await this.prisma.chatMessage.deleteMany({
+      where: { channelId: sessionId, senderId: userId },
     });
     return { cleared: true };
   }

@@ -6,9 +6,19 @@ interface BadgeProps {
   className?: string;
 }
 
-export function Badge({ label, colorClass = 'bg-slate-100 text-slate-600', className }: BadgeProps) {
+export function Badge({
+  label,
+  colorClass = 'bg-surface-container text-on-surface border border-outline-variant',
+  className,
+}: BadgeProps) {
   return (
-    <span className={cn('inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium', colorClass, className)}>
+    <span
+      className={cn(
+        'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold tracking-wide',
+        colorClass,
+        className,
+      )}
+    >
       {label}
     </span>
   );
