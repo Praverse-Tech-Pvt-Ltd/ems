@@ -479,7 +479,7 @@ export default function EmployeeDetailPage() {
       )}
 
       {/* ── Tabs header ─── */}
-      {(isAllowedAdmin || isSelf) && (
+      {(canViewEmployee || isSelf) && (
         <div className="flex flex-wrap items-center gap-2 brutal-border-b pb-4">
           <button
             onClick={() => setActiveTab('overview')}
