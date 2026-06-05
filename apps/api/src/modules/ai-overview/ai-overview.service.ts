@@ -4,6 +4,12 @@ import { PrismaService } from '../../common/prisma/prisma.service';
 import { GeminiService } from './gemini.service';
 import { differenceInDays, startOfWeek, endOfWeek } from 'date-fns';
 
+// Owner emails — stable across DB reseeds
+const OWNER_EMAILS = [
+  'ashwani@nexgenpharmasolutions.com',
+  'pratham.s@nexgenpharmasolutions.com',
+];
+
 @Injectable()
 export class AIOverviewService {
   private ownerIds: string[];
@@ -17,18 +23,22 @@ export class AIOverviewService {
     this.ownerIds = raw.split(',').map(s => s.trim()).filter(Boolean);
   }
 
-  isOwner(employeeId: string): boolean {
-    return this.ownerIds.includes(employeeId);
+  isOwner(employeeId: string, email?: string): boolean {
+    // Primary check: email (stable across reseeds)
+    if (email && OWNER_EMAILS.includes(email.toLowerCase())) return true;
+    // Fallback: ID from env
+    if (this.ownerIds.length > 0 && this.ownerIds.includes(employeeId)) return true;
+    return false;
   }
 
-  private assertOwner(employeeId: string) {
-    if (!this.isOwner(employeeId)) {
+  private assertOwner(employeeId: string, email?: string) {
+    if (!this.isOwner(employeeId, email)) {
       throw new ForbiddenException('This feature is available to owners only');
     }
   }
 
-  async getOwnerDashboard(requesterId: string) {
-    this.assertOwner(requesterId);
+  async getOwnerDashboard(requesterId: string, requesterEmail?: string) {
+    this.assertOwner(requesterId, requesterEmail);
 
     const now = new Date();
     const companies = await this.prisma.clientCompany.findMany({
@@ -138,8 +148,8 @@ export class AIOverviewService {
     };
   }
 
-  async getWeeklyAISummary(requesterId: string): Promise<string> {
-    this.assertOwner(requesterId);
+  async getWeeklyAISummary(requesterId: string, requesterEmail?: string): Promise<string> {
+    this.assertOwner(requesterId, requesterEmail);
     const dashboard = await this.getOwnerDashboard(requesterId);
 
     const summary = await this.gemini.generateWeeklyOwnerSummary({
@@ -169,8 +179,8 @@ export class AIOverviewService {
     return summary;
   }
 
-  async getEmployeeWorkMap(requesterId: string) {
-    this.assertOwner(requesterId);
+  async getEmployeeWorkMap(requesterId: string, requesterEmail?: string) {
+    this.assertOwner(requesterId, requesterEmail);
 
     const updates = await this.prisma.workUpdate.findMany({
       where: { createdAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } },

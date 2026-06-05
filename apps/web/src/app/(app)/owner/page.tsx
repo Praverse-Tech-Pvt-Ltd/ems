@@ -49,7 +49,7 @@ export default function OwnerPage() {
     );
   }
 
-  if (!data) {
+  if (!isLoading && !data) {
     return (
       <div className="p-6">
         <div className="brutal-border p-8 text-center bg-red-50">

@@ -12,17 +12,17 @@ export class AIOverviewController {
   constructor(private readonly service: AIOverviewService) {}
 
   @Get('owner-dashboard')
-  getOwnerDashboard(@CurrentUser('id') userId: string) {
-    return this.service.getOwnerDashboard(userId);
+  getOwnerDashboard(@CurrentUser() user: { id: string; email: string }) {
+    return this.service.getOwnerDashboard(user.id, user.email);
   }
 
   @Post('weekly-summary')
-  getWeeklySummary(@CurrentUser('id') userId: string) {
-    return this.service.getWeeklyAISummary(userId);
+  getWeeklySummary(@CurrentUser() user: { id: string; email: string }) {
+    return this.service.getWeeklyAISummary(user.id, user.email);
   }
 
   @Get('employee-work-map')
-  getEmployeeWorkMap(@CurrentUser('id') userId: string) {
-    return this.service.getEmployeeWorkMap(userId);
+  getEmployeeWorkMap(@CurrentUser() user: { id: string; email: string }) {
+    return this.service.getEmployeeWorkMap(user.id, user.email);
   }
 }
