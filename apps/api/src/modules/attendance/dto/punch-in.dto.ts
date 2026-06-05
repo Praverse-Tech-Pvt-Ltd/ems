@@ -6,7 +6,6 @@ import {
   Max,
   IsOptional,
   IsObject,
-  ValidateIf,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
@@ -16,20 +15,9 @@ import { BadRequestException } from '@nestjs/common';
 const DEVICE_INFO_MAX_BYTES = 4096;
 
 export class PunchInDto {
-  @ApiPropertyOptional({ description: 'Base64 encoded face image (required unless manualPunch=true)' })
-  @ValidateIf(o => !o.manualPunch)
-  @IsString()
-  faceImageBase64?: string;
 
-  @ApiPropertyOptional({
-    description: 'Skip face verification (only allowed when face service is unavailable). Location is still required.',
-    default: false,
-  })
-  @IsOptional()
-  @IsBoolean()
-  manualPunch?: boolean;
 
-  @ApiPropertyOptional({ description: 'Reason for manual punch (face service down, camera unavailable, etc.)' })
+  @ApiPropertyOptional({ description: 'Reason for manual punch' })
   @IsOptional()
   @IsString()
   manualPunchReason?: string;

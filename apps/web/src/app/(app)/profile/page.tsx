@@ -25,7 +25,6 @@ import {
   XCircle,
 } from 'lucide-react';
 import Link from 'next/link';
-import { FaceEnrollModal } from '@/components/layouts/FaceEnrollModal';
 import { useAvatarUrl } from '@/hooks/useAvatarUrl';
 
 type Requirement = { key: string; label: string; complete: boolean };
@@ -36,7 +35,6 @@ type Onboarding = {
   panSubmitted: boolean;
   aadhaarSubmitted: boolean;
   profilePhotoSubmitted: boolean;
-  faceEnrolled: boolean;
 };
 
 const HIDDEN_KEYS = new Set(['BANK', 'AADHAAR', 'PAN']);
@@ -76,9 +74,7 @@ export default function ProfilePage() {
   const [phoneNum, setPhoneNum] = useState('');
   const [phoneSaved, setPhoneSaved] = useState('');
 
-  // Face reset state
-  const [showEnrollModal, setShowEnrollModal] = useState(false);
-  const [faceResetConfirm, setFaceResetConfirm] = useState(false);
+
 
   const { data: profile, isLoading } = useQuery<Employee & { manager?: Employee }>({
     queryKey: ['profile'],
@@ -120,15 +116,7 @@ export default function ProfilePage() {
     changePw.mutate();
   };
 
-  const resetFace = useMutation({
-    mutationFn: () => apiClient.delete('/attendance/face/reset'),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['profile'] });
-      queryClient.invalidateQueries({ queryKey: ['me-face'] });
-      setFaceResetConfirm(false);
-      setShowEnrollModal(true);
-    },
-  });
+
 
   const uploadPhoto = useMutation({
     mutationFn: (file: File) => {
@@ -170,7 +158,6 @@ export default function ProfilePage() {
 
   const allRequirements = onboarding?.requirements ?? [
     { key: 'PHOTO', label: 'Photograph', complete: false },
-    { key: 'FACE_CAPTURE', label: 'Face recognition capture', complete: profile.faceEnrolled },
   ];
   const requirements = allRequirements.filter((r) => !HIDDEN_KEYS.has(r.key));
   const completed = requirements.filter((item) => item.complete).length;
@@ -452,58 +439,7 @@ export default function ProfilePage() {
             </div>
           </div>
 
-          {/* Face ID card */}
-          <div className={`brutal-border brutal-shadow p-5 ${profile.faceEnrolled ? 'bg-brutal-yellow' : 'bg-brutal-surface'}`}>
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-brutal-ink text-brutal-yellow flex items-center justify-center">
-                  <Fingerprint size={20} />
-                </div>
-                <div>
-                  <p className="font-display font-bold uppercase">Face ID</p>
-                  <p className="font-display font-bold text-[10px] uppercase tracking-widest text-[#4a4a4a]">
-                    {profile.faceEnrolled ? 'Enrolled · used for all punch-ins' : 'Required on first login for attendance'}
-                  </p>
-                </div>
-              </div>
-              <div className="flex gap-2 flex-wrap">
-                <Link href="/attendance/biometric" className="brutal-btn-secondary px-4 py-2 text-xs text-center">
-                  {profile.faceEnrolled ? 'Re-enroll' : 'Enroll Now'}
-                </Link>
-                {profile.faceEnrolled && (
-                  <button
-                    onClick={() => setFaceResetConfirm(true)}
-                    className="brutal-border px-4 py-2 text-xs font-display font-bold uppercase tracking-wide bg-brutal-red text-white hover:bg-brutal-ink transition-colors flex items-center gap-1.5"
-                  >
-                    <RefreshCw size={12} /> Reset Face ID
-                  </button>
-                )}
-              </div>
-            </div>
 
-            {faceResetConfirm && (
-              <div className="mt-4 brutal-border border-brutal-red bg-white p-4">
-                <p className="font-display font-bold text-sm uppercase text-brutal-red mb-3">
-                  This will delete your stored face data and require re-enrollment. Continue?
-                </p>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => resetFace.mutate()}
-                    disabled={resetFace.isPending}
-                    className="brutal-btn-primary px-4 py-2 text-xs bg-brutal-red border-brutal-red disabled:opacity-50"
-                  >
-                    {resetFace.isPending ? 'Resetting…' : 'Yes, Reset'}
-                  </button>
-                  <button
-                    onClick={() => setFaceResetConfirm(false)}
-                    className="brutal-btn-secondary px-4 py-2 text-xs"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
 
           {/* Change Password */}
           <div className="bg-brutal-white brutal-border brutal-shadow p-5">
@@ -546,13 +482,7 @@ export default function ProfilePage() {
         </section>
       </div>
 
-      {showEnrollModal && (
-        <FaceEnrollModal onDone={() => {
-          setShowEnrollModal(false);
-          queryClient.invalidateQueries({ queryKey: ['me-face'] });
-          queryClient.invalidateQueries({ queryKey: ['profile'] });
-        }} />
-      )}
+
     </div>
   );
 }

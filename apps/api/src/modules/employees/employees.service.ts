@@ -28,7 +28,6 @@ const EMPLOYEE_SELECT = {
   manager: { select: { id: true, firstName: true, lastName: true } },
   joiningDate: true,
   profilePhotoUrl: true,
-  faceEnrolled: true,
   status: true,
   createdAt: true,
 } as const;
@@ -170,7 +169,6 @@ export class EmployeesService {
         role: true,
         status: true,
         joiningDate: true,
-        faceEnrolled: true,
       },
       orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }],
     });
@@ -228,7 +226,6 @@ export class EmployeesService {
         panEnc: true,
         aadhaarLast4: true,
         profilePhotoUrl: true,
-        faceEnrolled: true,
         documents: {
           select: { id: true, docType: true, fileS3Key: true, status: true, rejectionReason: true, createdAt: true },
           orderBy: { createdAt: 'desc' },
@@ -250,7 +247,6 @@ export class EmployeesService {
       panSubmitted: !!employee.panEnc,
       aadhaarSubmitted: !!employee.aadhaarLast4,
       profilePhotoSubmitted: !!employee.profilePhotoUrl || latestDocs.has('PHOTO'),
-      faceEnrolled: employee.faceEnrolled,
       completionPercent: Math.round((requirements.filter((item) => item.complete).length / requirements.length) * 100),
       requirements,
       documents: [...latestDocs.values()],
@@ -301,12 +297,7 @@ export class EmployeesService {
         data: { profilePhotoUrl: dto.fileS3Key },
       });
     }
-    if (dto.docType === 'FACE_CAPTURE') {
-      await this.prisma.employee.update({
-        where: { id },
-        data: { faceEnrolled: true, faceVectorS3Key: dto.fileS3Key },
-      });
-    }
+
     return { document: doc, onboarding: await this.getMyOnboarding(id) };
   }
 

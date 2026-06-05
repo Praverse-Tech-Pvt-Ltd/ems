@@ -46,7 +46,6 @@ services:
       DATABASE_URL: postgresql://nexgen:nexgen_dev_pass@postgres:5432/nexgen_ems
       DIRECT_URL: postgresql://nexgen:nexgen_dev_pass@postgres:5432/nexgen_ems
       REDIS_URL: redis://redis:6379
-      FACE_SERVICE_URL: http://face-service:8000
       NODE_ENV: development
     ports:
       - '3001:3001'
@@ -74,20 +73,6 @@ services:
       - '3000:3000'
     depends_on:
       - api
-
-  face-service:
-    build:
-      context: apps/face-service
-      dockerfile: Dockerfile
-    container_name: nexgen_face_dev
-    env_file: apps/api/.env
-    environment:
-      DATABASE_URL: postgresql://nexgen:nexgen_dev_pass@postgres:5432/nexgen_ems
-    ports:
-      - '8000:8000'
-    depends_on:
-      postgres:
-        condition: service_healthy
 
 volumes:
   postgres_data:

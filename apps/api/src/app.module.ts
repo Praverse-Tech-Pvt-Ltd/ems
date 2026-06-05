@@ -21,7 +21,7 @@ import { AuditModule } from './modules/audit/audit.module';
 import { CommentsModule } from './modules/comments/comments.module';
 import { CorporateModule } from './modules/corporate/corporate.module';
 import { KeepAliveModule } from './common/keep-alive/keep-alive.module';
-import { FaceRecognitionModule } from './modules/face-recognition/face-recognition.module';
+
 import { ChatModule } from './modules/chat/chat.module';
 import { ClientCompaniesModule } from './modules/client-companies/client-companies.module';
 import { MeetingNotesModule } from './modules/meeting-notes/meeting-notes.module';
@@ -81,7 +81,7 @@ import { ZohoSyncModule } from './modules/zoho-sync/zoho-sync.module';
     CommentsModule,
     CorporateModule,
     KeepAliveModule,
-    FaceRecognitionModule,
+
     ChatModule,
     AIOverviewModule,
     ClientCompaniesModule,

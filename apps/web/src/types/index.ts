@@ -51,7 +51,7 @@ export interface Employee {
   role: Role;
   status: EmployeeStatus;
   joiningDate: string;
-  faceEnrolled: boolean;
+
   department?: Department;
   manager?: Pick<Employee, 'id' | 'firstName' | 'lastName'>;
   approvalAuthority?: string[];

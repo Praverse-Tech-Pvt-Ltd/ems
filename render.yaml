@@ -38,12 +38,6 @@ services:
       # Set to this service's own URL to keep the free-tier instance alive
       - key: RENDER_SELF_URL
         sync: false
-      # Set to the nexgen-face service URL once it is deployed
-      - key: FACE_SERVICE_URL
-        sync: false
-      # Shared internal token sent to the face service. Must match the face service if auth is enabled there.
-      - key: FACE_SERVICE_API_KEY
-        generateValue: true
 
       # Auto-generated secrets
       - key: JWT_SECRET
@@ -76,8 +70,6 @@ services:
         value: 1800
       - key: CRON_TOKEN_CLEANUP
         value: "0 2 * * *"
-      - key: RECOGNITION_THRESHOLD
-        value: "0.5"
       - key: OFFICE_LAT
         value: "28.6139"
       - key: OFFICE_LNG
@@ -85,19 +77,3 @@ services:
       - key: OFFICE_RADIUS_METERS
         value: "200"
 
-  # ── Python Face Recognition Service ──────────────────────────────────────────
-  # Requires Starter plan ($7/mo) — free tier spins down and dlib builds are heavy.
-  # Build takes ~20 min on first deploy (dlib compiles from source).
-  - type: web
-    name: nexgen-face
-    runtime: docker
-    dockerfilePath: apps/face-service/Dockerfile
-    dockerContext: apps/face-service
-    plan: starter
-    healthCheckPath: /health
-    envVars:
-      # Use the DIRECT (non-pooled) URL — psycopg2 needs persistent connections
-      - key: DATABASE_URL
-        sync: false
-      - key: RECOGNITION_THRESHOLD
-        value: "0.5"

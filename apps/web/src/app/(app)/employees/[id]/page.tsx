@@ -414,14 +414,7 @@ export default function EmployeeDetailPage() {
                 SINCE {sinceYear}
               </span>
 
-              <span className={`flex items-center gap-1.5 px-3 py-1 border-2 font-display font-bold text-[10px] tracking-[0.14em] uppercase ${
-                employee.faceEnrolled
-                  ? 'border-brutal-cream/30 text-brutal-cream/60'
-                  : 'border-brutal-red/50 text-brutal-red'
-              }`}>
-                <Fingerprint size={10} strokeWidth={2.5} />
-                {employee.faceEnrolled ? 'FACE ENROLLED' : 'NO FACE ID'}
-              </span>
+
 
               {onboarding && (
                 <span className={`flex items-center gap-1.5 px-3 py-1 border-2 font-display font-bold text-[10px] tracking-[0.14em] uppercase ${
@@ -472,9 +465,7 @@ export default function EmployeeDetailPage() {
           <div className="brutal-border-l">
             <StatBox label="DEPT" value={employee.department?.name?.toUpperCase() ?? '—'} />
           </div>
-          <div className="brutal-border-l">
-            <StatBox label="FACE ID" value={employee.faceEnrolled ? 'YES' : 'NO'} accent={employee.faceEnrolled} />
-          </div>
+
         </div>
       )}
 

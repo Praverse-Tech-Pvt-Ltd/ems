@@ -78,17 +78,11 @@ export default function DashboardPage() {
   const user  = useAuthStore((s) => s.user);
   const clock = useClock();
   const [punchModal, setPunchModal] = useState<'in' | 'out' | null>(null);
-  const [punchManual, setPunchManual] = useState(false);
   const time  = clock ? clock.toLocaleTimeString('en-GB', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false }) : '--:--';
   const secs  = clock ? String(clock.getSeconds()).padStart(2, '0') : '00';
   const date  = clock ? clock.toLocaleDateString('en-GB', { timeZone: 'Asia/Kolkata',
     weekday: 'long', day: '2-digit', month: 'long', year: 'numeric',
   }).toUpperCase() : 'LOADING...';
-
-  const { data: me } = useQuery<{ faceEnrolled: boolean }>({
-    queryKey: ['me-face'],
-    queryFn:  () => apiClient.get('/employees/me').then((r) => r.data).catch(() => null),
-  });
 
   const { data: stats } = useQuery<DashboardStats>({
     queryKey: ['dashboard-stats'],
@@ -232,7 +226,7 @@ export default function DashboardPage() {
           <div className="flex items-center gap-2 font-display font-bold text-[10px] tracking-[0.22em]">
             <span className="px-2 py-1 bg-brutal-ink text-brutal-yellow">PUNCH-IN STATION</span>
             <span className="w-2 h-2 bg-brutal-blue" />
-            <span className="text-brutal-ink/60">FACE RECOGNITION · LIVENESS V4</span>
+            <span className="text-brutal-ink/60">GPS VERIFICATION</span>
           </div>
 
           <h2 className="mt-5 font-display font-bold text-[56px] leading-[0.9] tracking-[-0.02em] text-brutal-ink">
@@ -253,39 +247,23 @@ export default function DashboardPage() {
           </div>
 
           <div className="mt-7 flex items-end gap-4 flex-wrap">
-            {me === undefined ? (
-              <div className="px-6 py-4 brutal-border bg-brutal-surface font-display font-bold text-[13px] opacity-50">
-                LOADING…
-              </div>
-            ) : todayRecord?.punchOutTime ? (
+            {todayRecord?.punchOutTime ? (
               <div className="px-4 py-3 bg-[#0F8F3A] text-white font-display font-bold text-[11px] tracking-[0.18em] border-2 border-[#0F8F3A]">
                 ✓ SHIFT COMPLETE
               </div>
             ) : todayRecord?.punchInTime ? (
               <button
-                onClick={() => { setPunchManual(!me?.faceEnrolled); setPunchModal('out'); }}
+                onClick={() => setPunchModal('out')}
                 className="brutal-btn-primary px-6 py-4 text-[13px] flex items-center gap-2 bg-brutal-red text-white border-brutal-red"
               >
-                <Camera size={18} /> PUNCH OUT <ArrowRight size={14} />
+                <MapPin size={18} /> PUNCH OUT <ArrowRight size={14} />
               </button>
             ) : (
               <button
-                onClick={() => { setPunchManual(!me?.faceEnrolled); setPunchModal('in'); }}
+                onClick={() => setPunchModal('in')}
                 className="brutal-btn-primary px-6 py-4 text-[13px] flex items-center gap-2"
               >
-                <Camera size={18} /> PUNCH IN <ArrowRight size={14} />
-              </button>
-            )}
-            {/* Manual punch — always visible when shift not complete */}
-            {!todayRecord?.punchOutTime && (
-              <button
-                onClick={() => {
-                  setPunchManual(true);
-                  setPunchModal(todayRecord?.punchInTime ? 'out' : 'in');
-                }}
-                className="px-5 py-4 border-[3px] border-brutal-ink font-display font-bold text-[13px] tracking-[0.1em] flex items-center gap-2 hover:bg-brutal-surface transition-colors"
-              >
-                <MapPin size={16} /> MANUAL PUNCH
+                <MapPin size={18} /> PUNCH IN <ArrowRight size={14} />
               </button>
             )}
             {todayRecord?.punchInTime && (
@@ -321,7 +299,7 @@ export default function DashboardPage() {
             </div>
 
             <div className="relative my-4 mx-auto w-full max-w-[180px] aspect-square bg-brutal-ink brutal-border" style={{ boxShadow: '4px 4px 0 0 #ffa23a' }}>
-              <Fingerprint size={70} className="absolute inset-0 m-auto text-brutal-yellow/60" />
+              <MapPin size={70} className="absolute inset-0 m-auto text-brutal-yellow/60" />
               {[
                 'top-2 left-2 border-t-[3px] border-l-[3px]',
                 'top-2 right-2 border-t-[3px] border-r-[3px]',
@@ -648,8 +626,7 @@ export default function DashboardPage() {
     {punchModal && (
       <PunchModal
         punchType={punchModal}
-        startManual={punchManual}
-        onClose={() => { setPunchModal(null); setPunchManual(false); }}
+        onClose={() => setPunchModal(null)}
       />
     )}
     </>

@@ -3,14 +3,18 @@
 Full-stack monorepo for **NexGen Pharma Solutions Pvt Ltd**.
 
 ## Stack
+# NexGen EMS — Employee Management System
+
+Full-stack monorepo for **NexGen Pharma Solutions Pvt Ltd**.
+
+## Stack
 
 | Layer | Technology |
 |---|---|
 | Frontend | Next.js 14, TypeScript, Tailwind CSS (brutalist design system) |
 | Backend API | NestJS, TypeScript, Prisma ORM |
-| Database | PostgreSQL 16 + pgvector |
+| Database | PostgreSQL 16 |
 | Cache | Redis 7 |
-| Face Recognition | Python 3.11, FastAPI, FaceNet-PyTorch (512-d embeddings, pgvector) |
 | File Storage | Local disk in dev, S3-ready abstraction |
 | PDF | PDFKit salary slip generation |
 | Monorepo | Turborepo + npm workspaces |
@@ -23,18 +27,7 @@ Full-stack monorepo for **NexGen Pharma Solutions Pvt Ltd**.
 nexgen-ems/
 ├── apps/
 │   ├── web/                    # Next.js 14 frontend         → port 3000
-│   ├── api/                    # NestJS REST API             → port 3001
-│   └── face-service/           # Python FastAPI face service → port 8000
-│       ├── app/
-│       │   ├── config.py       # Settings (DATABASE_URL, RECOGNITION_THRESHOLD)
-│       │   ├── routes/
-│       │   │   ├── register.py     # POST /register, /register/upload, DELETE /register/employee/:id
-│       │   │   └── recognition.py  # POST /recognize, POST /verify
-│       │   └── services/
-│       │       └── face_service.py # FaceNet model + DB logic
-│       ├── main.py             # FastAPI entry point
-│       ├── requirements.txt
-│       └── Dockerfile
+│   └── api/                    # NestJS REST API             → port 3001
 ├── packages/
 │   ├── db/                     # Prisma schema + migrations
 │   └── types/                  # Shared TypeScript types
@@ -54,7 +47,6 @@ nexgen-ems/
 | Node.js | 20+ | `node -v` |
 | npm | 11+ | `npm -v` |
 | Docker Desktop | Latest | Must be running |
-| Python | 3.11 | `python --version` |
 
 ---
 
@@ -82,18 +74,11 @@ FRONTEND_URL=http://localhost:3000
 NEXT_PUBLIC_API_URL=http://localhost:3001
 STORAGE_DRIVER=local
 LOCAL_STORAGE_DIR=uploads
-FACE_SERVICE_URL=http://localhost:8000
 ```
 
 **`apps/web/.env.local`**
 ```env
 NEXT_PUBLIC_API_URL=http://localhost:3001
-```
-
-**`apps/face-service/.env`**
-```env
-DATABASE_URL=postgresql://nexgen:nexgen_dev_pass@localhost:5433/nexgen_ems?schema=public
-RECOGNITION_THRESHOLD=0.5
 ```
 
 ---
@@ -136,40 +121,7 @@ npm run db:generate
 
 ---
 
-### 5 — Set Up the Face Recognition Service
-
-```powershell
-cd apps/face-service
-
-# Create virtual environment
-python -m venv venv
-
-# Activate it (PowerShell)
-.\venv\Scripts\Activate.ps1
-
-# 1 — Install CPU PyTorch first
-pip install torch==2.6.0+cpu torchvision==0.21.0+cpu --index-url https://download.pytorch.org/whl/cpu
-
-# 2 — Install facenet-pytorch without dep enforcement (its torch<2.3 pin is stale)
-pip install facenet-pytorch==2.6.0 --no-deps
-
-# 3 — Install remaining dependencies
-pip install -r requirements.txt
-
-# Start the service with hot-reload
-uvicorn main:app --host 0.0.0.0 --port 8000 --reload
-
-cd ../..
-```
-
-> On first start, FaceNet downloads VGGFace2 model weights (~90 MB). This is cached locally after the first run.
-
-Face service health check: http://localhost:8000/health  
-Interactive API docs: http://localhost:8000/docs
-
----
-
-### 6 — Start API and Frontend
+### 5 — Start API and Frontend
 
 **Option A — Individually (recommended for debugging):**
 
@@ -189,15 +141,13 @@ npm run dev
 
 ---
 
-### 7 — Service URLs
+### 6 — Service URLs
 
 | Service | URL |
 |---|---|
 | Web App | http://localhost:3000 |
 | NestJS API | http://localhost:3001 |
 | Swagger / API Docs | http://localhost:3001/api/docs |
-| Face Recognition Service | http://localhost:8000 |
-| Face Service API Docs | http://localhost:8000/docs |
 | Prisma Studio | http://localhost:5555 (run `npm run db:studio`) |
 
 ---
@@ -222,29 +172,6 @@ npm run dev
 
 ---
 
-## Face ID System
-
-Face recognition works like a phone's Face ID — enroll once, verify forever.
-
-**First login:** `faceEnrolled = false` → Face ID Setup modal appears automatically → camera scans 5 frames → 512-d embedding stored in PostgreSQL via pgvector.
-
-**All subsequent punch-ins:** The stored embedding is used directly — no re-enrollment needed.
-
-**If face data needs resetting:** Profile → Reset Face ID → re-enrollment modal opens automatically.
-
-### Face Service Endpoints
-
-| Method | Path | Description |
-|---|---|---|
-| `GET` | `/health` | Service health check |
-| `POST` | `/register` | Register face (base64 JSON) |
-| `POST` | `/register/upload` | Register face (multipart file) |
-| `DELETE` | `/register/employee/:id` | Delete stored face embedding |
-| `POST` | `/recognize` | 1:N identify employee from image |
-| `POST` | `/verify` | 1:1 verify face against specific employee |
-
----
-
 ## API Reference
 
 ### Authentication
@@ -257,12 +184,10 @@ Face recognition works like a phone's Face ID — enroll once, verify forever.
 | `POST` | `/auth/forgot-password` | Public | Reset password by email (no email service needed — direct reset for internal use) |
 | `PATCH` | `/auth/change-password` | Bearer | Change password with current password verification |
 
-### Attendance & Face
+### Attendance
 
 | Method | Path | Auth | Description |
 |---|---|---|---|
-| `POST` | `/attendance/face/enroll` | Bearer | Enroll face from 5 frames |
-| `DELETE` | `/attendance/face/reset` | Bearer | Reset own face data (clears embedding, re-triggers enrollment) |
 | `POST` | `/attendance/punch-in` | Bearer | Manual punch-in |
 | `POST` | `/attendance/punch-out` | Bearer | Manual punch-out |
 | `GET` | `/attendance/today` | Bearer | Today's own attendance record |
@@ -355,21 +280,16 @@ docker compose down -v
 
 # Docker — tail postgres logs
 docker compose logs -f postgres
-
-# Face service (run from apps/face-service with venv active)
-.\venv\Scripts\Activate.ps1
-uvicorn main:app --host 0.0.0.0 --port 8000 --reload
-pip install -r requirements.txt            # Install / update deps
 ```
 
 ---
 
 ## Features
 
-- **Face ID attendance** — enroll once on first login, punch in/out by face forever. Reset and re-enroll from Profile if needed.
+- **Attendance** — manual punch in/out.
 - **Forgot Password** — self-service password reset from the login page (no email service required for internal use).
 - **Change Password** — authenticated password change from Profile / Settings.
-- **Employee onboarding** — bank details, Aadhaar, PAN, photograph, and face capture with checklist tracking.
+- **Employee onboarding** — bank details, Aadhaar, PAN, and photograph with checklist tracking.
 - **Payroll** — salary structures, payroll generation, incentives, deductions, approved reimbursements, approval/rejection/transfer workflow, branded PDF salary slips.
 - **Leaves** — annual CL/SL/PL balances, no rollover, paid-leave payout tracking, intern unpaid/deductible leave, and approval workflow.
 - **Expenses** — expense claims with receipt uploads and approval.
@@ -418,6 +338,4 @@ Protected access: `GET /files?key=<stored-key>`
 
 - Do not commit `.env`, `.env.local`, `uploads/`, `.next/`, `dist/`, or `node_modules/`.
 - `tsconfig.tsbuildinfo` are local build artifacts — keep out of commits.
-- FaceNet model weights are downloaded on first face service start and cached in `~/.cache/torch/`. (~90 MB, one-time only.)
-- `RECOGNITION_THRESHOLD` (default `0.5`) controls match sensitivity — lower value = stricter matching.
 - For production: replace all dev secrets, add an SMTP provider for password reset emails, and switch `STORAGE_DRIVER=s3`.

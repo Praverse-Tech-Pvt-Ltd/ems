@@ -1,7 +1,7 @@
 import { Controller, Post, Delete, Get, Patch, Body, Param, Query, UseGuards, Ip, Headers, ForbiddenException } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { AttendanceService } from './attendance.service';
-import { FaceRecognitionService } from './face-recognition.service';
+
 import { PunchInDto } from './dto/punch-in.dto';
 import { RegularizeDto } from './dto/regularize.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -16,7 +16,6 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 export class AttendanceController {
   constructor(
     private service: AttendanceService,
-    private fr: FaceRecognitionService,
   ) {}
 
   @Post('punch-in')
@@ -39,25 +38,7 @@ export class AttendanceController {
     return this.service.punchOut(user.id, dto, ip, userAgent);
   }
 
-  @Get('face/health')
-  async faceHealth() {
-    try {
-      await this.fr.ping();
-      return { status: 'ok' };
-    } catch {
-      return { status: 'unavailable' };
-    }
-  }
 
-  @Post('face/enroll')
-  enrollFace(@CurrentUser() user: { id: string }, @Body() body: { frames?: string[] }) {
-    return this.service.enrollFace(user.id, body.frames ?? []);
-  }
-
-  @Delete('face/reset')
-  resetMyFace(@CurrentUser() user: { id: string }) {
-    return this.service.resetFace(user.id);
-  }
 
   @Get('today')
   getToday(@CurrentUser() user: { id: string }) {

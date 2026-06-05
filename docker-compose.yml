@@ -69,7 +69,7 @@ services:
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-15m}
       JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-7d}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:-change_me_32char_aes_key_prod!!!}
-      FACE_SERVICE_URL: ${FACE_SERVICE_URL:-http://face-service:8000}
+
       STORAGE_DRIVER: ${STORAGE_DRIVER:-local}
       LOCAL_STORAGE_DIR: uploads
       SES_FROM_EMAIL: ${SES_FROM_EMAIL:-noreply@nexgen.in}
@@ -106,26 +106,6 @@ services:
       api:
         condition: service_healthy
 
-  # ── Python Face Recognition Service (dlib + pgvector) ────────────────────────
-  face-service:
-    build:
-      context: apps/face-service
-      dockerfile: Dockerfile
-    container_name: nexgen_face
-    restart: unless-stopped
-    ports:
-      - '8000:8000'
-    environment:
-      DATABASE_URL: ${DATABASE_URL:-postgresql://nexgen:nexgen_dev_pass@postgres:5432/nexgen_ems?sslmode=disable}
-      RECOGNITION_THRESHOLD: ${RECOGNITION_THRESHOLD:-0.5}
-    depends_on:
-      postgres:
-        condition: service_healthy
-    healthcheck:
-      test: ['CMD-SHELL', 'python -c "import urllib.request; urllib.request.urlopen(\"http://localhost:8000/health\")"']
-      interval: 15s
-      timeout: 10s
-      retries: 5
 
 volumes:
   postgres_data:

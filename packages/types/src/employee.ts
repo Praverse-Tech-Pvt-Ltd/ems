@@ -40,7 +40,7 @@ export interface EmployeeProfile {
   manager: { id: string; firstName: string; lastName: string } | null;
   joiningDate: string;
   profilePhotoUrl: string | null;
-  faceEnrolled: boolean;
+
   status: string;
   createdAt: string;
 }

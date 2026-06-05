@@ -96,7 +96,7 @@ export default function LoginPage() {
       </div>
       <div className="space-y-4">
         {[
-          { label: 'Biometric Attendance', detail: 'Face recognition + GPS geo-fencing' },
+          { label: 'GPS Attendance', detail: 'GPS geo-fencing for strict location validation' },
           { label: 'Payroll Automation',   detail: 'Automated salary slips and deductions' },
           { label: 'Real-time Alerts',     detail: 'Instant notifications via Socket.io' },
         ].map(({ label, detail }) => (

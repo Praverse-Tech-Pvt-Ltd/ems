@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Enterprise OS - Directory</title>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Tailwind Config -->
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-tint": "#4d44e3",
+                        "on-tertiary-container": "#ffd2be",
+                        "primary-container": "#4f46e5",
+                        "on-primary-fixed-variant": "#3323cc",
+                        "on-surface": "#1b1b24",
+                        "tertiary-fixed-dim": "#ffb695",
+                        "secondary-container": "#d0e1fb",
+                        "tertiary-container": "#a44100",
+                        "surface-container-high": "#eae6f4",
+                        "surface-container-low": "#f5f2ff",
+                        "on-primary": "#ffffff",
+                        "inverse-surface": "#302f39",
+                        "secondary": "#505f76",
+                        "on-secondary": "#ffffff",
+                        "error-container": "#ffdad6",
+                        "on-primary-container": "#dad7ff",
+                        "surface-container-highest": "#e4e1ee",
+                        "tertiary": "#7e3000",
+                        "primary-fixed": "#e2dfff",
+                        "on-error": "#ffffff",
+                        "on-background": "#1b1b24",
+                        "outline-variant": "#c7c4d8",
+                        "secondary-fixed-dim": "#b7c8e1",
+                        "on-secondary-fixed": "#0b1c30",
+                        "error": "#ba1a1a",
+                        "surface-container": "#f0ecf9",
+                        "on-surface-variant": "#464555",
+                        "surface-container-lowest": "#ffffff",
+                        "secondary-fixed": "#d3e4fe",
+                        "surface-bright": "#fcf8ff",
+                        "on-error-container": "#93000a",
+                        "surface": "#fcf8ff",
+                        "primary-fixed-dim": "#c3c0ff",
+                        "surface-dim": "#dcd8e5",
+                        "inverse-on-surface": "#f3effc",
+                        "outline": "#777587",
+                        "primary": "#3525cd",
+                        "on-tertiary-fixed-variant": "#7b2f00",
+                        "inverse-primary": "#c3c0ff",
+                        "tertiary-fixed": "#ffdbcc",
+                        "on-secondary-fixed-variant": "#38485d",
+                        "on-tertiary-fixed": "#351000",
+                        "on-primary-fixed": "#0f0069",
+                        "surface-variant": "#e4e1ee",
+                        "on-tertiary": "#ffffff",
+                        "on-secondary-container": "#54647a",
+                        "background": "#fcf8ff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "xs": "4px",
+                        "sm": "8px",
+                        "gutter": "24px",
+                        "container-max": "1280px",
+                        "base": "4px",
+                        "md": "16px",
+                        "lg": "24px",
+                        "xl": "32px",
+                        "2xl": "48px"
+                    },
+                    "fontFamily": {
+                        "label-md": ["Inter", "sans-serif"],
+                        "display-lg": ["Inter", "sans-serif"],
+                        "button": ["Inter", "sans-serif"],
+                        "body-md": ["Inter", "sans-serif"],
+                        "body-lg": ["Inter", "sans-serif"],
+                        "headline-lg-mobile": ["Inter", "sans-serif"],
+                        "headline-lg": ["Inter", "sans-serif"],
+                        "title-md": ["Inter", "sans-serif"]
+                    },
+                    "fontSize": {
+                        "label-md": ["12px", { "lineHeight": "1.4", "letterSpacing": "0.02em", "fontWeight": "500" }],
+                        "display-lg": ["48px", { "lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "600" }],
+                        "button": ["14px", { "lineHeight": "1", "letterSpacing": "0.01em", "fontWeight": "600" }],
+                        "body-md": ["14px", { "lineHeight": "1.5", "letterSpacing": "0", "fontWeight": "400" }],
+                        "body-lg": ["16px", { "lineHeight": "1.6", "letterSpacing": "0", "fontWeight": "400" }],
+                        "headline-lg-mobile": ["24px", { "lineHeight": "1.2", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+                        "headline-lg": ["32px", { "lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "600" }],
+                        "title-md": ["20px", { "lineHeight": "1.4", "letterSpacing": "-0.01em", "fontWeight": "600" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .material-symbols-outlined[data-weight="fill"] {
+            font-variation-settings: 'FILL' 1;
+        }
+        
+        /* Custom scrollbar for SideNav */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background-color: #e4e1ee;
+            border-radius: 20px;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body-md antialiased flex h-screen overflow-hidden">
+<!-- Shared Component: SideNavBar -->
+<nav class="fixed left-0 top-0 h-full w-[260px] bg-surface-container-lowest dark:bg-surface-container-low border-r border-outline-variant flex flex-col py-md overflow-y-auto custom-scrollbar z-20">
+<!-- Brand Area -->
+<div class="px-gutter mb-xl flex items-center gap-sm">
+<div class="w-8 h-8 rounded-lg bg-primary-container text-on-primary-container flex items-center justify-center">
+<span class="material-symbols-outlined" data-weight="fill">domain</span>
+</div>
+<div>
+<h1 class="font-headline-lg text-headline-lg font-black text-primary dark:text-primary-fixed-dim text-[20px] leading-tight">Enterprise OS</h1>
+<p class="font-label-md text-label-md text-secondary">V2.4.0</p>
+</div>
+</div>
+<!-- CTA -->
+<div class="px-md mb-lg">
+<button class="w-full bg-primary text-on-primary font-button text-button py-sm px-md rounded-full flex items-center justify-center gap-sm hover:opacity-90 transition-opacity shadow-sm">
+<span class="material-symbols-outlined text-[18px]">add</span>
+                New Project
+            </button>
+</div>
+<!-- Navigation Tabs -->
+<div class="flex-1 px-sm space-y-[2px]">
+<!-- Tab 01 -->
+<a class="flex items-center gap-md px-md py-sm rounded-lg text-on-secondary-container hover:bg-surface-container-high transition-colors duration-150 group" href="#">
+<span class="material-symbols-outlined text-[20px] text-secondary group-hover:text-primary transition-colors">dashboard</span>
+<span class="font-label-md text-label-md">01 Dashboard</span>
+</a>
+<!-- Tab 02 -->
+<a class="flex items-center gap-md px-md py-sm rounded-lg text-on-secondary-container hover:bg-surface-container-high transition-colors duration-150 group" href="#">
+<span class="material-symbols-outlined text-[20px] text-secondary group-hover:text-primary transition-colors">folder_shared</span>
+<span class="font-label-md text-label-md">02 Projects</span>
+</a>
+<!-- Tab 03 -->
+<a class="flex items-center gap-md px-md py-sm rounded-lg text-on-secondary-container hover:bg-surface-container-high transition-colors duration-150 group" href="#">
+<span class="material-symbols-outlined text-[20px] text-secondary group-hover:text-primary transition-colors">assignment</span>
+<span class="font-label-md text-label-md">03 Tasks</span>
+</a>
+<!-- Tab 04 -->
+<a class="flex items-center gap-md px-md py-sm rounded-lg text-on-secondary-container hover:bg-surface-container-high transition-colors duration-150 group" href="#">
+<span class="material-symbols-outlined text-[20px] text-secondary group-hover:text-primary transition-colors">calendar_month</span>
+<span class="font-label-md text-label-md">04 Calendar</span>
+</a>
+<!-- Tab 05 -->
+<a class="flex items-center gap-md px-md py-sm rounded-lg text-on-secondary-container hover:bg-surface-container-high transition-colors duration-150 group" href="#">
+<span class="material-symbols-outlined text-[20px] text-secondary group-hover:text-primary transition-colors">work</span>
+<span class="font-label-md text-label-md">05 Workspace</span>
+</a>
+<!-- Tab 06 -->
+<a class="flex items-center gap-md px-md py-sm rounded-lg text-on-secondary-container hover:bg-surface-container-high transition-colors duration-150 group" href="#">
+<span class="material-symbols-outlined text-[20px] text-secondary group-hover:text-primary transition-colors">group</span>
+<span class="font-label-md text-label-md">06 Members</span>
+</a>
+<!-- Tab 07 -->
+<a class="flex items-center gap-md px-md py-sm rounded-lg text-on-secondary-container hover:bg-surface-container-high transition-colors duration-150 group" href="#">
+<span class="material-symbols-outlined text-[20px] text-secondary group-hover:text-primary transition-colors">schema</span>
+<span class="font-label-md text-label-md">07 Departments</span>
+</a>
+<!-- Tab 08 ACTIVE DIRECTORY -->
+<a class="flex items-center gap-md px-md py-sm rounded-r-lg bg-primary-container text-on-primary-container border-l-4 border-primary font-bold opacity-90 transition-all" href="#">
+<span class="material-symbols-outlined text-[20px] text-primary" data-weight="fill">contact_page</span>
+<span class="font-label-md text-label-md font-bold">08 Directory</span>
+</a>
+<!-- Tab 09 -->
+<a class="flex items-center gap-md px-md py-sm rounded-lg text-on-secondary-container hover:bg-surface-container-high transition-colors duration-150 group" href="#">
+<span class="material-symbols-outlined text-[20px] text-secondary group-hover:text-primary transition-colors">description</span>
+<span class="font-label-md text-label-md">09 Reports</span>
+</a>
+<!-- Tab 10 -->
+<a class="flex items-center gap-md px-md py-sm rounded-lg text-on-secondary-container hover:bg-surface-container-high transition-colors duration-150 group" href="#">
+<span class="material-symbols-outlined text-[20px] text-secondary group-hover:text-primary transition-colors">lightbulb</span>
+<span class="font-label-md text-label-md">10 Insights</span>
+</a>
+<!-- Tab 11 -->
+<a class="flex items-center gap-md px-md py-sm rounded-lg text-on-secondary-container hover:bg-surface-container-high transition-colors duration-150 group" href="#">
+<span class="material-symbols-outlined text-[20px] text-secondary group-hover:text-primary transition-colors">bar_chart</span>
+<span class="font-label-md text-label-md">11 Analytics</span>
+</a>
+<!-- Tab 12 -->
+<a class="flex items-center gap-md px-md py-sm rounded-lg text-on-secondary-container hover:bg-surface-container-high transition-colors duration-150 group" href="#">
+<span class="material-symbols-outlined text-[20px] text-secondary group-hover:text-primary transition-colors">trending_up</span>
+<span class="font-label-md text-label-md">12 Forecasts</span>
+</a>
+<div class="my-md border-t border-outline-variant mx-md"></div>
+<!-- Tab 13 -->
+<a class="flex items-center gap-md px-md py-sm rounded-lg text-on-secondary-container hover:bg-surface-container-high transition-colors duration-150 group" href="#">
+<span class="material-symbols-outlined text-[20px] text-secondary group-hover:text-primary transition-colors">settings</span>
+<span class="font-label-md text-label-md">13 Settings</span>
+</a>
+<!-- Tab 14 -->
+<a class="flex items-center gap-md px-md py-sm rounded-lg text-on-secondary-container hover:bg-surface-container-high transition-colors duration-150 group" href="#">
+<span class="material-symbols-outlined text-[20px] text-secondary group-hover:text-primary transition-colors">payments</span>
+<span class="font-label-md text-label-md">14 Billing</span>
+</a>
+<!-- Tab 15 -->
+<a class="flex items-center gap-md px-md py-sm rounded-lg text-on-secondary-container hover:bg-surface-container-high transition-colors duration-150 group" href="#">
+<span class="material-symbols-outlined text-[20px] text-secondary group-hover:text-primary transition-colors">vpn_key</span>
+<span class="font-label-md text-label-md">15 API Keys</span>
+</a>
+<!-- Tab 16 -->
+<a class="flex items-center gap-md px-md py-sm rounded-lg text-on-secondary-container hover:bg-surface-container-high transition-colors duration-150 group" href="#">
+<span class="material-symbols-outlined text-[20px] text-secondary group-hover:text-primary transition-colors">security</span>
+<span class="font-label-md text-label-md">16 Security</span>
+</a>
+<!-- Tab 17 -->
+<a class="flex items-center gap-md px-md py-sm rounded-lg text-on-secondary-container hover:bg-surface-container-high transition-colors duration-150 group" href="#">
+<span class="material-symbols-outlined text-[20px] text-secondary group-hover:text-primary transition-colors">history</span>
+<span class="font-label-md text-label-md">17 Logs</span>
+</a>
+<!-- Tab 18 -->
+<a class="flex items-center gap-md px-md py-sm rounded-lg text-on-secondary-container hover:bg-surface-container-high transition-colors duration-150 group" href="#">
+<span class="material-symbols-outlined text-[20px] text-secondary group-hover:text-primary transition-colors">archive</span>
+<span class="font-label-md text-label-md">18 Archive</span>
+</a>
+</div>
+</nav>
+<!-- Main Content Area -->
+<div class="flex-1 flex flex-col ml-[260px] min-h-screen">
+<!-- Shared Component: TopNavBar -->
+<header class="h-16 bg-surface-container-lowest dark:bg-surface-container-low border-b border-outline-variant flex items-center justify-between px-lg w-full flex-shrink-0 z-10 sticky top-0">
+<!-- Left Side: Product Name & Search -->
+<div class="flex items-center gap-gutter">
+<span class="font-title-md text-title-md font-bold text-on-surface tracking-tight hidden md:block">Enterprise Management</span>
+<div class="relative group focus-within:ring-2 focus-within:ring-primary rounded-full transition-shadow">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-secondary group-focus-within:text-primary pointer-events-none text-[20px]">search</span>
+<input class="pl-10 pr-4 py-1.5 bg-surface-container border border-surface-variant rounded-full text-sm font-body-md text-on-surface focus:outline-none w-[280px] placeholder:text-outline transition-colors" placeholder="Global search..." type="text"/>
+</div>
+</div>
+<!-- Right Side: Actions & Profile -->
+<div class="flex items-center gap-md">
+<button class="p-2 rounded-full text-on-surface-variant hover:text-primary hover:bg-surface-container transition-colors relative">
+<span class="material-symbols-outlined">notifications</span>
+<span class="absolute top-1.5 right-1.5 w-2 h-2 bg-error rounded-full border-2 border-surface-container-lowest"></span>
+</button>
+<button class="p-2 rounded-full text-on-surface-variant hover:text-primary hover:bg-surface-container transition-colors">
+<span class="material-symbols-outlined">help</span>
+</button>
+<button class="p-2 rounded-full text-on-surface-variant hover:text-primary hover:bg-surface-container transition-colors">
+<span class="material-symbols-outlined">apps</span>
+</button>
+<div class="h-6 w-px bg-outline-variant mx-xs"></div>
+<button class="font-label-md text-label-md text-on-surface-variant hover:text-primary transition-colors hidden sm:block">Support</button>
+<div class="w-8 h-8 rounded-full bg-surface-variant ml-sm overflow-hidden border border-outline-variant cursor-pointer ring-2 ring-transparent hover:ring-primary-container transition-all">
+<img alt="User Profile" class="w-full h-full object-cover" data-alt="A professional headshot of a corporate employee smiling subtly. Bright, even studio lighting with a neutral light gray background. High-resolution photography suitable for an enterprise directory. The individual is wearing smart-casual modern office attire, conveying approachability and competence." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAAUQh3eGo31bTrla4qyPYycX_6lwoWIEw16FnH__p4Q1Q_XAufOIeMEhwtUa5kv1b3w5D8-9IZ-NWIfGV76BhxPWlIaen2hE0zRT-MvEbAsC9huJREeFAjbarKnN7DtOheO3Tqq4idaSPbYqDvG2vYIkjMvbb47jS6bII5MeJ7l2G9XWwH_Lufk460OBsiCzdHQ3Q0Mlg74fccILQfjOLk1EMbm2vy5zVb18l2ywuV-_oqYS4mIKmaYmN4F1s-1OL5tar66lbF0xv5"/>
+</div>
+</div>
+</header>
+<!-- Canvas -->
+<main class="flex-1 overflow-y-auto bg-background p-lg pt-xl custom-scrollbar">
+<div class="max-w-[1440px] mx-auto space-y-xl">
+<!-- Page Header -->
+<div class="flex flex-col md:flex-row md:items-end justify-between gap-md">
+<div>
+<h2 class="font-headline-lg text-headline-lg text-on-surface tracking-tight mb-xs">Employee Directory</h2>
+<p class="font-body-md text-body-md text-secondary">Manage and connect with team members across the organization.</p>
+</div>
+<div class="flex items-center gap-sm">
+<!-- View Toggle -->
+<div class="bg-surface-container-high p-1 rounded-lg flex items-center border border-surface-variant">
+<button class="px-3 py-1.5 rounded-md bg-surface-container-lowest shadow-sm text-primary font-label-md text-label-md flex items-center gap-xs pointer-events-none">
+<span class="material-symbols-outlined text-[18px]">grid_view</span>
+                                Grid
+                            </button>
+<button class="px-3 py-1.5 rounded-md text-secondary hover:text-on-surface font-label-md text-label-md flex items-center gap-xs transition-colors">
+<span class="material-symbols-outlined text-[18px]">account_tree</span>
+                                Tree
+                            </button>
+</div>
+<button class="bg-surface-container-lowest border border-outline-variant text-on-surface font-button text-button py-2 px-md rounded-lg flex items-center gap-xs hover:bg-surface-container-low transition-colors shadow-sm">
+<span class="material-symbols-outlined text-[18px]">person_add</span>
+                            Add Employee
+                        </button>
+</div>
+</div>
+<!-- New Hire Highlights (Bento Grid Style) -->
+<section>
+<div class="flex items-center gap-sm mb-md">
+<span class="material-symbols-outlined text-primary text-[20px]">stars</span>
+<h3 class="font-title-md text-title-md text-on-surface">New Hire Highlights</h3>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-gutter">
+<!-- Highlight Card 1 -->
+<div class="bg-gradient-to-br from-surface-container-low to-surface-container-lowest border border-surface-variant rounded-xl p-md flex items-start gap-md shadow-sm relative overflow-hidden group">
+<div class="absolute top-0 right-0 w-24 h-24 bg-primary-container rounded-bl-full opacity-20 -z-10 group-hover:scale-110 transition-transform duration-500"></div>
+<img alt="New Hire" class="w-14 h-14 rounded-full border-2 border-surface-container-lowest shadow-sm object-cover" data-alt="A professional headshot of a corporate employee smiling subtly. Bright, even studio lighting with a neutral light gray background. High-resolution photography suitable for an enterprise directory. The individual is wearing smart-casual modern office attire, conveying approachability and competence." src="https://lh3.googleusercontent.com/aida-public/AB6AXuC-dnOCA3JpB48N4_PgpL2XpHBUggovhNtfSS0Q1eN_vCljocMzgAZTKWJ3wcbG87reZEDroOBEEYoCs0MbqPWVRgnCkBV5dySZIxrloQQCZBT1LitS6o7blGcSQSysnUrxV4voYqauho92foUH1OzpUc5bismu8ZeQ-fUPh6_r0Og8hW3HBJOBTHzvr_YWLns7qqaBMjQJj8bnIGVVeZlCoBItRovmJ5cljSGPoTRyOp1vlqc8Ocy1fzQf2KfEewmKQiCheHNsqjKn"/>
+<div>
+<h4 class="font-label-md text-label-md font-bold text-on-surface">Sarah Jenkins</h4>
+<p class="font-body-md text-[13px] text-secondary leading-snug mb-1">Senior UX Designer</p>
+<span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-secondary-container text-on-secondary-container">Design</span>
+</div>
+</div>
+<!-- Highlight Card 2 -->
+<div class="bg-gradient-to-br from-surface-container-low to-surface-container-lowest border border-surface-variant rounded-xl p-md flex items-start gap-md shadow-sm relative overflow-hidden group">
+<div class="absolute top-0 right-0 w-24 h-24 bg-tertiary-container rounded-bl-full opacity-10 -z-10 group-hover:scale-110 transition-transform duration-500"></div>
+<img alt="New Hire" class="w-14 h-14 rounded-full border-2 border-surface-container-lowest shadow-sm object-cover" data-alt="A professional headshot of a male corporate employee with a subtle smile. Soft, directional studio lighting creating mild depth against a pristine white background. High-resolution enterprise directory portrait. Wearing a crisp light blue collared shirt, conveying professionalism and sharp intellect." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAd6VmlO2AqpqIVWkvPpnpzd9T_w1n9sARikKNl5ee8zGiuPcbLfm5Gs-NKYbXYHIrV5C79C1jgj4rBoj9tfQX0CcCl_LaHEGaKmvg4W8iIFIgpU5O4IL49vyA4DlaLIxMYSpAZK45p3UHBH26lMuquzqfVi5VJ6JssWQlmj4IaWgBS_6IXewVxa4VJdVlyN4rtWnv-IgUSLcV-dcbBxPudSRLycozF9sTsa7wAU_Nw1GbI0RjvucdotXjWKodi0PCwtDtPBHyvPE4K"/>
+<div>
+<h4 class="font-label-md text-label-md font-bold text-on-surface">David Chen</h4>
+<p class="font-body-md text-[13px] text-secondary leading-snug mb-1">Backend Engineer</p>
+<span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-primary-container text-on-primary-container">Engineering</span>
+</div>
+</div>
+<!-- Highlight Card 3 -->
+<div class="bg-gradient-to-br from-surface-container-low to-surface-container-lowest border border-surface-variant rounded-xl p-md flex items-start gap-md shadow-sm relative overflow-hidden group hidden md:flex">
+<div class="absolute top-0 right-0 w-24 h-24 bg-secondary-container rounded-bl-full opacity-30 -z-10 group-hover:scale-110 transition-transform duration-500"></div>
+<img alt="New Hire" class="w-14 h-14 rounded-full border-2 border-surface-container-lowest shadow-sm object-cover" data-alt="A professional headshot of a young female corporate employee looking directly at the camera. Bright, high-key studio lighting with a soft gradient gray background. High-resolution corporate portraiture. Wearing a modern dark blazer, conveying confidence and contemporary business style." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCoZEbvcQeHpu2B1sugIRPhA_RLxV_Y1V4OjXH_wkL71bqKo_klxH42cUx4cDCibGyul7Nvr5Ys6HeU9Rf7UInTocN_fhkJaBzJW4KoeugWpU5LEZWOt1zx3jzcIt4jLXLOuhe1rlgLziqtVWT9QSJmXIJzkxstoH-LcH_ftBIYiPOOSU1xnZoWMEP66BB9f8qWeOs43dJhxYEdwRLqV_lBQgyCXBFxEWKIkafapz3996eL8NYfVssxTPz2S0vovzQQsmd__xGV7Cv-"/>
+<div>
+<h4 class="font-label-md text-label-md font-bold text-on-surface">Elena Rodriguez</h4>
+<p class="font-body-md text-[13px] text-secondary leading-snug mb-1">Product Manager</p>
+<span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-surface-variant text-on-surface-variant border border-outline-variant">Product</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Search and Filter Bar -->
+<section class="bg-surface-container-lowest border border-surface-variant rounded-xl p-md shadow-sm flex flex-col md:flex-row gap-md items-center justify-between">
+<div class="flex-1 w-full flex flex-col sm:flex-row gap-md">
+<!-- Name Search -->
+<div class="relative flex-1 group">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-secondary group-focus-within:text-primary pointer-events-none text-[20px]">badge</span>
+<input class="w-full pl-10 pr-4 py-2 bg-background border border-outline-variant rounded-lg text-sm font-body-md text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors" placeholder="Search by name or email..." type="text"/>
+</div>
+<!-- Department Filter -->
+<div class="relative min-w-[200px]">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-secondary pointer-events-none text-[20px]">schema</span>
+<select class="w-full pl-10 pr-8 py-2 bg-background border border-outline-variant rounded-lg text-sm font-body-md text-on-surface appearance-none focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors cursor-pointer">
+<option disabled="" selected="" value="">Department</option>
+<option value="all">All Departments</option>
+<option value="eng">Engineering</option>
+<option value="design">Design</option>
+<option value="sales">Sales</option>
+<option value="hr">Human Resources</option>
+</select>
+<span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-secondary pointer-events-none text-[20px]">expand_more</span>
+</div>
+<!-- Location Filter -->
+<div class="relative min-w-[200px]">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-secondary pointer-events-none text-[20px]">location_on</span>
+<select class="w-full pl-10 pr-8 py-2 bg-background border border-outline-variant rounded-lg text-sm font-body-md text-on-surface appearance-none focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors cursor-pointer">
+<option disabled="" selected="" value="">Location</option>
+<option value="all">All Locations</option>
+<option value="ny">New York, NY</option>
+<option value="sf">San Francisco, CA</option>
+<option value="ldn">London, UK</option>
+<option value="remote">Remote</option>
+</select>
+<span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-secondary pointer-events-none text-[20px]">expand_more</span>
+</div>
+</div>
+<div class="w-full md:w-auto flex justify-end gap-sm">
+<button class="p-2 rounded-lg border border-outline-variant text-secondary hover:bg-surface-container-high transition-colors" title="Clear Filters">
+<span class="material-symbols-outlined text-[20px]">filter_alt_off</span>
+</button>
+</div>
+</section>
+<!-- Employee Grid -->
+<section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-gutter">
+<!-- Card 1 -->
+<div class="bg-surface-container-lowest rounded-xl shadow-sm border border-surface-variant p-lg flex flex-col items-center text-center hover:shadow-md transition-shadow group">
+<div class="relative mb-sm">
+<img alt="Employee Avatar" class="w-20 h-20 rounded-full border border-surface-variant object-cover" data-alt="A professional headshot of a corporate employee smiling subtly. Bright, even studio lighting with a neutral light gray background. High-resolution photography suitable for an enterprise directory. The individual is wearing smart-casual modern office attire, conveying approachability and competence." src="https://lh3.googleusercontent.com/aida-public/AB6AXuC09l4ps8t67k1ae8X-pP0qPFgEi3JEexdzb0gn0GbRxClGF6DbFHocZdCH0nJgtJ3_iwzfGeYqpz8jOBK7xpk6QZ2Le9d4bDoZK7B5HoFaPeF05gqDi0R4FoYigvIgWxt5zrriCjvmxKUfJ5UUR6GuSHo3r199LTMzy81AjSMcP_es4D96lm3-sh7xUaY2TqqRk00NLaI0eqsazPjpuWqOA-J35eA5RL8QbJh01zgAAzi9_lR9wLd6EGP-kNMXuuk3dcre8-tyqT9k"/>
+<div class="absolute bottom-0 right-0 w-4 h-4 bg-emerald-500 border-2 border-surface-container-lowest rounded-full" title="Online"></div>
+</div>
+<h4 class="font-title-md text-[18px] text-on-surface font-semibold mb-xs group-hover:text-primary transition-colors">Michael Foster</h4>
+<p class="font-body-md text-[13px] text-secondary mb-xs">VP of Engineering</p>
+<p class="font-body-md text-[12px] text-outline flex items-center gap-1 mb-md">
+<span class="material-symbols-outlined text-[14px]">location_on</span> San Francisco, CA
+                        </p>
+<div class="w-full flex gap-sm mt-auto">
+<button class="flex-1 bg-surface border border-outline-variant text-on-surface font-label-md text-label-md py-1.5 rounded-full hover:bg-surface-container-high transition-colors flex items-center justify-center gap-xs">
+<span class="material-symbols-outlined text-[16px]">person</span> Profile
+                            </button>
+<button class="flex-1 bg-primary-container text-on-primary-container font-label-md text-label-md py-1.5 rounded-full hover:opacity-90 transition-opacity flex items-center justify-center gap-xs font-semibold">
+<span class="material-symbols-outlined text-[16px]">chat</span> Chat
+                            </button>
+</div>
+</div>
+<!-- Card 2 -->
+<div class="bg-surface-container-lowest rounded-xl shadow-sm border border-surface-variant p-lg flex flex-col items-center text-center hover:shadow-md transition-shadow group">
+<div class="relative mb-sm">
+<img alt="Employee Avatar" class="w-20 h-20 rounded-full border border-surface-variant object-cover" data-alt="A professional headshot of a female corporate executive. Soft, high-key studio lighting against a clean white background. High-resolution corporate portraiture. She is wearing a modern tailored blouse, looking confident and approachable with a slight smile." src="https://lh3.googleusercontent.com/aida-public/AB6AXuA54uhKvgz6PPPMpEDQOMPMfzsbKkPj5cWbVhNDsNcXStsjrY6SL_hSeB_-zF6Zy5x-1F7yulCeqF39HYQuBAubNe2wdggg9_zVVzsOEhNy-oBEA1gqmkO7BUzb7CjFViL9bUm8LqeAMIXXyojGQJ3MJ9ded-MTiNFx0XM6AgcFrIwwiceR7GVoMHsV2bJP3yu1lA1hDgTofa4mfcylkipZ0L-tkFX5wse9M6LOhhMZ8Nxvx3OOASdNjFMv5JTDwZb90E6nWrQcuukO"/>
+<div class="absolute bottom-0 right-0 w-4 h-4 bg-emerald-500 border-2 border-surface-container-lowest rounded-full" title="Online"></div>
+</div>
+<h4 class="font-title-md text-[18px] text-on-surface font-semibold mb-xs group-hover:text-primary transition-colors">Amanda Reed</h4>
+<p class="font-body-md text-[13px] text-secondary mb-xs">Director of Design</p>
+<p class="font-body-md text-[12px] text-outline flex items-center gap-1 mb-md">
+<span class="material-symbols-outlined text-[14px]">location_on</span> New York, NY
+                        </p>
+<div class="w-full flex gap-sm mt-auto">
+<button class="flex-1 bg-surface border border-outline-variant text-on-surface font-label-md text-label-md py-1.5 rounded-full hover:bg-surface-container-high transition-colors flex items-center justify-center gap-xs">
+<span class="material-symbols-outlined text-[16px]">person</span> Profile
+                            </button>
+<button class="flex-1 bg-primary-container text-on-primary-container font-label-md text-label-md py-1.5 rounded-full hover:opacity-90 transition-opacity flex items-center justify-center gap-xs font-semibold">
+<span class="material-symbols-outlined text-[16px]">chat</span> Chat
+                            </button>
+</div>
+</div>
+<!-- Card 3 -->
+<div class="bg-surface-container-lowest rounded-xl shadow-sm border border-surface-variant p-lg flex flex-col items-center text-center hover:shadow-md transition-shadow group">
+<div class="relative mb-sm">
+<div class="w-20 h-20 rounded-full bg-secondary-container text-on-secondary-container flex items-center justify-center font-headline-lg text-headline-lg font-bold border border-surface-variant">
+                                TW
+                            </div>
+<div class="absolute bottom-0 right-0 w-4 h-4 bg-amber-400 border-2 border-surface-container-lowest rounded-full" title="Away"></div>
+</div>
+<h4 class="font-title-md text-[18px] text-on-surface font-semibold mb-xs group-hover:text-primary transition-colors">Thomas Wilson</h4>
+<p class="font-body-md text-[13px] text-secondary mb-xs">Senior Data Analyst</p>
+<p class="font-body-md text-[12px] text-outline flex items-center gap-1 mb-md">
+<span class="material-symbols-outlined text-[14px]">location_on</span> Remote
+                        </p>
+<div class="w-full flex gap-sm mt-auto">
+<button class="flex-1 bg-surface border border-outline-variant text-on-surface font-label-md text-label-md py-1.5 rounded-full hover:bg-surface-container-high transition-colors flex items-center justify-center gap-xs">
+<span class="material-symbols-outlined text-[16px]">person</span> Profile
+                            </button>
+<button class="flex-1 bg-primary-container text-on-primary-container font-label-md text-label-md py-1.5 rounded-full hover:opacity-90 transition-opacity flex items-center justify-center gap-xs font-semibold">
+<span class="material-symbols-outlined text-[16px]">chat</span> Chat
+                            </button>
+</div>
+</div>
+<!-- Card 4 -->
+<div class="bg-surface-container-lowest rounded-xl shadow-sm border border-surface-variant p-lg flex flex-col items-center text-center hover:shadow-md transition-shadow group">
+<div class="relative mb-sm">
+<img alt="Employee Avatar" class="w-20 h-20 rounded-full border border-surface-variant object-cover" data-alt="A professional headshot of a young male corporate employee. Bright, natural-looking studio lighting with a light gray background. High-resolution photography suitable for an enterprise directory. Wearing glasses and a casual button-down shirt, conveying a modern tech-industry professional look." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAM-lyvVRABDG9r7zhBCfvadseh2GZvJ3yvKzd-r353yr4ZyldeYI1YxpRIowTqAjZE5d7eQsVc4c6EVeRVBQasWOfu47oHQNcdkdIK0sDUn5FGZ-hmTKDQejZAAze2SQspyttO9fWDF5o36IeP4qa7Q1PrQA0H_w1kl35kRok-K8uxnq3MSgqfghwVa_l9HTFrHPrPgj4m9m1UI2m8Au8bUdy1c_e_iW0zvW0eINhcIdK7hf84qm7NHnXxSzYIBYNo4r_cTGDvEdun"/>
+<div class="absolute bottom-0 right-0 w-4 h-4 bg-outline-variant border-2 border-surface-container-lowest rounded-full" title="Offline"></div>
+</div>
+<h4 class="font-title-md text-[18px] text-on-surface font-semibold mb-xs group-hover:text-primary transition-colors">James Cooper</h4>
+<p class="font-body-md text-[13px] text-secondary mb-xs">Frontend Engineer</p>
+<p class="font-body-md text-[12px] text-outline flex items-center gap-1 mb-md">
+<span class="material-symbols-outlined text-[14px]">location_on</span> London, UK
+                        </p>
+<div class="w-full flex gap-sm mt-auto">
+<button class="flex-1 bg-surface border border-outline-variant text-on-surface font-label-md text-label-md py-1.5 rounded-full hover:bg-surface-container-high transition-colors flex items-center justify-center gap-xs">
+<span class="material-symbols-outlined text-[16px]">person</span> Profile
+                            </button>
+<button class="flex-1 bg-primary-container text-on-primary-container font-label-md text-label-md py-1.5 rounded-full hover:opacity-90 transition-opacity flex items-center justify-center gap-xs font-semibold">
+<span class="material-symbols-outlined text-[16px]">chat</span> Chat
+                            </button>
+</div>
+</div>
+<!-- Card 5 -->
+<div class="bg-surface-container-lowest rounded-xl shadow-sm border border-surface-variant p-lg flex flex-col items-center text-center hover:shadow-md transition-shadow group">
+<div class="relative mb-sm">
+<img alt="Employee Avatar" class="w-20 h-20 rounded-full border border-surface-variant object-cover" data-alt="A professional headshot of a corporate employee smiling subtly. Bright, even studio lighting with a neutral light gray background. High-resolution photography suitable for an enterprise directory. The individual is wearing smart-casual modern office attire, conveying approachability and competence." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDPIbi9dAMHpBqOrvdE0VBiYj17LfW4afFCek-fdwv3pXYtanBgulPqA63fTc5vZLBTR2NtprMmXx5tMP6Z0Q50BGJlnDTD54uMvEFGl9iaotfN5gtq5XSD_95Um0DkblvsliX6DhG4Sc65zihxFeGL6MBOroIZtbMHIqsNIrXW4Dx7Q-AYQmfBpXHe9ORxyqFD2-SKgGR2rV4LAp3Uo36QkE9-X8JThSqSVmLlkEKI3zRFzD7x4b2cVsvalUtJtUfhSV7ydsFqjDji"/>
+<div class="absolute bottom-0 right-0 w-4 h-4 bg-emerald-500 border-2 border-surface-container-lowest rounded-full" title="Online"></div>
+</div>
+<h4 class="font-title-md text-[18px] text-on-surface font-semibold mb-xs group-hover:text-primary transition-colors">Sarah Jenkins</h4>
+<p class="font-body-md text-[13px] text-secondary mb-xs">Senior UX Designer</p>
+<p class="font-body-md text-[12px] text-outline flex items-center gap-1 mb-md">
+<span class="material-symbols-outlined text-[14px]">location_on</span> San Francisco, CA
+                        </p>
+<div class="w-full flex gap-sm mt-auto">
+<button class="flex-1 bg-surface border border-outline-variant text-on-surface font-label-md text-label-md py-1.5 rounded-full hover:bg-surface-container-high transition-colors flex items-center justify-center gap-xs">
+<span class="material-symbols-outlined text-[16px]">person</span> Profile
+                            </button>
+<button class="flex-1 bg-primary-container text-on-primary-container font-label-md text-label-md py-1.5 rounded-full hover:opacity-90 transition-opacity flex items-center justify-center gap-xs font-semibold">
+<span class="material-symbols-outlined text-[16px]">chat</span> Chat
+                            </button>
+</div>
+</div>
+</section>
+<!-- Pagination / Load More -->
+<div class="flex justify-center pt-md pb-xl">
+<button class="bg-surface border border-outline-variant text-secondary font-button text-button py-2 px-lg rounded-full hover:bg-surface-container hover:text-on-surface transition-colors shadow-sm flex items-center gap-sm">
+                        Load More Employees
+                        <span class="material-symbols-outlined text-[18px]">expand_more</span>
+</button>
+</div>
+</div>
+</main>
+</div>
+</body></html>

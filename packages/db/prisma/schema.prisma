@@ -200,157 +200,151 @@ model Department {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  employees   Employee[]
-  headId      String?    @map("head_id")
+  employees Employee[]
+  headId    String?    @map("head_id")
 
   @@map("departments")
 }
 
 model OfficeLocation {
-  id            String   @id @default(uuid())
-  name          String
-  latitude      Decimal  @db.Decimal(10, 7)
-  longitude     Decimal  @db.Decimal(10, 7)
-  radiusMeters  Int      @default(200) @map("radius_meters")
-  isActive      Boolean  @default(true) @map("is_active")
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
+  id           String   @id @default(uuid())
+  name         String
+  latitude     Decimal  @db.Decimal(10, 7)
+  longitude    Decimal  @db.Decimal(10, 7)
+  radiusMeters Int      @default(200) @map("radius_meters")
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
 
   @@map("office_locations")
 }
 
 model Employee {
-  id               String         @id @default(uuid())
-  employeeCode     String         @unique @map("employee_code")
-  email            String         @unique
-  passwordHash     String         @map("password_hash")
-  firstName        String         @map("first_name")
-  lastName         String         @map("last_name")
-  phone            String?
-  departmentId     String?        @map("department_id")
-  designation      String?
-  role             Role           @default(EMPLOYEE)
-  managerId        String?        @map("manager_id")
-  joiningDate      DateTime       @map("joining_date") @db.Date
-  salaryGrade      String?        @map("salary_grade")
-  grossSalary      Decimal?       @map("gross_salary") @db.Decimal(12, 2)
-  bankAccountEnc   String?        @map("bank_account_enc")
-  panEnc           String?        @map("pan_enc")
-  aadhaarLast4     String?        @map("aadhaar_last4") @db.Char(4)
-  profilePhotoUrl  String?        @map("profile_photo_url")
-  faceEnrolled     Boolean                    @default(false) @map("face_enrolled")
-  faceVector       Unsupported("vector(512)")? @map("face_vector")
-  faceEmbedding    Json?                      @map("face_embedding")
-  faceVectorS3Key  String?                    @map("face_vector_s3_key")
-  faceModel        String?                    @map("face_model")
-  faceEnrolledAt   DateTime?                  @map("face_enrolled_at") @db.Timestamptz
+  id              String   @id @default(uuid())
+  employeeCode    String   @unique @map("employee_code")
+  email           String   @unique
+  passwordHash    String   @map("password_hash")
+  firstName       String   @map("first_name")
+  lastName        String   @map("last_name")
+  phone           String?
+  departmentId    String?  @map("department_id")
+  designation     String?
+  role            Role     @default(EMPLOYEE)
+  managerId       String?  @map("manager_id")
+  joiningDate     DateTime @map("joining_date") @db.Date
+  salaryGrade     String?  @map("salary_grade")
+  grossSalary     Decimal? @map("gross_salary") @db.Decimal(12, 2)
+  bankAccountEnc  String?  @map("bank_account_enc")
+  panEnc          String?  @map("pan_enc")
+  aadhaarLast4    String?  @map("aadhaar_last4") @db.Char(4)
+  profilePhotoUrl String?  @map("profile_photo_url")
+
   status           EmployeeStatus @default(ACTIVE)
   address          String?
   emergencyContact String?        @map("emergency_contact")
   createdAt        DateTime       @default(now()) @map("created_at")
   updatedAt        DateTime       @updatedAt @map("updated_at")
 
-  department       Department?       @relation(fields: [departmentId], references: [id])
-  manager          Employee?         @relation("ManagerSubordinates", fields: [managerId], references: [id])
-  subordinates     Employee[]        @relation("ManagerSubordinates")
+  department   Department? @relation(fields: [departmentId], references: [id])
+  manager      Employee?   @relation("ManagerSubordinates", fields: [managerId], references: [id])
+  subordinates Employee[]  @relation("ManagerSubordinates")
 
-  attendance             AttendanceRecord[]
-  expensesClaimed        Expense[]          @relation("ExpenseClaimant")
-  expensesL1Approved     Expense[]          @relation("ExpenseL1Approver")
-  expensesFinanceApproved Expense[]         @relation("ExpenseFinanceApprover")
-  invoicesSubmitted      Invoice[]          @relation("InvoiceSubmitter")
-  invoicesApproved       Invoice[]          @relation("InvoiceApprover")
-  leaveRequests          LeaveRequest[]     @relation("LeaveRequester")
-  leavesApproved         LeaveRequest[]     @relation("LeaveApprover")
-  leaveBalances          LeaveBalance[]
-  employeeRequests       EmployeeRequest[]  @relation("RequestSubmitter")
-  requestsReviewed       EmployeeRequest[]  @relation("RequestReviewer")
-  salarySlips            SalarySlip[]       @relation("SlipEmployee")
-  salarySlipsUploaded    SalarySlip[]       @relation("SlipUploader")
-  salaryStructures       SalaryStructure[]  @relation("StructureEmployee")
-  salaryStructuresApproved SalaryStructure[] @relation("StructureApprover")
-  salarySlipsApproved    SalarySlip[]       @relation("SlipApprover")
-  notifications          Notification[]
-  commentsMade           Comment[]
-  auditLogs              AuditLog[]         @relation("AuditActor")
-  attendanceRegularized  AttendanceRecord[] @relation("AttendanceRegularizer")
-  consentRecords         ConsentRecord[]
-  refreshTokens          RefreshToken[]
-  passwordResetTokens    PasswordResetToken[]
-  documents              EmployeeDocument[]
-  tasksCreated           Task[]             @relation("TaskCreator")
-  taskAssignments        TaskAssignment[]
-  chatMemberships        ChatChannelMember[]
-  chatMessages           ChatMessage[]
-  policyAcknowledgements PolicyAcknowledgement[]
-  lifecycleEvents        EmployeeLifecycleEvent[] @relation("LifecycleEmployee")
-  lifecycleEventsCreated EmployeeLifecycleEvent[] @relation("LifecycleCreator")
-  faceEmbeddingRecord    FaceEmbedding?
+  attendance               AttendanceRecord[]
+  expensesClaimed          Expense[]                @relation("ExpenseClaimant")
+  expensesL1Approved       Expense[]                @relation("ExpenseL1Approver")
+  expensesFinanceApproved  Expense[]                @relation("ExpenseFinanceApprover")
+  invoicesSubmitted        Invoice[]                @relation("InvoiceSubmitter")
+  invoicesApproved         Invoice[]                @relation("InvoiceApprover")
+  leaveRequests            LeaveRequest[]           @relation("LeaveRequester")
+  leavesApproved           LeaveRequest[]           @relation("LeaveApprover")
+  leaveBalances            LeaveBalance[]
+  employeeRequests         EmployeeRequest[]        @relation("RequestSubmitter")
+  requestsReviewed         EmployeeRequest[]        @relation("RequestReviewer")
+  salarySlips              SalarySlip[]             @relation("SlipEmployee")
+  salarySlipsUploaded      SalarySlip[]             @relation("SlipUploader")
+  salaryStructures         SalaryStructure[]        @relation("StructureEmployee")
+  salaryStructuresApproved SalaryStructure[]        @relation("StructureApprover")
+  salarySlipsApproved      SalarySlip[]             @relation("SlipApprover")
+  notifications            Notification[]
+  commentsMade             Comment[]
+  auditLogs                AuditLog[]               @relation("AuditActor")
+  attendanceRegularized    AttendanceRecord[]       @relation("AttendanceRegularizer")
+  consentRecords           ConsentRecord[]
+  refreshTokens            RefreshToken[]
+  passwordResetTokens      PasswordResetToken[]
+  documents                EmployeeDocument[]
+  tasksCreated             Task[]                   @relation("TaskCreator")
+  taskAssignments          TaskAssignment[]
+  chatMemberships          ChatChannelMember[]
+  chatMessages             ChatMessage[]
+  policyAcknowledgements   PolicyAcknowledgement[]
+  lifecycleEvents          EmployeeLifecycleEvent[] @relation("LifecycleEmployee")
+  lifecycleEventsCreated   EmployeeLifecycleEvent[] @relation("LifecycleCreator")
 
   // Company Intelligence relations
-  companiesResponsible   ClientCompany[]          @relation("CompanyResponsible")
-  companiesCreated       ClientCompany[]          @relation("CompanyCreator")
-  companyProjects        CompanyProject[]         @relation("ProjectLead")
-  statusHistoryChanges   CompanyStatusHistory[]   @relation("StatusHistoryChanger")
-  companyVisits          CompanyVisit[]           @relation("VisitEmployee")
-  meetingNotesEntered    MeetingNote[]            @relation("MeetingNoteEntered")
-  meetingNotesReviewed   MeetingNote[]            @relation("MeetingNoteReviewer")
-  workUpdatesSubmitted   WorkUpdate[]             @relation("WorkUpdateEmployee")
-  workUpdatesReviewed    WorkUpdate[]             @relation("WorkUpdateReviewer")
-  timelineEntries        CompanyTimelineEntry[]   @relation("TimelineEmployee")
-  calendarEventsAssigned CalendarEvent[]          @relation("CalendarAssignee")
-  calendarEventsCreated  CalendarEvent[]          @relation("CalendarCreator")
-  alertsResolved         CompanyAlert[]           @relation("AlertResolver")
-  attendanceEdits        AttendanceEditHistory[]  @relation("AttendanceEditor")
+  companiesResponsible   ClientCompany[]         @relation("CompanyResponsible")
+  companiesCreated       ClientCompany[]         @relation("CompanyCreator")
+  companyProjects        CompanyProject[]        @relation("ProjectLead")
+  statusHistoryChanges   CompanyStatusHistory[]  @relation("StatusHistoryChanger")
+  companyVisits          CompanyVisit[]          @relation("VisitEmployee")
+  meetingNotesEntered    MeetingNote[]           @relation("MeetingNoteEntered")
+  meetingNotesReviewed   MeetingNote[]           @relation("MeetingNoteReviewer")
+  workUpdatesSubmitted   WorkUpdate[]            @relation("WorkUpdateEmployee")
+  workUpdatesReviewed    WorkUpdate[]            @relation("WorkUpdateReviewer")
+  timelineEntries        CompanyTimelineEntry[]  @relation("TimelineEmployee")
+  calendarEventsAssigned CalendarEvent[]         @relation("CalendarAssignee")
+  calendarEventsCreated  CalendarEvent[]         @relation("CalendarCreator")
+  alertsResolved         CompanyAlert[]          @relation("AlertResolver")
+  attendanceEdits        AttendanceEditHistory[] @relation("AttendanceEditor")
 
   // Tier 1 + 2 relations
-  auditItemsResponsible       AuditReadinessItem[]    @relation("AuditItemResponsible")
+  auditItemsResponsible       AuditReadinessItem[]  @relation("AuditItemResponsible")
   aiChatMessages              AIChatMessage[]
-  followUpTasksAssigned       FollowUpTask[]          @relation("FollowUpAssignee")
-  companyDocumentsUploaded    CompanyDocument[]       @relation("DocUploader")
-  clientCommunicationsCreated ClientCommunication[]   @relation("CommAuthor")
+  followUpTasksAssigned       FollowUpTask[]        @relation("FollowUpAssignee")
+  companyDocumentsUploaded    CompanyDocument[]     @relation("DocUploader")
+  clientCommunicationsCreated ClientCommunication[] @relation("CommAuthor")
 
   @@map("employees")
 }
 
 model RefreshToken {
-  id          String   @id @default(uuid())
-  token       String   @unique
-  employeeId  String   @map("employee_id")
-  expiresAt   DateTime @map("expires_at")
-  createdAt   DateTime @default(now()) @map("created_at")
-  isRevoked   Boolean  @default(false) @map("is_revoked")
+  id         String   @id @default(uuid())
+  token      String   @unique
+  employeeId String   @map("employee_id")
+  expiresAt  DateTime @map("expires_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+  isRevoked  Boolean  @default(false) @map("is_revoked")
 
-  employee    Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
   @@map("refresh_tokens")
 }
 
 model AttendanceRecord {
-  id                     String           @id @default(uuid())
-  employeeId             String           @map("employee_id")
-  date                   DateTime         @db.Date
-  punchInTime            DateTime?        @map("punch_in_time") @db.Timestamptz
-  punchOutTime           DateTime?        @map("punch_out_time") @db.Timestamptz
-  punchInLat             Decimal?         @map("punch_in_lat") @db.Decimal(10, 7)
-  punchInLng             Decimal?         @map("punch_in_lng") @db.Decimal(10, 7)
-  punchOutLat            Decimal?         @map("punch_out_lat") @db.Decimal(10, 7)
-  punchOutLng            Decimal?         @map("punch_out_lng") @db.Decimal(10, 7)
-  status                 AttendanceStatus @default(PRESENT)
-  workingHours           Decimal?         @map("working_hours") @db.Decimal(4, 2)
-  isGeoValidIn           Boolean?         @map("is_geo_valid_in")
-  isGeoValidOut          Boolean?         @map("is_geo_valid_out")
-  frConfidenceIn         Decimal?         @map("fr_confidence_in") @db.Decimal(4, 3)
-  frConfidenceOut        Decimal?         @map("fr_confidence_out") @db.Decimal(4, 3)
-  isRegularized          Boolean          @default(false) @map("is_regularized")
-  regularizedBy          String?          @map("regularized_by")
-  regularizationReason   String?          @map("regularization_reason")
-  isManualPunch          Boolean          @default(false) @map("is_manual_punch")
-  manualPunchReason      String?          @map("manual_punch_reason")
-  deviceInfo             Json?            @map("device_info")
-  notes                  String?
-  createdAt              DateTime         @default(now()) @map("created_at")
-  updatedAt              DateTime         @updatedAt @map("updated_at")
+  id                   String           @id @default(uuid())
+  employeeId           String           @map("employee_id")
+  date                 DateTime         @db.Date
+  punchInTime          DateTime?        @map("punch_in_time") @db.Timestamptz
+  punchOutTime         DateTime?        @map("punch_out_time") @db.Timestamptz
+  punchInLat           Decimal?         @map("punch_in_lat") @db.Decimal(10, 7)
+  punchInLng           Decimal?         @map("punch_in_lng") @db.Decimal(10, 7)
+  punchOutLat          Decimal?         @map("punch_out_lat") @db.Decimal(10, 7)
+  punchOutLng          Decimal?         @map("punch_out_lng") @db.Decimal(10, 7)
+  status               AttendanceStatus @default(PRESENT)
+  workingHours         Decimal?         @map("working_hours") @db.Decimal(4, 2)
+  isGeoValidIn         Boolean?         @map("is_geo_valid_in")
+  isGeoValidOut        Boolean?         @map("is_geo_valid_out")
+  frConfidenceIn       Decimal?         @map("fr_confidence_in") @db.Decimal(4, 3)
+  frConfidenceOut      Decimal?         @map("fr_confidence_out") @db.Decimal(4, 3)
+  isRegularized        Boolean          @default(false) @map("is_regularized")
+  regularizedBy        String?          @map("regularized_by")
+  regularizationReason String?          @map("regularization_reason")
+  isManualPunch        Boolean          @default(false) @map("is_manual_punch")
+  manualPunchReason    String?          @map("manual_punch_reason")
+  deviceInfo           Json?            @map("device_info")
+  notes                String?
+  createdAt            DateTime         @default(now()) @map("created_at")
+  updatedAt            DateTime         @updatedAt @map("updated_at")
 
   employee    Employee                @relation(fields: [employeeId], references: [id])
   regularizer Employee?               @relation("AttendanceRegularizer", fields: [regularizedBy], references: [id])
@@ -361,29 +355,29 @@ model AttendanceRecord {
 }
 
 model Expense {
-  id                  String        @id @default(uuid())
-  employeeId          String        @map("employee_id")
-  category            ExpenseCategory
-  amount              Decimal       @db.Decimal(10, 2)
-  expenseDate         DateTime      @map("expense_date") @db.Date
-  description         String?
-  paymentMode         PaymentMode?  @map("payment_mode")
-  billS3Key           String?       @map("bill_s3_key")
-  status              ExpenseStatus @default(DRAFT)
-  l1ApproverId        String?       @map("l1_approver_id")
-  l1ApprovedAt        DateTime?     @map("l1_approved_at") @db.Timestamptz
-  financeApproverId   String?       @map("finance_approver_id")
-  financeApprovedAt   DateTime?     @map("finance_approved_at") @db.Timestamptz
-  paidAt              DateTime?     @map("paid_at") @db.Timestamptz
-  paymentRef          String?       @map("payment_ref")
-  rejectionReason     String?       @map("rejection_reason")
-  createdAt           DateTime      @default(now()) @map("created_at")
-  updatedAt           DateTime      @updatedAt @map("updated_at")
+  id                String          @id @default(uuid())
+  employeeId        String          @map("employee_id")
+  category          ExpenseCategory
+  amount            Decimal         @db.Decimal(10, 2)
+  expenseDate       DateTime        @map("expense_date") @db.Date
+  description       String?
+  paymentMode       PaymentMode?    @map("payment_mode")
+  billS3Key         String?         @map("bill_s3_key")
+  status            ExpenseStatus   @default(DRAFT)
+  l1ApproverId      String?         @map("l1_approver_id")
+  l1ApprovedAt      DateTime?       @map("l1_approved_at") @db.Timestamptz
+  financeApproverId String?         @map("finance_approver_id")
+  financeApprovedAt DateTime?       @map("finance_approved_at") @db.Timestamptz
+  paidAt            DateTime?       @map("paid_at") @db.Timestamptz
+  paymentRef        String?         @map("payment_ref")
+  rejectionReason   String?         @map("rejection_reason")
+  createdAt         DateTime        @default(now()) @map("created_at")
+  updatedAt         DateTime        @updatedAt @map("updated_at")
 
-  employee         Employee  @relation("ExpenseClaimant", fields: [employeeId], references: [id])
-  l1Approver       Employee? @relation("ExpenseL1Approver", fields: [l1ApproverId], references: [id])
-  financeApprover  Employee? @relation("ExpenseFinanceApprover", fields: [financeApproverId], references: [id])
-  comments         Comment[]
+  employee        Employee  @relation("ExpenseClaimant", fields: [employeeId], references: [id])
+  l1Approver      Employee? @relation("ExpenseL1Approver", fields: [l1ApproverId], references: [id])
+  financeApprover Employee? @relation("ExpenseFinanceApprover", fields: [financeApproverId], references: [id])
+  comments        Comment[]
 
   @@map("expenses")
 }
@@ -406,126 +400,126 @@ model Invoice {
   createdAt     DateTime      @default(now()) @map("created_at")
   updatedAt     DateTime      @updatedAt @map("updated_at")
 
-  submitter  Employee  @relation("InvoiceSubmitter", fields: [submittedBy], references: [id])
-  approver   Employee? @relation("InvoiceApprover", fields: [approvedBy], references: [id])
-  comments   Comment[]
+  submitter Employee  @relation("InvoiceSubmitter", fields: [submittedBy], references: [id])
+  approver  Employee? @relation("InvoiceApprover", fields: [approvedBy], references: [id])
+  comments  Comment[]
 
   @@map("invoices")
 }
 
 model LeaveBalance {
-  id          String    @id @default(uuid())
-  employeeId  String    @map("employee_id")
-  leaveType   LeaveType @map("leave_type")
-  totalDays   Int       @default(0) @map("total_days")
-  usedDays    Int       @default(0) @map("used_days")
-  year        Int
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
+  id         String    @id @default(uuid())
+  employeeId String    @map("employee_id")
+  leaveType  LeaveType @map("leave_type")
+  totalDays  Int       @default(0) @map("total_days")
+  usedDays   Int       @default(0) @map("used_days")
+  year       Int
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
 
-  employee  Employee @relation(fields: [employeeId], references: [id])
+  employee Employee @relation(fields: [employeeId], references: [id])
 
   @@unique([employeeId, leaveType, year])
   @@map("leave_balances")
 }
 
 model LeaveRequest {
-  id           String      @id @default(uuid())
-  employeeId   String      @map("employee_id")
-  leaveType    LeaveType   @map("leave_type")
-  fromDate     DateTime    @map("from_date") @db.Date
-  toDate       DateTime    @map("to_date") @db.Date
-  totalDays    Int         @map("total_days")
-  reason       String
-  status       LeaveStatus @default(PENDING)
-  approvedBy   String?     @map("approved_by")
-  approvedAt   DateTime?   @map("approved_at") @db.Timestamptz
-  rejectionReason String?  @map("rejection_reason")
-  documentS3Key   String?  @map("document_s3_key")
-  createdAt    DateTime    @default(now()) @map("created_at")
-  updatedAt    DateTime    @updatedAt @map("updated_at")
+  id              String      @id @default(uuid())
+  employeeId      String      @map("employee_id")
+  leaveType       LeaveType   @map("leave_type")
+  fromDate        DateTime    @map("from_date") @db.Date
+  toDate          DateTime    @map("to_date") @db.Date
+  totalDays       Int         @map("total_days")
+  reason          String
+  status          LeaveStatus @default(PENDING)
+  approvedBy      String?     @map("approved_by")
+  approvedAt      DateTime?   @map("approved_at") @db.Timestamptz
+  rejectionReason String?     @map("rejection_reason")
+  documentS3Key   String?     @map("document_s3_key")
+  createdAt       DateTime    @default(now()) @map("created_at")
+  updatedAt       DateTime    @updatedAt @map("updated_at")
 
-  employee  Employee  @relation("LeaveRequester", fields: [employeeId], references: [id])
-  approver  Employee? @relation("LeaveApprover", fields: [approvedBy], references: [id])
-  comments  Comment[]
+  employee Employee  @relation("LeaveRequester", fields: [employeeId], references: [id])
+  approver Employee? @relation("LeaveApprover", fields: [approvedBy], references: [id])
+  comments Comment[]
 
   @@map("leave_requests")
 }
 
 model EmployeeRequest {
-  id            String        @id @default(uuid())
-  employeeId    String        @map("employee_id")
-  requestType   RequestType   @map("request_type")
-  details       Json
-  status        RequestStatus @default(PENDING)
-  reviewedBy    String?       @map("reviewed_by")
-  reviewedAt    DateTime?     @map("reviewed_at") @db.Timestamptz
-  comment       String?
-  createdAt     DateTime      @default(now()) @map("created_at")
-  updatedAt     DateTime      @updatedAt @map("updated_at")
+  id          String        @id @default(uuid())
+  employeeId  String        @map("employee_id")
+  requestType RequestType   @map("request_type")
+  details     Json
+  status      RequestStatus @default(PENDING)
+  reviewedBy  String?       @map("reviewed_by")
+  reviewedAt  DateTime?     @map("reviewed_at") @db.Timestamptz
+  comment     String?
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
 
-  employee  Employee  @relation("RequestSubmitter", fields: [employeeId], references: [id])
-  reviewer  Employee? @relation("RequestReviewer", fields: [reviewedBy], references: [id])
-  comments  Comment[]
+  employee Employee  @relation("RequestSubmitter", fields: [employeeId], references: [id])
+  reviewer Employee? @relation("RequestReviewer", fields: [reviewedBy], references: [id])
+  comments Comment[]
 
   @@map("employee_requests")
 }
 
 model SalarySlip {
-  id            String   @id @default(uuid())
-  employeeId    String   @map("employee_id")
-  month         Int
-  year          Int
-  baseSalary    Decimal? @map("base_salary") @db.Decimal(12, 2)
-  incentives    Decimal  @default(0) @db.Decimal(12, 2)
-  reimbursements Decimal @default(0) @db.Decimal(12, 2)
-  grossSalary   Decimal  @map("gross_salary") @db.Decimal(12, 2)
-  deductions    Decimal  @db.Decimal(12, 2)
-  netPayable    Decimal  @map("net_payable") @db.Decimal(12, 2)
-  lopDays       Int      @default(0) @map("lop_days")
-  daysPresent   Int      @map("days_present")
-  status        PayrollStatus @default(DRAFT)
-  slipPdfS3Key  String?  @map("slip_pdf_s3_key")
-  signatureName String?  @map("signature_name")
-  signatureTitle String? @map("signature_title")
-  signatureAssetKey String? @map("signature_asset_key")
-  approvedBy    String?  @map("approved_by")
-  approvedAt    DateTime? @map("approved_at") @db.Timestamptz
-  transferredAt DateTime? @map("transferred_at") @db.Timestamptz
-  paymentRef    String?  @map("payment_ref")
-  emailSentAt   DateTime? @map("email_sent_at") @db.Timestamptz
-  notes         String?
-  uploadedBy    String   @map("uploaded_by")
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
+  id                String        @id @default(uuid())
+  employeeId        String        @map("employee_id")
+  month             Int
+  year              Int
+  baseSalary        Decimal?      @map("base_salary") @db.Decimal(12, 2)
+  incentives        Decimal       @default(0) @db.Decimal(12, 2)
+  reimbursements    Decimal       @default(0) @db.Decimal(12, 2)
+  grossSalary       Decimal       @map("gross_salary") @db.Decimal(12, 2)
+  deductions        Decimal       @db.Decimal(12, 2)
+  netPayable        Decimal       @map("net_payable") @db.Decimal(12, 2)
+  lopDays           Int           @default(0) @map("lop_days")
+  daysPresent       Int           @map("days_present")
+  status            PayrollStatus @default(DRAFT)
+  slipPdfS3Key      String?       @map("slip_pdf_s3_key")
+  signatureName     String?       @map("signature_name")
+  signatureTitle    String?       @map("signature_title")
+  signatureAssetKey String?       @map("signature_asset_key")
+  approvedBy        String?       @map("approved_by")
+  approvedAt        DateTime?     @map("approved_at") @db.Timestamptz
+  transferredAt     DateTime?     @map("transferred_at") @db.Timestamptz
+  paymentRef        String?       @map("payment_ref")
+  emailSentAt       DateTime?     @map("email_sent_at") @db.Timestamptz
+  notes             String?
+  uploadedBy        String        @map("uploaded_by")
+  createdAt         DateTime      @default(now()) @map("created_at")
+  updatedAt         DateTime      @updatedAt @map("updated_at")
 
-  employee  Employee @relation("SlipEmployee", fields: [employeeId], references: [id])
-  uploader  Employee @relation("SlipUploader", fields: [uploadedBy], references: [id])
-  approver  Employee? @relation("SlipApprover", fields: [approvedBy], references: [id])
+  employee Employee  @relation("SlipEmployee", fields: [employeeId], references: [id])
+  uploader Employee  @relation("SlipUploader", fields: [uploadedBy], references: [id])
+  approver Employee? @relation("SlipApprover", fields: [approvedBy], references: [id])
 
   @@unique([employeeId, month, year])
   @@map("salary_slips")
 }
 
 model SalaryStructure {
-  id              String   @id @default(uuid())
-  employeeId      String   @map("employee_id")
-  basic           Decimal  @db.Decimal(12, 2)
-  hra             Decimal  @default(0) @db.Decimal(12, 2)
-  allowances      Decimal  @default(0) @db.Decimal(12, 2)
-  pfDeduction     Decimal  @default(0) @map("pf_deduction") @db.Decimal(12, 2)
-  professionalTax Decimal  @default(0) @map("professional_tax") @db.Decimal(12, 2)
-  tds             Decimal  @default(0) @db.Decimal(12, 2)
-  effectiveFrom   DateTime @map("effective_from") @db.Date
-  approvedBy      String?  @map("approved_by")
+  id              String    @id @default(uuid())
+  employeeId      String    @map("employee_id")
+  basic           Decimal   @db.Decimal(12, 2)
+  hra             Decimal   @default(0) @db.Decimal(12, 2)
+  allowances      Decimal   @default(0) @db.Decimal(12, 2)
+  pfDeduction     Decimal   @default(0) @map("pf_deduction") @db.Decimal(12, 2)
+  professionalTax Decimal   @default(0) @map("professional_tax") @db.Decimal(12, 2)
+  tds             Decimal   @default(0) @db.Decimal(12, 2)
+  effectiveFrom   DateTime  @map("effective_from") @db.Date
+  approvedBy      String?   @map("approved_by")
   approvedAt      DateTime? @map("approved_at") @db.Timestamptz
-  signatureName   String?  @map("signature_name")
-  signatureTitle  String?  @map("signature_title")
+  signatureName   String?   @map("signature_name")
+  signatureTitle  String?   @map("signature_title")
   notes           String?
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
 
-  employee Employee @relation("StructureEmployee", fields: [employeeId], references: [id])
+  employee Employee  @relation("StructureEmployee", fields: [employeeId], references: [id])
   approver Employee? @relation("StructureApprover", fields: [approvedBy], references: [id])
 
   @@unique([employeeId, effectiveFrom])
@@ -544,24 +538,24 @@ model Notification {
   referenceType String?          @map("reference_type")
   createdAt     DateTime         @default(now()) @map("created_at")
 
-  employee  Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
   @@map("notifications")
 }
 
 model Comment {
-  id            String   @id @default(uuid())
-  authorId      String   @map("author_id")
-  body          String
+  id              String  @id @default(uuid())
+  authorId        String  @map("author_id")
+  body            String
   attachmentS3Key String? @map("attachment_s3_key")
 
-  expenseId     String?          @map("expense_id")
-  invoiceId     String?          @map("invoice_id")
-  leaveRequestId String?         @map("leave_request_id")
-  employeeRequestId String?      @map("employee_request_id")
+  expenseId         String? @map("expense_id")
+  invoiceId         String? @map("invoice_id")
+  leaveRequestId    String? @map("leave_request_id")
+  employeeRequestId String? @map("employee_request_id")
 
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   author          Employee         @relation(fields: [authorId], references: [id])
   expense         Expense?         @relation(fields: [expenseId], references: [id])
@@ -584,7 +578,7 @@ model AuditLog {
   userAgent    String?  @map("user_agent")
   createdAt    DateTime @default(now()) @map("created_at")
 
-  actor  Employee @relation("AuditActor", fields: [actorId], references: [id])
+  actor Employee @relation("AuditActor", fields: [actorId], references: [id])
 
   @@map("audit_logs")
 }
@@ -597,25 +591,25 @@ model ConsentRecord {
   ipAddress   String?  @map("ip_address")
   createdAt   DateTime @default(now()) @map("created_at")
 
-  employee  Employee @relation(fields: [employeeId], references: [id])
+  employee Employee @relation(fields: [employeeId], references: [id])
 
   @@map("consent_records")
 }
 
 model EmployeeDocument {
-  id           String   @id @default(uuid())
-  employeeId   String   @map("employee_id")
-  docType      String   @map("doc_type")
-  fileS3Key    String   @map("file_s3_key")
-  uploadedBy   String   @map("uploaded_by")
-  status       DocumentReviewStatus @default(PENDING)
-  reviewedBy   String?  @map("reviewed_by")
-  reviewedAt   DateTime? @map("reviewed_at") @db.Timestamptz
-  rejectionReason String? @map("rejection_reason")
-  expiresAt    DateTime? @map("expires_at") @db.Date
-  createdAt    DateTime @default(now()) @map("created_at")
+  id              String               @id @default(uuid())
+  employeeId      String               @map("employee_id")
+  docType         String               @map("doc_type")
+  fileS3Key       String               @map("file_s3_key")
+  uploadedBy      String               @map("uploaded_by")
+  status          DocumentReviewStatus @default(PENDING)
+  reviewedBy      String?              @map("reviewed_by")
+  reviewedAt      DateTime?            @map("reviewed_at") @db.Timestamptz
+  rejectionReason String?              @map("rejection_reason")
+  expiresAt       DateTime?            @map("expires_at") @db.Date
+  createdAt       DateTime             @default(now()) @map("created_at")
 
-  employee  Employee @relation(fields: [employeeId], references: [id])
+  employee Employee @relation(fields: [employeeId], references: [id])
 
   @@map("employee_documents")
 }
@@ -646,16 +640,16 @@ model Holiday {
 }
 
 model Policy {
-  id        String       @id @default(uuid())
-  title     String
-  category  String
-  body      String
-  status    PolicyStatus @default(DRAFT)
-  version   String       @default("1.0")
-  createdBy String       @map("created_by")
-  publishedAt DateTime?  @map("published_at") @db.Timestamptz
-  createdAt DateTime     @default(now()) @map("created_at")
-  updatedAt DateTime     @updatedAt @map("updated_at")
+  id          String       @id @default(uuid())
+  title       String
+  category    String
+  body        String
+  status      PolicyStatus @default(DRAFT)
+  version     String       @default("1.0")
+  createdBy   String       @map("created_by")
+  publishedAt DateTime?    @map("published_at") @db.Timestamptz
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
 
   acknowledgements PolicyAcknowledgement[]
 
@@ -663,9 +657,9 @@ model Policy {
 }
 
 model PolicyAcknowledgement {
-  id         String   @id @default(uuid())
-  policyId   String   @map("policy_id")
-  employeeId String   @map("employee_id")
+  id             String   @id @default(uuid())
+  policyId       String   @map("policy_id")
+  employeeId     String   @map("employee_id")
   acknowledgedAt DateTime @default(now()) @map("acknowledged_at")
 
   policy   Policy   @relation(fields: [policyId], references: [id], onDelete: Cascade)
@@ -676,7 +670,7 @@ model PolicyAcknowledgement {
 }
 
 model Task {
-  id          String   @id @default(uuid())
+  id          String    @id @default(uuid())
   title       String
   description String?
   dueAt       DateTime? @map("due_at") @db.Timestamptz
@@ -685,7 +679,7 @@ model Task {
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
 
-  creator     Employee @relation("TaskCreator", fields: [createdBy], references: [id])
+  creator     Employee         @relation("TaskCreator", fields: [createdBy], references: [id])
   assignments TaskAssignment[]
 
   @@map("tasks")
@@ -720,11 +714,11 @@ model ChatChannel {
 }
 
 model ChatChannelMember {
-  id          String    @id @default(uuid())
-  channelId   String    @map("channel_id")
-  employeeId  String    @map("employee_id")
-  lastReadAt  DateTime? @map("last_read_at") @db.Timestamptz
-  createdAt   DateTime  @default(now()) @map("created_at")
+  id         String    @id @default(uuid())
+  channelId  String    @map("channel_id")
+  employeeId String    @map("employee_id")
+  lastReadAt DateTime? @map("last_read_at") @db.Timestamptz
+  createdAt  DateTime  @default(now()) @map("created_at")
 
   channel  ChatChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
   employee Employee    @relation(fields: [employeeId], references: [id], onDelete: Cascade)
@@ -748,16 +742,16 @@ model ChatMessage {
 }
 
 model EmployeeLifecycleEvent {
-  id          String   @id @default(uuid())
-  employeeId  String   @map("employee_id")
-  eventType   String   @map("event_type")
+  id          String    @id @default(uuid())
+  employeeId  String    @map("employee_id")
+  eventType   String    @map("event_type")
   title       String
   description String?
-  status      String   @default("OPEN")
+  status      String    @default("OPEN")
   dueAt       DateTime? @map("due_at") @db.Timestamptz
-  createdBy   String   @map("created_by")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  createdBy   String    @map("created_by")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
 
   employee Employee @relation("LifecycleEmployee", fields: [employeeId], references: [id], onDelete: Cascade)
   creator  Employee @relation("LifecycleCreator", fields: [createdBy], references: [id])
@@ -775,7 +769,7 @@ model PasswordResetToken {
   ipAddress    String    @map("ip_address") @db.VarChar(45)
   createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
 
-  employee     Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
   @@map("password_reset_tokens")
 }
@@ -1101,34 +1095,19 @@ model CompanyAlert {
 }
 
 model AttendanceEditHistory {
-  id           String   @id @default(uuid())
-  attendanceId String   @map("attendance_id")
-  editedBy     String   @map("edited_by")
-  fieldChanged String   @map("field_changed")
-  originalValue String? @map("original_value")
-  newValue     String?  @map("new_value")
-  reason       String
-  createdAt    DateTime @default(now()) @map("created_at")
+  id            String   @id @default(uuid())
+  attendanceId  String   @map("attendance_id")
+  editedBy      String   @map("edited_by")
+  fieldChanged  String   @map("field_changed")
+  originalValue String?  @map("original_value")
+  newValue      String?  @map("new_value")
+  reason        String
+  createdAt     DateTime @default(now()) @map("created_at")
 
   attendance AttendanceRecord @relation(fields: [attendanceId], references: [id], onDelete: Cascade)
   editor     Employee         @relation("AttendanceEditor", fields: [editedBy], references: [id])
 
   @@map("attendance_edit_history")
-}
-
-// ── Face Recognition ─────────────────────────────────────────────────────────
-
-model FaceEmbedding {
-  id         String                     @id @default(uuid())
-  employeeId String                     @unique @map("employee_id")
-  /// 512-dimensional DeepFace/Facenet512 embedding stored as pgvector
-  embedding  Unsupported("vector(512)")
-  createdAt  DateTime                   @default(now()) @map("created_at")
-  updatedAt  DateTime                   @updatedAt @map("updated_at")
-
-  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-
-  @@map("face_embeddings")
 }
 
 // ─── Tier 1 Models ────────────────────────────────────────────────────────────
@@ -1194,22 +1173,22 @@ model FollowUpTask {
 // ─── Tier 2 Models ────────────────────────────────────────────────────────────
 
 model CompanyDocument {
-  id           String           @id @default(uuid())
-  companyId    String           @map("company_id")
-  docName      String           @map("doc_name")
-  docType      String           @map("doc_type")
-  status       CompanyDocStatus @default(PENDING)
-  fileS3Key    String?          @map("file_s3_key")
-  expiresAt    DateTime?        @map("expires_at") @db.Date
-  uploadedBy   String           @map("uploaded_by")
-  notes        String?
-  zohoDocId    String?          @map("zoho_doc_id")
+  id         String           @id @default(uuid())
+  companyId  String           @map("company_id")
+  docName    String           @map("doc_name")
+  docType    String           @map("doc_type")
+  status     CompanyDocStatus @default(PENDING)
+  fileS3Key  String?          @map("file_s3_key")
+  expiresAt  DateTime?        @map("expires_at") @db.Date
+  uploadedBy String           @map("uploaded_by")
+  notes      String?
+  zohoDocId  String?          @map("zoho_doc_id")
   // TIER3: AI document OCR pipeline — add processingStatus field here
-  createdAt    DateTime         @default(now()) @map("created_at")
-  updatedAt    DateTime         @updatedAt @map("updated_at")
+  createdAt  DateTime         @default(now()) @map("created_at")
+  updatedAt  DateTime         @updatedAt @map("updated_at")
 
-  company    ClientCompany       @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  uploader   Employee            @relation("DocUploader", fields: [uploadedBy], references: [id])
+  company    ClientCompany        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  uploader   Employee             @relation("DocUploader", fields: [uploadedBy], references: [id])
   auditItems AuditReadinessItem[]
 
   @@index([companyId, status])

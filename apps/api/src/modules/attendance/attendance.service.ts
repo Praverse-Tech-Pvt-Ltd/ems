@@ -5,7 +5,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
-import { FaceRecognitionService } from './face-recognition.service';
+
 import { GeoFenceService } from './geo-fence.service';
 import { PunchInDto } from './dto/punch-in.dto';
 import { RegularizeDto } from './dto/regularize.dto';
@@ -13,16 +13,9 @@ import { RegularizeDto } from './dto/regularize.dto';
 // ── Attendance Policy Constants ────────────────────────────────────────────────
 const HALF_DAY_HOURS = 4;           // < 4 h worked → auto HALF_DAY at punch-out
 
-// Punch-in windows (minutes since midnight)
-const PRESENT_CUTOFF   = 9 * 60 + 45;  // ≤ 9:45 → PRESENT
-const LATE_CUTOFF      = 10 * 60;       // 9:45–10:00 → LATE (allowance), >10:00 → HALF_DAY
+// Allowance constants per month
 const MAX_LATE_PM      = 4;             // late punch-in allowances per month
-
-// Punch-out early-exit window
-const EARLY_OUT_CUTOFF = 17 * 60 + 45; // < 5:45 PM = early exit
 const MAX_EARLY_PM     = 4;             // early punch-out allowances per month
-
-// Half-day cap per month
 const MAX_HALFDAY_PM   = 4;             // > 4 half-days in a month → LEAVE
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -33,68 +26,50 @@ export class AttendanceService {
 
   constructor(
     private prisma: PrismaService,
-    private fr: FaceRecognitionService,
     private geoFence: GeoFenceService,
   ) {}
 
-  // ── Face verification ──────────────────────────────────────────────────────
 
-  private async verifyFaceOrThrow(employeeId: string, faceImageBase64: string) {
-    const employee = await this.prisma.employee.findUnique({
-      where: { id: employeeId },
-      select: { faceEnrolled: true },
-    });
-
-    if (!employee?.faceEnrolled) return;
-
-    const embeddingRows = await this.prisma.$queryRaw<{ count: bigint }[]>`
-      SELECT COUNT(*)::bigint AS count
-      FROM face_embeddings
-      WHERE employee_id = ${employeeId}
-    `;
-    const count = embeddingRows[0]?.count ?? 0n;
-
-    if (Number(count) === 0) {
-      await this.prisma.employee.update({
-        where: { id: employeeId },
-        data: { faceEnrolled: false, faceEnrolledAt: null },
-      });
-      throw new BadRequestException(
-        'Face enrollment is incomplete. Please enroll your face again before punching in.',
-      );
-    }
-
-    try {
-      const result = await this.fr.verify(employeeId, faceImageBase64);
-      if (!result.verified) {
-        throw new BadRequestException(
-          result.reason ?? `Face not recognized (confidence: ${(result.confidence * 100).toFixed(0)}%). Please try again in better lighting.`,
-        );
-      }
-    } catch (err) {
-      if (err instanceof BadRequestException) throw err;
-      this.logger.warn(`FR service unavailable for ${employeeId}: ${(err as Error).message}`);
-      throw new BadRequestException(
-        'Face recognition service is offline. Please use the manual punch option.',
-      );
-    }
-  }
-
-  /** Returns true if the face recognition service is currently reachable. */
-  async isFaceServiceOnline(): Promise<boolean> {
-    try {
-      await this.fr.ping();
-      return true;
-    } catch {
-      return false;
-    }
-  }
 
   private getISTToday(): Date {
     const now = new Date();
     const utc = now.getTime() + now.getTimezoneOffset() * 60000;
     const ist = new Date(utc + (3600000 * 5.5));
     return new Date(Date.UTC(ist.getFullYear(), ist.getMonth(), ist.getDate()));
+  }
+
+  private async getEmployeeTimeConstraints(employeeId: string) {
+    const employee = await this.prisma.employee.findUnique({
+      where: { id: employeeId },
+      select: { firstName: true }
+    });
+    const name = employee?.firstName.toLowerCase() || '';
+
+    if (name.includes('shifa') || name.includes('chandni') || name.includes('dilip')) {
+      return {
+        PRESENT_CUTOFF: 9 * 60 + 15, // 9:15 AM
+        LATE_CUTOFF: 9 * 60 + 30,    // 9:30 AM
+        EARLY_OUT_CUTOFF: 17 * 60 + 15, // 5:15 PM
+        policyText: {
+          presentCutoff: '09:15',
+          lateCutoff: '09:30',
+          earlyOutCutoff: '17:15',
+          regularPunchOut: '17:30',
+        }
+      };
+    }
+
+    return {
+      PRESENT_CUTOFF: 9 * 60 + 45, // 9:45 AM
+      LATE_CUTOFF: 10 * 60,        // 10:00 AM
+      EARLY_OUT_CUTOFF: 17 * 60 + 45, // 5:45 PM
+      policyText: {
+        presentCutoff: '09:45',
+        lateCutoff: '10:00',
+        earlyOutCutoff: '17:45',
+        regularPunchOut: '18:00',
+      }
+    };
   }
 
   // ── Policy helpers ─────────────────────────────────────────────────────────
@@ -124,6 +99,7 @@ export class AttendanceService {
    * in the current month, by fetching records and filtering in JS.
    */
   private async countEarlyPunchOutsThisMonth(employeeId: string): Promise<number> {
+    const { EARLY_OUT_CUTOFF } = await this.getEmployeeTimeConstraints(employeeId);
     const records = await this.prisma.attendanceRecord.findMany({
       where: {
         employeeId,
@@ -182,23 +158,16 @@ export class AttendanceService {
       throw new ConflictException('Already punched in today');
     }
 
-    const isManual = dto.manualPunch === true;
-
-    if (isManual) {
-      // Manual punch: location is mandatory, face image is skipped.
-      // Require non-zero coordinates so the client can't silently omit location.
-      if (!dto.latitude && !dto.longitude) {
-        throw new BadRequestException(
-          'Location is required for manual punch-in. Please enable GPS and try again.',
-        );
-      }
-    } else {
-      await this.verifyFaceOrThrow(employeeId, dto.faceImageBase64 ?? '');
+    if (!dto.latitude && !dto.longitude) {
+      throw new BadRequestException(
+        'Location is required for punch-in. Please enable GPS and try again.',
+      );
     }
 
     const isGeoValid = await this.geoFence.isWithinAnyOffice(dto.latitude, dto.longitude);
     const now        = new Date();
     const punchMins  = this.minutesSinceMidnight(now);
+    const { PRESENT_CUTOFF, LATE_CUTOFF } = await this.getEmployeeTimeConstraints(employeeId);
 
     // ── Determine punch-in status ────────────────────────────────────────────
     let punchInStatus: 'PRESENT' | 'LATE' | 'HALF_DAY' | 'WFH' | 'LEAVE';
@@ -207,14 +176,14 @@ export class AttendanceService {
       // Outside geo-fence: WFH, no time penalty
       punchInStatus = 'WFH';
     } else if (punchMins <= PRESENT_CUTOFF) {
-      // ≤ 9:45 AM
+      // Within allowance
       punchInStatus = 'PRESENT';
     } else if (punchMins <= LATE_CUTOFF) {
-      // 9:45 – 10:00 AM: check monthly late allowance
+      // Late punch-in window: check monthly late allowance
       const lateCount = await this.countLateThisMonth(employeeId);
       punchInStatus   = lateCount < MAX_LATE_PM ? 'LATE' : 'HALF_DAY';
     } else {
-      // After 10:00 AM: straight HALF_DAY
+      // After late window: straight HALF_DAY
       punchInStatus = 'HALF_DAY';
     }
 
@@ -234,7 +203,7 @@ export class AttendanceService {
         punchInLng:  dto.longitude,
         isGeoValidIn: isGeoValid,
         frConfidenceIn: null,
-        isManualPunch: isManual,
+        isManualPunch: false,
         manualPunchReason: dto.manualPunchReason ?? null,
         status: punchInStatus,
         deviceInfo: (dto.deviceInfo ?? {}) as any,
@@ -245,7 +214,7 @@ export class AttendanceService {
         punchInLng:  dto.longitude,
         isGeoValidIn: isGeoValid,
         frConfidenceIn: null,
-        isManualPunch: isManual,
+        isManualPunch: false,
         manualPunchReason: dto.manualPunchReason ?? null,
         status: punchInStatus,
       },
@@ -266,7 +235,7 @@ export class AttendanceService {
         userAgent: userAgent,
         newValue: {
           status: punchInStatus,
-          isManual,
+          isManual: false,
           manualPunchReason: dto.manualPunchReason ?? null,
           isGeoValidIn: isGeoValid,
           location: isGeoValid ? 'OFFICE' : 'REMOTE',
@@ -295,16 +264,10 @@ export class AttendanceService {
       throw new ConflictException('Already punched out today');
     }
 
-    const isManualOut = dto.manualPunch === true;
-
-    if (isManualOut) {
-      if (!dto.latitude && !dto.longitude) {
-        throw new BadRequestException(
-          'Location is required for manual punch-out. Please enable GPS and try again.',
-        );
-      }
-    } else {
-      await this.verifyFaceOrThrow(employeeId, dto.faceImageBase64 ?? '');
+    if (!dto.latitude && !dto.longitude) {
+      throw new BadRequestException(
+        'Location is required for punch-out. Please enable GPS and try again.',
+      );
     }
 
     const isGeoValid    = await this.geoFence.isWithinAnyOffice(dto.latitude, dto.longitude);
@@ -312,6 +275,7 @@ export class AttendanceService {
     const punchOutMins  = this.minutesSinceMidnight(now);
     const workingHours  = (now.getTime() - record.punchInTime.getTime()) / (1000 * 60 * 60);
     const timeStr       = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+    const { EARLY_OUT_CUTOFF } = await this.getEmployeeTimeConstraints(employeeId);
 
     // ── Determine final status ───────────────────────────────────────────────
     let finalStatus: string = record.status;     // inherit punch-in status
@@ -357,7 +321,7 @@ export class AttendanceService {
         workingHours:   Math.round(workingHours * 100) / 100,
         status:         finalStatus as any,
         // Mark as manual if punch-out is manual (preserve existing true if already set)
-        ...(isManualOut ? { isManualPunch: true, manualPunchReason: dto.manualPunchReason ?? record.manualPunchReason } : {}),
+        ...(dto.manualPunchReason ? { isManualPunch: true, manualPunchReason: dto.manualPunchReason } : {}),
       },
     });
 
@@ -372,7 +336,7 @@ export class AttendanceService {
         userAgent: userAgent,
         newValue: {
           status: finalStatus,
-          isManual: isManualOut,
+          isManual: false,
           manualPunchReason: dto.manualPunchReason ?? null,
           isGeoValidOut: isGeoValid,
           location: isGeoValid ? 'OFFICE' : 'REMOTE',
@@ -522,66 +486,21 @@ export class AttendanceService {
 
   /** Returns a summary of the employee's monthly policy usage. */
   async getPolicyUsage(employeeId: string) {
-    const [lateCount, earlyCount, halfDayCount] = await Promise.all([
+    const [lateCount, earlyCount, halfDayCount, constraints] = await Promise.all([
       this.countLateThisMonth(employeeId),
       this.countEarlyPunchOutsThisMonth(employeeId),
       this.countHalfDaysThisMonth(employeeId),
+      this.getEmployeeTimeConstraints(employeeId),
     ]);
     return {
       latePunchIns:          { used: lateCount,    allowed: MAX_LATE_PM,     remaining: Math.max(0, MAX_LATE_PM - lateCount) },
       earlyPunchOuts:        { used: earlyCount,   allowed: MAX_EARLY_PM,    remaining: Math.max(0, MAX_EARLY_PM - earlyCount) },
       halfDays:              { used: halfDayCount, allowed: MAX_HALFDAY_PM,  remaining: Math.max(0, MAX_HALFDAY_PM - halfDayCount) },
-      policy: {
-        presentCutoff:   '09:45',
-        lateCutoff:      '10:00',
-        earlyOutCutoff:  '17:45',
-        regularPunchOut: '18:00',
-      },
+      policy: constraints.policyText,
     };
   }
 
-  async resetFace(employeeId: string) {
-    try { await this.fr.deleteFace(employeeId); } catch { /* FR may be offline */ }
-    await this.prisma.$executeRaw`
-      DELETE FROM face_embeddings WHERE employee_id = ${employeeId}
-    `;
-    await this.prisma.employee.update({
-      where: { id: employeeId },
-      data: { faceEnrolled: false, faceEnrolledAt: null },
-    });
-    return { message: 'Face data reset. Please re-enroll on next login.' };
-  }
 
-  async enrollFace(employeeId: string, frames: string[]) {
-    if (!frames.length) {
-      throw new BadRequestException('No frames provided for enrollment');
-    }
-    try {
-      await this.fr.enroll(employeeId, frames);
-    } catch (err) {
-      const msg = (err as Error).message ?? '';
-      throw new BadRequestException(
-        msg || 'Face enrollment failed. Please make sure the face service is running and retry.',
-      );
-    }
-
-    const embeddingRows = await this.prisma.$queryRaw<{ count: bigint }[]>`
-      SELECT COUNT(*)::bigint AS count FROM face_embeddings WHERE employee_id = ${employeeId}
-    `;
-    const count = embeddingRows[0]?.count ?? 0n;
-
-    if (Number(count) === 0) {
-      throw new BadRequestException(
-        'Face enrollment did not save a biometric template. Please retry.',
-      );
-    }
-
-    await this.prisma.employee.update({
-      where: { id: employeeId },
-      data: { faceEnrolled: true, faceEnrolledAt: new Date() },
-    });
-    return { message: 'Face enrolled successfully.' };
-  }
 
   private minutesSinceMidnight(date: Date): number {
     return date.getHours() * 60 + date.getMinutes();

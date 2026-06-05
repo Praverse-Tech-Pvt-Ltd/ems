@@ -9,7 +9,6 @@ import { apiClient } from '@/lib/api-client';
 import { AppSidebar } from '@/components/layouts/AppSidebar';
 import { AppTopNav } from '@/components/layouts/AppTopNav';
 import { NotificationsDrawer } from '@/components/layouts/NotificationsDrawer';
-import { FaceEnrollModal } from '@/components/layouts/FaceEnrollModal';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -18,7 +17,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   const [navOpen, setNavOpen]       = useState(false);
   const [notifOpen, setNotifOpen]   = useState(false);
-  const [enrollDone, setEnrollDone] = useState(false);
 
   /**
    * Silent refresh on mount.
@@ -57,14 +55,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener('keydown', handler);
   }, []);
 
-  const { data: me, isLoading: meLoading } = useQuery<{ faceEnrolled: boolean }>({
+  const { data: me, isLoading: meLoading } = useQuery<{ id: string }>({
     queryKey: ['me-face'],
     queryFn: () => apiClient.get('/employees/me').then(r => r.data).catch(() => null),
     enabled: authReady && !!accessToken,
     staleTime: 60_000,
   });
-
-  const showEnrollModal = false;
 
   // Don't render the app shell until we know whether the user is authenticated.
   if (!authReady) {
@@ -90,10 +86,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </main>
       </div>
       <NotificationsDrawer open={notifOpen} onClose={() => setNotifOpen(false)} />
-
-      {showEnrollModal && (
-        <FaceEnrollModal onDone={() => setEnrollDone(true)} />
-      )}
     </div>
   );
 }

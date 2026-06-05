@@ -280,7 +280,6 @@ export default function AttendancePage() {
   const clock = useClock();
   const [showModal, setShowModal] = useState(false);
   const [punchType, setPunchType] = useState<'in' | 'out'>('in');
-  const [manualPunch, setManualPunch] = useState(false);
 
   const now = new Date();
   const [calMonth, setCalMonth] = useState({ year: now.getFullYear(), month: now.getMonth() });
@@ -292,7 +291,7 @@ export default function AttendancePage() {
       }).toUpperCase()
     : 'LOADING...';
 
-  const { data: me } = useQuery<{ faceEnrolled: boolean; email: string }>({
+  const { data: me } = useQuery<{ email: string }>({
     queryKey: ['me-profile'],
     queryFn: () => apiClient.get('/employees/me').then(r => r.data).catch(() => null),
   });
@@ -366,31 +365,10 @@ export default function AttendancePage() {
   return (
     <div className="space-y-8 max-w-[1320px] animate-fade-up">
 
-      {/* Enrollment banner */}
-      {me && !me.faceEnrolled && (
-        <div className="brutal-border brutal-shadow bg-brutal-yellow flex items-center justify-between gap-4 px-5 py-4 flex-wrap">
-          <div className="flex items-center gap-3">
-            <UserCheck size={20} className="text-brutal-ink shrink-0" />
-            <div>
-              <div className="font-display font-bold text-[12px] tracking-[0.2em]">FACE NOT ENROLLED</div>
-              <div className="font-display font-bold text-[10px] tracking-[0.14em] text-brutal-ink/70 mt-0.5">
-                You must enroll your face before punching in. It only takes 10 seconds.
-              </div>
-            </div>
-          </div>
-          <Link href="/attendance/biometric" className="brutal-btn-primary px-4 py-2 text-[11px] flex items-center gap-2 shrink-0">
-            <Camera size={13} /> ENROLL NOW →
-          </Link>
-        </div>
-      )}
-
       {/* Punch-in hero */}
-      <section className="grid grid-cols-12 gap-0 brutal-border brutal-shadow-lg">
-        <div className="col-span-12 lg:col-span-8 p-5 sm:p-7 lg:p-9 relative">
+      <section className="brutal-border brutal-shadow-lg p-5 sm:p-7 lg:p-9 relative">
           <div className="flex items-center gap-2 font-display font-bold text-[10px] tracking-[0.22em]">
             <span className="px-2 py-1 bg-brutal-ink text-brutal-yellow">PUNCH-IN STATION</span>
-            <span className="w-2 h-2 bg-brutal-blue" />
-            <span className="text-brutal-ink/60">FACE RECOGNITION · LIVENESS V4</span>
           </div>
           <h1 className="mt-5 text-[38px] sm:text-[52px] lg:text-[64px] leading-[0.9] font-bold tracking-[-0.03em]">
             READY <span className="text-brutal-blue">WHEN</span><br />
@@ -415,25 +393,12 @@ export default function AttendancePage() {
                 ✓ SHIFT COMPLETE
               </div>
             ) : !todayRecord?.punchInTime ? (
-              <button onClick={() => { setManualPunch(!me?.faceEnrolled); setPunchType('in'); setShowModal(true); }} className="brutal-btn-primary px-6 py-4 text-[13px] flex items-center gap-2">
-                <Camera size={18} /> PUNCH IN <ArrowRight size={16} />
+              <button onClick={() => { setPunchType('in'); setShowModal(true); }} className="brutal-btn-primary px-6 py-4 text-[13px] flex items-center gap-2">
+                <MapPin size={18} /> PUNCH IN <ArrowRight size={16} />
               </button>
             ) : (
-              <button onClick={() => { setManualPunch(!me?.faceEnrolled); setPunchType('out'); setShowModal(true); }} className="brutal-btn-primary px-6 py-4 text-[13px] flex items-center gap-2 bg-brutal-red text-white border-brutal-red">
-                <Camera size={18} /> PUNCH OUT <ArrowRight size={16} />
-              </button>
-            )}
-            {/* Manual punch — bypass face recognition */}
-            {!todayRecord?.punchOutTime && (
-              <button
-                onClick={() => {
-                  setManualPunch(true);
-                  setPunchType(todayRecord?.punchInTime ? 'out' : 'in');
-                  setShowModal(true);
-                }}
-                className="px-5 py-4 border-[3px] border-brutal-ink font-display font-bold text-[13px] tracking-[0.1em] flex items-center gap-2 hover:bg-brutal-surface transition-colors"
-              >
-                <MapPin size={16} /> MANUAL PUNCH
+              <button onClick={() => { setPunchType('out'); setShowModal(true); }} className="brutal-btn-primary px-6 py-4 text-[13px] flex items-center gap-2 bg-brutal-red text-white border-brutal-red">
+                <MapPin size={18} /> PUNCH OUT <ArrowRight size={16} />
               </button>
             )}
             {todayRecord?.punchInTime && (
@@ -450,36 +415,7 @@ export default function AttendancePage() {
             )}
           </div>
           <div className="mt-6 font-display font-bold text-[10px] tracking-[0.2em] text-brutal-ink/60">{dateStr}</div>
-        </div>
 
-        {/* Right — face scan panel */}
-        <div className="col-span-12 lg:col-span-4 lg:border-l-[4px] brutal-border-t lg:border-t-0 border-brutal-ink bg-brutal-blue relative overflow-hidden">
-          <div className="absolute inset-0 diag opacity-15" />
-          <div className="relative h-full p-6 flex flex-col justify-between text-white min-h-[320px]">
-            <div className="flex items-center justify-between">
-              <span className="font-display font-bold text-[10px] tracking-[0.22em] bg-white text-brutal-blue px-2 py-1 border-2 border-white">FACE ID</span>
-              <span className="font-display font-bold text-[10px] tracking-[0.18em] flex items-center gap-1.5">
-                <span className="w-2 h-2 bg-brutal-yellow animate-blink" /> LIVE
-              </span>
-            </div>
-            <div className="relative my-6 mx-auto w-full max-w-[200px] aspect-square bg-brutal-ink brutal-border" style={{ boxShadow: '6px 6px 0 0 #ffa23a' }}>
-              <div className="absolute inset-0 dotgrid opacity-30" />
-              <Camera size={80} className="absolute inset-0 m-auto text-brutal-yellow/60" />
-              {['top-2 left-2 border-t-[3px] border-l-[3px]','top-2 right-2 border-t-[3px] border-r-[3px]','bottom-2 left-2 border-b-[3px] border-l-[3px]','bottom-2 right-2 border-b-[3px] border-r-[3px]'].map((p,i) => (
-                <span key={i} className={`absolute w-5 h-5 border-brutal-yellow ${p}`} />
-              ))}
-              <div className="absolute inset-x-2 h-[3px] bg-brutal-yellow animate-scan" />
-            </div>
-            <div className="grid grid-cols-3 gap-2">
-              {[{ l: 'METHOD', v: 'FACE' },{ l: 'LIVENESS', v: 'V4' },{ l: 'STATION', v: '04' }].map(s => (
-                <div key={s.l} className="border-2 border-white p-2">
-                  <div className="font-display font-bold text-[9px] tracking-[0.18em] text-white/70">{s.l}</div>
-                  <div className="font-display font-bold text-[14px]">{s.v}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
       </section>
 
       {/* ── Monthly Policy Usage ─────────────────────────────────────────── */}
@@ -636,8 +572,7 @@ export default function AttendancePage() {
       {showModal && (
         <PunchModal
           punchType={punchType}
-          startManual={manualPunch}
-          onClose={() => { setShowModal(false); setManualPunch(false); }}
+          onClose={() => { setShowModal(false); }}
         />
       )}
     </div>
