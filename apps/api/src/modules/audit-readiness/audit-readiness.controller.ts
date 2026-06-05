@@ -2,6 +2,7 @@ import {
   Controller, Get, Post, Patch, Delete, Body, Param, Query,
   UseGuards, Res,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { Response } from 'express';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { AuditReadinessService } from './audit-readiness.service';
@@ -54,6 +55,7 @@ export class AuditReadinessController {
 
   @Post(':projectId/ai-gaps')
   @Roles('ADMIN', 'SUPER_ADMIN', 'MANAGER')
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   generateAIGaps(@Param('projectId') projectId: string) {
     return this.service.generateAIGaps(projectId);
   }

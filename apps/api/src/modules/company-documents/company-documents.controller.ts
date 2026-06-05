@@ -1,8 +1,10 @@
 import {
   Controller, Get, Post, Patch, Delete, Body, Param, Query,
   UseGuards, UseInterceptors, UploadedFile, Res,
+  BadRequestException, ParseIntPipe, DefaultValuePipe,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
 import { Response } from 'express';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { CompanyDocumentsService } from './company-documents.service';
@@ -10,6 +12,19 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+
+const ALLOWED_MIME_TYPES = [
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'text/plain',
+];
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 
 @ApiTags('company-documents')
 @ApiBearerAuth()
@@ -20,8 +35,10 @@ export class CompanyDocumentsController {
 
   @Get('expiring')
   @Roles('ADMIN', 'SUPER_ADMIN')
-  findExpiring(@Query('days') days?: string) {
-    return this.service.findExpiring(days ? parseInt(days) : 30);
+  findExpiring(
+    @Query('days', new DefaultValuePipe(30), ParseIntPipe) days: number,
+  ) {
+    return this.service.findExpiring(days);
   }
 
   @Get(':companyId')
@@ -39,12 +56,24 @@ export class CompanyDocumentsController {
   }
 
   @Post(':companyId/:docId/upload')
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileInterceptor('file', {
+    storage: memoryStorage(),
+    limits: { fileSize: MAX_FILE_SIZE },
+    fileFilter: (_req, file, cb) => {
+      if (!ALLOWED_MIME_TYPES.includes(file.mimetype)) {
+        return cb(new BadRequestException(
+          `File type not allowed. Allowed: PDF, Word, Excel, images, text.`
+        ), false);
+      }
+      cb(null, true);
+    },
+  }))
   upload(
     @Param('companyId') companyId: string,
     @Param('docId') docId: string,
     @UploadedFile() file: Express.Multer.File,
   ) {
+    if (!file) throw new BadRequestException('No file provided');
     return this.service.uploadFile(companyId, docId, file);
   }
 

@@ -43,7 +43,12 @@ export class CompanyDocumentsService {
     const doc = await this.prisma.companyDocument.findUnique({ where: { id: docId } });
     if (!doc) throw new NotFoundException('Document not found');
 
-    const key = `company-documents/${companyId}/${docId}/${file.originalname}`;
+    // Sanitize filename: strip path separators, keep only safe characters
+    const safeName = file.originalname
+      .replace(/[^a-zA-Z0-9._-]/g, '_')
+      .replace(/\.{2,}/g, '_')
+      .substring(0, 100);
+    const key = `company-documents/${companyId}/${docId}/${safeName}`;
     await this.storage.upload(key, file.buffer, file.mimetype);
 
     return this.prisma.companyDocument.update({

@@ -121,17 +121,21 @@ OWNER'S QUESTION: ${question}`;
     return { answer, sessionId };
   }
 
-  async getHistory(sessionId: string, userEmail: string) {
+  async getHistory(sessionId: string, userId: string, userEmail: string) {
     this.assertOwner(userEmail);
+    // Scope to requesting user's own messages only
     return this.prisma.aIChatMessage.findMany({
-      where: { sessionId },
+      where: { sessionId, createdBy: userId },
       orderBy: { createdAt: 'asc' },
     });
   }
 
-  async clearHistory(sessionId: string, userEmail: string) {
+  async clearHistory(sessionId: string, userId: string, userEmail: string) {
     this.assertOwner(userEmail);
-    await this.prisma.aIChatMessage.deleteMany({ where: { sessionId } });
+    // Only delete messages belonging to requesting user
+    await this.prisma.aIChatMessage.deleteMany({
+      where: { sessionId, createdBy: userId },
+    });
     return { cleared: true };
   }
 }
