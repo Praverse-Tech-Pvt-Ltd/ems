@@ -1,7 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { GeminiService } from '../ai-overview/gemini.service';
-import { differenceInDays, startOfWeek, endOfWeek, format } from 'date-fns';
+import { differenceInDays, startOfWeek, endOfWeek, format, subDays } from 'date-fns';
+import PDFDocument from 'pdfkit';
+import * as XLSX from 'xlsx';
 
 @Injectable()
 export class ManagementReviewService {
@@ -159,5 +161,183 @@ export class ManagementReviewService {
       noRecentActivity: review.noRecentActivity.map(c => c.name),
       pendingMeetingReviews: review.summary.pendingMeetingNotes,
     });
+  }
+
+  async getEmployeePerformanceReport(days = 30) {
+    const since = subDays(new Date(), days);
+
+    const employees = await this.prisma.employee.findMany({
+      where: { status: 'ACTIVE' },
+      select: { id: true, firstName: true, lastName: true, designation: true },
+    });
+
+    const [updates, visits, followUps] = await Promise.all([
+      this.prisma.workUpdate.groupBy({
+        by: ['employeeId', 'companyId'],
+        where: { createdAt: { gte: since } },
+        _count: { id: true },
+      }),
+      this.prisma.companyVisit.groupBy({
+        by: ['visitedBy'],
+        where: { visitDate: { gte: since } },
+        _count: { id: true },
+      }),
+      this.prisma.followUpTask.groupBy({
+        by: ['assignedTo'],
+        where: { status: 'DONE', completedAt: { gte: since } },
+        _count: { id: true },
+      }),
+    ]);
+
+    const report = employees.map(emp => {
+      const empUpdates = updates.filter(u => u.employeeId === emp.id);
+      const companiesCovered = new Set(empUpdates.map(u => u.companyId).filter(Boolean)).size;
+      const updatesCount = empUpdates.reduce((s, u) => s + u._count.id, 0);
+      const visitCount = visits.find(v => v.visitedBy === emp.id)?._count.id ?? 0;
+      const followUpCompleted = followUps.find(f => f.assignedTo === emp.id)?._count.id ?? 0;
+
+      return {
+        employee: { id: emp.id, name: `${emp.firstName} ${emp.lastName}`, designation: emp.designation },
+        updatesCount,
+        companiesCovered,
+        visitCount,
+        followUpCompleted,
+        activityScore: updatesCount * 2 + visitCount * 5 + followUpCompleted * 3,
+      };
+    }).sort((a, b) => b.activityScore - a.activityScore);
+
+    const topText = report.slice(0, 3).map(r =>
+      `${r.employee.name}: ${r.updatesCount} updates, ${r.visitCount} visits, ${r.followUpCompleted} follow-ups`
+    ).join('; ');
+
+    const aiSummary = await this.gemini.generateText(
+      `In 2-3 sentences, summarize this team performance data for Nexgen Pharma Solutions management: ${topText}. Focus on highlights and any gaps.`
+    );
+
+    return { report, days, aiSummary };
+  }
+
+  async exportPdf(): Promise<Buffer> {
+    const review = await this.getWeeklyReview();
+
+    return new Promise((resolve, reject) => {
+      const doc = new PDFDocument({ size: 'A4', margin: 40 });
+      const chunks: Buffer[] = [];
+      doc.on('data', c => chunks.push(c));
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+      doc.on('error', reject);
+
+      // Header
+      doc.rect(0, 0, doc.page.width, 55).fill('#1a1a1a');
+      doc.fillColor('white').font('Helvetica-Bold').fontSize(13)
+        .text('NEXGEN PHARMA SOLUTIONS', 40, 12);
+      doc.font('Helvetica').fontSize(9).fillColor('#ffa23a')
+        .text('WEEKLY MANAGEMENT REVIEW', 40, 29);
+      doc.fillColor('#aaa').fontSize(8)
+        .text(`Week: ${review.weekRange.start} to ${review.weekRange.end}`, 40, 42);
+
+      doc.fillColor('#1a1a1a').moveDown(2.5);
+
+      // Summary KPIs
+      const kpiData = [
+        { l: 'Companies', v: review.summary.totalCompanies },
+        { l: 'Active',    v: review.summary.active },
+        { l: 'At Risk',   v: review.summary.atRisk },
+        { l: 'Dormant',   v: review.summary.dormant },
+        { l: 'Updates',   v: review.summary.updatesThisWeek },
+      ];
+      const ky = doc.y;
+      kpiData.forEach((k, i) => {
+        const x = 40 + i * 103;
+        doc.rect(x, ky, 96, 34).fillAndStroke('#f5f0e8', '#1a1a1a');
+        doc.fillColor('#1a1a1a').font('Helvetica-Bold').fontSize(16)
+          .text(String(k.v), x + 5, ky + 4, { width: 86, align: 'center' });
+        doc.font('Helvetica').fontSize(7).fillColor('#888')
+          .text(k.l.toUpperCase(), x + 5, ky + 23, { width: 86, align: 'center' });
+      });
+      doc.moveDown(3);
+
+      const section = (title: string) => {
+        if (doc.y > doc.page.height - 100) doc.addPage();
+        doc.rect(40, doc.y, doc.page.width - 80, 16).fill('#1a1a1a');
+        doc.fillColor('white').font('Helvetica-Bold').fontSize(9)
+          .text(title, 46, doc.y - 12);
+        doc.moveDown(0.6);
+      };
+
+      const row = (label: string, value: string, urgent = false) => {
+        doc.font('Helvetica').fontSize(8.5).fillColor(urgent ? '#e63b2e' : '#1a1a1a')
+          .text(`• ${label}`, 45, doc.y, { continued: true })
+          .fillColor('#555').text(`  ${value}`);
+        doc.moveDown(0.1);
+      };
+
+      // Urgent attention
+      if (review.urgentAttention.length > 0) {
+        section('URGENT ATTENTION');
+        review.urgentAttention.forEach((c: any) => row(c.name, `${c.businessStatus} | Risk: ${c.riskScore}`, true));
+        doc.moveDown(0.4);
+      }
+
+      // Upcoming audits
+      if (review.upcomingAudits.length > 0) {
+        section('UPCOMING AUDITS (60 DAYS)');
+        review.upcomingAudits.forEach((c: any) =>
+          row(c.name, `${c.daysUntilAudit === 0 ? 'TODAY' : c.daysUntilAudit + ' days'} — ${format(new Date(c.nextAuditDate), 'dd MMM yyyy')}`, c.daysUntilAudit <= 14)
+        );
+        doc.moveDown(0.4);
+      }
+
+      // No recent activity
+      if (review.noRecentActivity.length > 0) {
+        section('NO RECENT ACTIVITY');
+        review.noRecentActivity.forEach((c: any) =>
+          row(c.name, `${c.daysSinceComm ?? '?'} days since last comm`, (c.daysSinceComm ?? 0) >= 30)
+        );
+        doc.moveDown(0.4);
+      }
+
+      // Employee contributions
+      if (review.employeeContributions.length > 0) {
+        section('EMPLOYEE CONTRIBUTIONS (THIS WEEK)');
+        review.employeeContributions.forEach((e: any) =>
+          row(e.name, `${e.count} updates · ${e.companies.join(', ') || 'No company tagged'}`)
+        );
+      }
+
+      doc.fillColor('#888').font('Helvetica').fontSize(7)
+        .text(`Generated by NexGen EMS · ${new Date().toISOString()}`, 40, doc.page.height - 30,
+          { align: 'center', width: doc.page.width - 80 });
+
+      doc.end();
+    });
+  }
+
+  async exportExcel(): Promise<Buffer> {
+    const companies = await this.prisma.clientCompany.findMany({
+      where: { isArchived: false },
+      include: { responsibleEmployee: { select: { firstName: true, lastName: true } } },
+      orderBy: [{ criticality: 'asc' }, { riskScore: 'desc' }],
+    });
+
+    const rows = companies.map(c => ({
+      'Company': c.name,
+      'Status': c.businessStatus,
+      'Priority': c.criticality,
+      'Risk Score': c.riskScore,
+      'Current Stage': c.currentStage ?? '',
+      'Responsible': c.responsibleEmployee ? `${c.responsibleEmployee.firstName} ${c.responsibleEmployee.lastName}` : '',
+      'Last Visit': c.lastVisitDate ? format(c.lastVisitDate, 'dd MMM yyyy') : '',
+      'Last Communication': c.lastCommunicationDate ? format(c.lastCommunicationDate, 'dd MMM yyyy') : '',
+      'Next Audit': c.nextAuditDate ? format(c.nextAuditDate, 'dd MMM yyyy') : '',
+      'Notes': c.notes ?? '',
+    }));
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(rows);
+    ws['!cols'] = [20, 12, 10, 8, 20, 20, 15, 18, 15, 30].map(w => ({ wch: w }));
+    XLSX.utils.book_append_sheet(wb, ws, 'Companies');
+
+    return Buffer.from(XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }));
   }
 }

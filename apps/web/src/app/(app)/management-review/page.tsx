@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { BarChart2, AlertTriangle, Calendar, Users, BrainCircuit, RefreshCw, Clock, Building2, ChevronRight } from 'lucide-react';
+import { BarChart2, AlertTriangle, Calendar, Users, BrainCircuit, RefreshCw, Clock, Building2, ChevronRight, Download, FileSpreadsheet } from 'lucide-react';
 import Link from 'next/link';
 import { format, differenceInDays } from 'date-fns';
 import { apiClient } from '@/lib/api-client';
@@ -45,11 +45,25 @@ export default function ManagementReviewPage() {
         title="Management Review"
         subtitle={`Week: ${weekRange.start} to ${weekRange.end}`}
         actions={
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             <Button variant="secondary" size="sm" onClick={() => refetch()}><RefreshCw size={14} /></Button>
             <Button size="sm" onClick={() => getAI()} disabled={loadingAI}>
               <BrainCircuit size={14} /> {loadingAI ? 'Generating…' : 'AI Recommendations'}
             </Button>
+            <a
+              href={`${process.env.NEXT_PUBLIC_API_URL}/api/v1/management-review/export/pdf`}
+              target="_blank"
+              className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium border border-slate-200 text-slate-700 hover:bg-slate-50 rounded-lg transition-colors"
+            >
+              <Download size={13} /> PDF
+            </a>
+            <a
+              href={`${process.env.NEXT_PUBLIC_API_URL}/api/v1/management-review/export/excel`}
+              target="_blank"
+              className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium border border-slate-200 text-slate-700 hover:bg-slate-50 rounded-lg transition-colors"
+            >
+              <FileSpreadsheet size={13} /> Excel
+            </a>
           </div>
         }
       />

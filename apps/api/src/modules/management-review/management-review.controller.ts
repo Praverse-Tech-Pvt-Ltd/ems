@@ -1,4 +1,5 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
+import { Controller, Get, Query, UseGuards, Res } from '@nestjs/common';
+import { Response } from 'express';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { ManagementReviewService } from './management-review.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -21,5 +22,26 @@ export class ManagementReviewController {
   @Get('ai-recommendations')
   getAIRecommendations() {
     return this.service.getAIRecommendations();
+  }
+
+  @Get('employee-performance')
+  getEmployeePerformance(@Query('days') days?: string) {
+    return this.service.getEmployeePerformanceReport(days ? parseInt(days) : 30);
+  }
+
+  @Get('export/pdf')
+  async exportPdf(@Res() res: Response) {
+    const buffer = await this.service.exportPdf();
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="management-review-${new Date().toISOString().split('T')[0]}.pdf"`);
+    res.send(buffer);
+  }
+
+  @Get('export/excel')
+  async exportExcel(@Res() res: Response) {
+    const buffer = await this.service.exportExcel();
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="company-status-${new Date().toISOString().split('T')[0]}.xlsx"`);
+    res.send(buffer);
   }
 }

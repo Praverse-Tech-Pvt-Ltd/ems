@@ -6,7 +6,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Building2, Calendar, User, AlertTriangle, Clock, ArrowLeft,
   BrainCircuit, FileText, Eye, Activity, MapPin, Phone, Mail,
-  Plus, ChevronDown, CheckCircle
+  Plus, ChevronDown, CheckCircle, Upload, Download, MessageSquare,
+  ClipboardCheck, X,
 } from 'lucide-react';
 import Link from 'next/link';
 import { format, differenceInDays } from 'date-fns';
@@ -41,7 +42,7 @@ const STATUS_COLORS: Record<string, string> = {
 export default function CompanyDetailPage() {
   const { id } = useParams<{ id: string }>();
   const qc = useQueryClient();
-  const [activeTab, setActiveTab] = useState<'overview' | 'timeline' | 'updates' | 'projects'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'timeline' | 'updates' | 'projects' | 'audit' | 'documents' | 'communications'>('overview');
 
   const { data: company, isLoading } = useQuery({
     queryKey: ['company', id],
@@ -172,16 +173,16 @@ export default function CompanyDetailPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b-2 border-brutal-ink mb-4">
-        {(['overview', 'timeline', 'updates', 'projects'] as const).map(tab => (
+      <div className="flex border-b-2 border-brutal-ink mb-4 overflow-x-auto">
+        {(['overview', 'timeline', 'updates', 'projects', 'audit', 'documents', 'communications'] as const).map(tab => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`px-4 py-2 font-display font-bold text-[12px] tracking-widest uppercase border-r-2 border-brutal-ink transition-colors ${
+            className={`px-4 py-2 font-display font-bold text-[11px] tracking-widest uppercase border-r-2 border-brutal-ink transition-colors whitespace-nowrap ${
               activeTab === tab ? 'bg-brutal-ink text-white' : 'bg-white hover:bg-brutal-surface'
             }`}
           >
-            {tab}
+            {tab === 'audit' ? '🔍 Audit' : tab === 'documents' ? '📁 Docs' : tab === 'communications' ? '💬 Comms' : tab}
           </button>
         ))}
       </div>
@@ -285,6 +286,15 @@ export default function CompanyDetailPage() {
       {/* Updates Tab */}
       {activeTab === 'updates' && <WorkUpdatesTab companyId={id} />}
 
+      {/* Audit Tab */}
+      {activeTab === 'audit' && <AuditTab companyId={id} projects={company.projects ?? []} />}
+
+      {/* Documents Tab */}
+      {activeTab === 'documents' && <DocumentsTab companyId={id} />}
+
+      {/* Communications Tab */}
+      {activeTab === 'communications' && <CommunicationsTab companyId={id} />}
+
       {/* Projects Tab */}
       {activeTab === 'projects' && (
         <div className="space-y-3">
@@ -350,6 +360,413 @@ function WorkUpdatesTab({ companyId }: { companyId: string }) {
           )}
         </div>
       ))}
+    </div>
+  );
+}
+
+// ── Audit Readiness Tab ───────────────────────────────────────────────────────
+const AUDIT_TYPES = ['WHO', 'GMP', 'CDSCO', 'FDA'];
+const STATUS_COLOR: Record<string, string> = {
+  APPROVED: 'bg-green-100 text-green-800 border-green-300',
+  IN_PROGRESS: 'bg-blue-100 text-blue-800 border-blue-300',
+  SUBMITTED: 'bg-yellow-100 text-yellow-800 border-yellow-300',
+  PENDING: 'bg-gray-100 text-gray-600 border-gray-300',
+  NOT_APPLICABLE: 'bg-purple-50 text-purple-500 border-purple-200',
+};
+const STATUS_OPTIONS = ['PENDING', 'IN_PROGRESS', 'SUBMITTED', 'APPROVED', 'NOT_APPLICABLE'];
+
+function AuditTab({ companyId, projects }: { companyId: string; projects: any[] }) {
+  const qc = useQueryClient();
+  const [selectedProject, setSelectedProject] = useState<string>(projects[0]?.id ?? '');
+  const [showSeed, setShowSeed] = useState(false);
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['audit-readiness', selectedProject],
+    queryFn: () => apiClient.get(`/audit-readiness/${selectedProject}`).then(r => r.data),
+    enabled: !!selectedProject,
+  });
+
+  const { mutate: updateItem } = useMutation({
+    mutationFn: ({ itemId, status }: { itemId: string; status: string }) =>
+      apiClient.patch(`/audit-readiness/${selectedProject}/items/${itemId}`, { status }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['audit-readiness', selectedProject] }),
+  });
+
+  const { mutate: seedChecklist, isPending: seeding } = useMutation({
+    mutationFn: (auditType: string) =>
+      apiClient.post(`/audit-readiness/${selectedProject}/seed`, { auditType }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['audit-readiness', selectedProject] }); setShowSeed(false); },
+  });
+
+  const { mutate: getAIGaps, isPending: gettingGaps, data: gapsData } = useMutation({
+    mutationFn: () => apiClient.post(`/audit-readiness/${selectedProject}/ai-gaps`).then(r => r.data),
+  });
+
+  if (projects.length === 0) {
+    return (
+      <div className="brutal-border p-8 text-center text-brutal-ink/40 font-display">
+        No projects — add a project with an audit date first
+      </div>
+    );
+  }
+
+  const readiness = data?.readinessPercent ?? 0;
+  const daysToAudit = data?.daysToAudit;
+
+  return (
+    <div className="space-y-4">
+      {/* Project selector */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <select
+          value={selectedProject}
+          onChange={e => setSelectedProject(e.target.value)}
+          className="brutal-border px-3 py-2 font-display text-sm outline-none bg-white"
+        >
+          {projects.map((p: any) => (
+            <option key={p.id} value={p.id}>{p.name}{p.auditDate ? ` — ${format(new Date(p.auditDate), 'dd MMM yyyy')}` : ''}</option>
+          ))}
+        </select>
+
+        {/* Seed dropdown */}
+        <div className="relative">
+          <button onClick={() => setShowSeed(!showSeed)} className="brutal-border px-3 py-2 font-display font-bold text-[11px] uppercase bg-white hover:bg-brutal-yellow flex items-center gap-1">
+            Seed Checklist <ChevronDown size={11} />
+          </button>
+          {showSeed && (
+            <div className="absolute top-full left-0 mt-1 brutal-border bg-white z-10 w-32">
+              {AUDIT_TYPES.map(t => (
+                <button key={t} onClick={() => seedChecklist(t)} disabled={seeding}
+                  className="block w-full text-left px-3 py-2 font-display font-bold text-[12px] hover:bg-brutal-yellow border-b border-brutal-ink/10 last:border-0">
+                  {t} {seeding && '…'}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <button
+          onClick={() => getAIGaps()}
+          disabled={gettingGaps}
+          className="brutal-border px-3 py-2 font-display font-bold text-[11px] uppercase bg-white hover:bg-brutal-blue hover:text-white flex items-center gap-1"
+        >
+          <BrainCircuit size={12} /> {gettingGaps ? 'Analyzing…' : 'AI Gaps'}
+        </button>
+
+        <a
+          href={`${process.env.NEXT_PUBLIC_API_URL}/api/v1/audit-readiness/${selectedProject}/export/pdf`}
+          target="_blank"
+          className="brutal-border px-3 py-2 font-display font-bold text-[11px] uppercase bg-white hover:bg-brutal-surface flex items-center gap-1"
+        >
+          <FileText size={12} /> Export PDF
+        </a>
+      </div>
+
+      {/* Readiness bar */}
+      {data && (
+        <div className="brutal-border p-4 bg-white">
+          <div className="flex items-center justify-between mb-2">
+            <span className="font-display font-bold text-[12px] tracking-widest uppercase">
+              Audit Readiness
+            </span>
+            <div className="flex items-center gap-3">
+              <span className={`font-display font-bold text-2xl ${readiness >= 80 ? 'text-green-600' : readiness >= 50 ? 'text-orange-500' : 'text-brutal-red'}`}>
+                {readiness}%
+              </span>
+              {daysToAudit !== null && (
+                <span className={`font-display font-bold text-[13px] px-2 py-0.5 border ${daysToAudit <= 14 ? 'bg-red-50 border-brutal-red text-brutal-red' : daysToAudit <= 30 ? 'bg-orange-50 border-orange-400 text-orange-700' : 'bg-brutal-surface border-brutal-ink/30'}`}>
+                  {daysToAudit <= 0 ? 'AUDIT TODAY/OVERDUE' : `${daysToAudit}d to audit`}
+                </span>
+              )}
+            </div>
+          </div>
+          <div className="h-4 brutal-border bg-brutal-surface">
+            <div
+              className={`h-full transition-all ${readiness >= 80 ? 'bg-green-500' : readiness >= 50 ? 'bg-orange-400' : 'bg-brutal-red'}`}
+              style={{ width: `${readiness}%` }}
+            />
+          </div>
+          <div className="flex gap-4 mt-2 text-[11px] text-brutal-ink/60">
+            <span>Total: {data.total}</span>
+            <span>✓ {data.done} approved/N/A</span>
+            <span>⏳ {data.total - data.done} pending</span>
+          </div>
+        </div>
+      )}
+
+      {/* AI Gaps */}
+      {gapsData?.analysis && (
+        <div className="bg-purple-50 border-2 border-purple-300 p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <BrainCircuit size={13} className="text-purple-700" />
+            <span className="font-display font-bold text-[11px] uppercase tracking-widest text-purple-700">AI Gap Analysis</span>
+          </div>
+          <pre className="text-[12px] text-purple-900 whitespace-pre-wrap font-mono leading-relaxed">{gapsData.analysis}</pre>
+        </div>
+      )}
+
+      {/* Checklist by category */}
+      {isLoading ? (
+        <div className="space-y-2">{[...Array(5)].map((_, i) => <div key={i} className="h-10 brutal-border bg-brutal-surface animate-pulse" />)}</div>
+      ) : data?.items?.length === 0 ? (
+        <div className="brutal-border p-8 text-center text-brutal-ink/40 font-display">
+          No checklist items — click "Seed Checklist" to add WHO/GMP/CDSCO/FDA items
+        </div>
+      ) : (
+        Object.entries(data?.byCategory ?? {}).map(([category, items]: [string, any]) => (
+          <div key={category}>
+            <div className="font-display font-bold text-[10px] tracking-widest uppercase bg-brutal-ink text-white px-3 py-1.5 mb-1">
+              {category}
+            </div>
+            <div className="space-y-0.5">
+              {items.map((item: any) => (
+                <div key={item.id} className="flex items-center gap-2 brutal-border px-3 py-2 bg-white hover:bg-brutal-surface">
+                  <select
+                    value={item.status}
+                    onChange={e => updateItem({ itemId: item.id, status: e.target.value })}
+                    className={`text-[10px] font-display font-bold px-2 py-0.5 border outline-none cursor-pointer ${STATUS_COLOR[item.status] ?? ''}`}
+                  >
+                    {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}
+                  </select>
+                  <span className="flex-1 text-[12px] font-display">{item.title}</span>
+                  {item.responsible && (
+                    <span className="text-[10px] text-brutal-ink/50">{item.responsible.firstName}</span>
+                  )}
+                  {item.dueDate && (
+                    <span className={`text-[10px] font-bold ${differenceInDays(new Date(item.dueDate), new Date()) <= 3 ? 'text-brutal-red' : 'text-brutal-ink/40'}`}>
+                      {format(new Date(item.dueDate), 'dd MMM')}
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        ))
+      )}
+    </div>
+  );
+}
+
+// ── Documents Tab ─────────────────────────────────────────────────────────────
+const DOC_STATUS_COLOR: Record<string, string> = {
+  PENDING: 'bg-gray-100 text-gray-600 border-gray-300',
+  SUBMITTED: 'bg-blue-100 text-blue-800 border-blue-300',
+  APPROVED: 'bg-green-100 text-green-800 border-green-300',
+  REJECTED: 'bg-red-100 text-red-800 border-red-300',
+  EXPIRED: 'bg-purple-100 text-purple-800 border-purple-300',
+};
+
+function DocumentsTab({ companyId }: { companyId: string }) {
+  const qc = useQueryClient();
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({ docName: '', docType: '', notes: '', expiresAt: '' });
+
+  const { data: docs = [], isLoading } = useQuery({
+    queryKey: ['company-docs', companyId],
+    queryFn: () => apiClient.get(`/company-documents/${companyId}`).then(r => r.data),
+  });
+
+  const { mutate: createDoc } = useMutation({
+    mutationFn: () => apiClient.post(`/company-documents/${companyId}`, form),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['company-docs', companyId] }); setShowForm(false); setForm({ docName: '', docType: '', notes: '', expiresAt: '' }); },
+  });
+
+  const { mutate: updateStatus } = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: string }) =>
+      apiClient.patch(`/company-documents/${companyId}/${id}`, { status }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['company-docs', companyId] }),
+  });
+
+  return (
+    <div className="space-y-3">
+      <div className="flex justify-between items-center">
+        <span className="font-display font-bold text-[11px] tracking-widest uppercase text-brutal-ink/60">
+          {docs.length} document{docs.length !== 1 ? 's' : ''}
+        </span>
+        <Button size="sm" onClick={() => setShowForm(!showForm)}>
+          <Plus size={13} /> Add Document
+        </Button>
+      </div>
+
+      {showForm && (
+        <div className="brutal-border p-4 bg-brutal-surface space-y-2">
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="font-display font-bold text-[10px] uppercase text-brutal-ink/60 block mb-1">Document Name *</label>
+              <input value={form.docName} onChange={e => setForm(f => ({ ...f, docName: e.target.value }))} className="w-full brutal-border p-2 text-sm font-display outline-none bg-white" />
+            </div>
+            <div>
+              <label className="font-display font-bold text-[10px] uppercase text-brutal-ink/60 block mb-1">Document Type *</label>
+              <input value={form.docType} onChange={e => setForm(f => ({ ...f, docType: e.target.value }))} placeholder="e.g. GMP Certificate, Drug License" className="w-full brutal-border p-2 text-sm font-display outline-none bg-white" />
+            </div>
+            <div>
+              <label className="font-display font-bold text-[10px] uppercase text-brutal-ink/60 block mb-1">Expiry Date</label>
+              <input type="date" value={form.expiresAt} onChange={e => setForm(f => ({ ...f, expiresAt: e.target.value }))} className="w-full brutal-border p-2 text-sm font-display outline-none bg-white" />
+            </div>
+            <div>
+              <label className="font-display font-bold text-[10px] uppercase text-brutal-ink/60 block mb-1">Notes</label>
+              <input value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} className="w-full brutal-border p-2 text-sm font-display outline-none bg-white" />
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Button size="sm" disabled={!form.docName || !form.docType} onClick={() => createDoc()}>Save</Button>
+            <Button variant="secondary" size="sm" onClick={() => setShowForm(false)}>Cancel</Button>
+          </div>
+        </div>
+      )}
+
+      {isLoading ? <div className="h-20 brutal-border bg-brutal-surface animate-pulse" /> :
+        docs.length === 0 ? <div className="brutal-border p-8 text-center text-brutal-ink/40 font-display">No documents yet</div> :
+        <div className="space-y-2">
+          {docs.map((doc: any) => {
+            const daysToExpiry = doc.expiresAt ? differenceInDays(new Date(doc.expiresAt), new Date()) : null;
+            const expiryUrgent = daysToExpiry !== null && daysToExpiry <= 30;
+            return (
+              <div key={doc.id} className={`brutal-border p-3 bg-white ${expiryUrgent ? 'border-orange-400' : ''}`}>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <span className="font-display font-bold text-[13px]">{doc.docName}</span>
+                      <span className="text-[10px] text-brutal-ink/50 font-display">{doc.docType}</span>
+                    </div>
+                    {doc.expiresAt && (
+                      <div className={`text-[11px] font-bold ${expiryUrgent ? 'text-orange-600' : 'text-brutal-ink/50'}`}>
+                        Expires: {format(new Date(doc.expiresAt), 'dd MMM yyyy')}
+                        {daysToExpiry !== null && daysToExpiry <= 30 && ` (${daysToExpiry}d left)`}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <select
+                      value={doc.status}
+                      onChange={e => updateStatus({ id: doc.id, status: e.target.value })}
+                      className={`text-[10px] font-display font-bold px-2 py-0.5 border outline-none cursor-pointer ${DOC_STATUS_COLOR[doc.status] ?? ''}`}
+                    >
+                      {['PENDING', 'SUBMITTED', 'APPROVED', 'REJECTED', 'EXPIRED'].map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                    {doc.fileS3Key ? (
+                      <a href={`${process.env.NEXT_PUBLIC_API_URL}/api/v1/company-documents/${companyId}/${doc.id}/download`}
+                        target="_blank"
+                        className="brutal-border w-7 h-7 grid place-items-center hover:bg-brutal-yellow">
+                        <Download size={12} />
+                      </a>
+                    ) : (
+                      <span className="text-[10px] text-brutal-ink/30 font-display">No file</span>
+                    )}
+                  </div>
+                </div>
+                {doc.notes && <p className="text-[11px] text-brutal-ink/60 mt-1">{doc.notes}</p>}
+              </div>
+            );
+          })}
+        </div>
+      }
+    </div>
+  );
+}
+
+// ── Communications Tab ────────────────────────────────────────────────────────
+const COMM_ICONS: Record<string, string> = {
+  EMAIL: '📧', PHONE_CALL: '📞', WHATSAPP: '💬',
+  IN_PERSON: '🤝', VIDEO_CALL: '📹', LETTER: '✉️',
+};
+const COMM_TYPES = ['EMAIL', 'PHONE_CALL', 'WHATSAPP', 'IN_PERSON', 'VIDEO_CALL', 'LETTER'];
+
+function CommunicationsTab({ companyId }: { companyId: string }) {
+  const qc = useQueryClient();
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({
+    type: 'PHONE_CALL',
+    commDate: format(new Date(), 'yyyy-MM-dd'),
+    summary: '',
+    outcome: '',
+    nextAction: '',
+  });
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['client-comms', companyId],
+    queryFn: () => apiClient.get(`/client-communications/${companyId}`).then(r => r.data),
+  });
+
+  const { mutate: addComm, isPending } = useMutation({
+    mutationFn: () => apiClient.post(`/client-communications/${companyId}`, form),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['client-comms', companyId] });
+      qc.invalidateQueries({ queryKey: ['company', companyId] });
+      setShowForm(false);
+      setForm({ type: 'PHONE_CALL', commDate: format(new Date(), 'yyyy-MM-dd'), summary: '', outcome: '', nextAction: '' });
+    },
+  });
+
+  const comms = data?.items ?? [];
+
+  return (
+    <div className="space-y-3">
+      <div className="flex justify-between items-center">
+        <span className="font-display font-bold text-[11px] tracking-widest uppercase text-brutal-ink/60">
+          {data?.total ?? 0} communication{(data?.total ?? 0) !== 1 ? 's' : ''}
+        </span>
+        <Button size="sm" onClick={() => setShowForm(!showForm)}>
+          <Plus size={13} /> Log Communication
+        </Button>
+      </div>
+
+      {showForm && (
+        <div className="brutal-border p-4 bg-brutal-surface space-y-2">
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="font-display font-bold text-[10px] uppercase text-brutal-ink/60 block mb-1">Type</label>
+              <select value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))} className="w-full brutal-border p-2 text-sm font-display outline-none bg-white">
+                {COMM_TYPES.map(t => <option key={t} value={t}>{COMM_ICONS[t]} {t.replace('_', ' ')}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="font-display font-bold text-[10px] uppercase text-brutal-ink/60 block mb-1">Date</label>
+              <input type="date" value={form.commDate} onChange={e => setForm(f => ({ ...f, commDate: e.target.value }))} className="w-full brutal-border p-2 text-sm font-display outline-none bg-white" />
+            </div>
+            <div className="col-span-2">
+              <label className="font-display font-bold text-[10px] uppercase text-brutal-ink/60 block mb-1">Summary *</label>
+              <textarea value={form.summary} onChange={e => setForm(f => ({ ...f, summary: e.target.value }))} rows={2} placeholder="What was discussed?" className="w-full brutal-border p-2 text-sm font-display outline-none bg-white resize-none" />
+            </div>
+            <div>
+              <label className="font-display font-bold text-[10px] uppercase text-brutal-ink/60 block mb-1">Outcome</label>
+              <input value={form.outcome} onChange={e => setForm(f => ({ ...f, outcome: e.target.value }))} className="w-full brutal-border p-2 text-sm font-display outline-none bg-white" />
+            </div>
+            <div>
+              <label className="font-display font-bold text-[10px] uppercase text-brutal-ink/60 block mb-1">Next Action</label>
+              <input value={form.nextAction} onChange={e => setForm(f => ({ ...f, nextAction: e.target.value }))} className="w-full brutal-border p-2 text-sm font-display outline-none bg-white" />
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Button size="sm" disabled={!form.summary.trim() || isPending} onClick={() => addComm()}>
+              {isPending ? 'Saving…' : 'Save'}
+            </Button>
+            <Button variant="secondary" size="sm" onClick={() => setShowForm(false)}>Cancel</Button>
+          </div>
+        </div>
+      )}
+
+      {isLoading ? <div className="h-20 brutal-border bg-brutal-surface animate-pulse" /> :
+        comms.length === 0 ? <div className="brutal-border p-8 text-center text-brutal-ink/40 font-display">No communications logged</div> :
+        <div className="space-y-2">
+          {comms.map((c: any) => (
+            <div key={c.id} className="brutal-border p-3 bg-white flex gap-3">
+              <div className="text-2xl flex-shrink-0 mt-0.5">{COMM_ICONS[c.type] ?? '💬'}</div>
+              <div className="flex-1">
+                <div className="flex items-center justify-between gap-2 mb-0.5">
+                  <span className="font-display font-bold text-[11px] text-brutal-ink/60 uppercase">{c.type.replace('_', ' ')}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-brutal-ink/40">{c.author.firstName} {c.author.lastName}</span>
+                    <span className="text-[10px] text-brutal-ink/40">{format(new Date(c.commDate), 'dd MMM yyyy')}</span>
+                  </div>
+                </div>
+                <p className="text-[13px] font-display">{c.summary}</p>
+                {c.outcome && <p className="text-[11px] text-brutal-ink/60 mt-0.5">→ {c.outcome}</p>}
+                {c.nextAction && <p className="text-[11px] text-brutal-blue font-bold mt-0.5">Next: {c.nextAction}</p>}
+              </div>
+            </div>
+          ))}
+        </div>
+      }
     </div>
   );
 }

@@ -1,0 +1,54 @@
+version: '3.9'
+
+# ── Production compose ────────────────────────────────────────────────────────
+# Usage: docker compose -f docker-compose.prod.yml up -d
+# Requires: .env file with all production values (Neon DB, Upstash, etc.)
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      args:
+        NODE_ENV: production
+    container_name: nexgen_api
+    env_file: .env
+    environment:
+      NODE_ENV: production
+    ports:
+      - '3001:3001'
+    restart: unless-stopped
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://localhost:3001/health']
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: '${NEXT_PUBLIC_API_URL}'
+    container_name: nexgen_web
+    env_file: .env
+    environment:
+      NODE_ENV: production
+    ports:
+      - '3000:3000'
+    restart: unless-stopped
+    depends_on:
+      - api
+
+  face-service:
+    build:
+      context: apps/face-service
+      dockerfile: Dockerfile
+    container_name: nexgen_face
+    env_file: .env
+    ports:
+      - '8000:8000'
+    restart: unless-stopped
+
+# NOTE: In production use Neon (DATABASE_URL) + Upstash (REDIS_URL) instead of local containers.
+# Do NOT run postgres/redis containers in prod — use managed cloud services.

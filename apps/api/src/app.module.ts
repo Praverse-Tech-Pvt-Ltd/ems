@@ -29,6 +29,12 @@ import { WorkUpdatesModule } from './modules/work-updates/work-updates.module';
 import { AIOverviewModule } from './modules/ai-overview/ai-overview.module';
 import { CompanyCalendarModule } from './modules/company-calendar/company-calendar.module';
 import { ManagementReviewModule } from './modules/management-review/management-review.module';
+import { AuditReadinessModule } from './modules/audit-readiness/audit-readiness.module';
+import { CompanyDocumentsModule } from './modules/company-documents/company-documents.module';
+import { ClientCommunicationsModule } from './modules/client-communications/client-communications.module';
+import { FollowUpTasksModule } from './modules/follow-up-tasks/follow-up-tasks.module';
+import { AIChatModule } from './modules/ai-chat/ai-chat.module';
+import { ZohoSyncModule } from './modules/zoho-sync/zoho-sync.module';
 
 @Module({
   imports: [
@@ -83,6 +89,12 @@ import { ManagementReviewModule } from './modules/management-review/management-r
     WorkUpdatesModule,
     CompanyCalendarModule,
     ManagementReviewModule,
+    AuditReadinessModule,
+    CompanyDocumentsModule,
+    ClientCommunicationsModule,
+    FollowUpTasksModule,
+    AIChatModule,
+    ZohoSyncModule,
   ],
   // Apply ThrottlerGuard globally so every route is rate-limited by default.
   // Individual routes/controllers can override limits with @Throttle().

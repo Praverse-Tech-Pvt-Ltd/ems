@@ -159,6 +159,39 @@ enum DocumentReviewStatus {
   REJECTED
 }
 
+// ─── Tier 1 + 2 Intelligence Enums ───────────────────────────────────────────
+
+enum AuditChecklistStatus {
+  PENDING
+  IN_PROGRESS
+  SUBMITTED
+  APPROVED
+  NOT_APPLICABLE
+}
+
+enum FollowUpTaskStatus {
+  OPEN
+  DONE
+  SNOOZED
+}
+
+enum CompanyDocStatus {
+  PENDING
+  SUBMITTED
+  APPROVED
+  REJECTED
+  EXPIRED
+}
+
+enum ClientCommType {
+  EMAIL
+  PHONE_CALL
+  WHATSAPP
+  IN_PERSON
+  VIDEO_CALL
+  LETTER
+}
+
 // ─── Core Tables ─────────────────────────────────────────────────────────────
 
 model Department {
@@ -269,6 +302,13 @@ model Employee {
   calendarEventsCreated  CalendarEvent[]          @relation("CalendarCreator")
   alertsResolved         CompanyAlert[]           @relation("AlertResolver")
   attendanceEdits        AttendanceEditHistory[]  @relation("AttendanceEditor")
+
+  // Tier 1 + 2 relations
+  auditItemsResponsible       AuditReadinessItem[]    @relation("AuditItemResponsible")
+  aiChatMessages              AIChatMessage[]
+  followUpTasksAssigned       FollowUpTask[]          @relation("FollowUpAssignee")
+  companyDocumentsUploaded    CompanyDocument[]       @relation("DocUploader")
+  clientCommunicationsCreated ClientCommunication[]   @relation("CommAuthor")
 
   @@map("employees")
 }
@@ -782,6 +822,11 @@ enum CalendarEventType {
   OWNER_MEETING
   RECURRING_REVIEW
   AI_SUGGESTED
+  WHO_AUDIT
+  GMP_RENEWAL
+  CDSCO_SUBMISSION
+  FDA_INSPECTION
+  DRUG_LICENSE_RENEWAL
 }
 
 enum AlertSeverity {
@@ -834,6 +879,9 @@ model ClientCompany {
   calendarEvents      CalendarEvent[]
   aiSummaries         AISummary[]
   alerts              CompanyAlert[]
+  followUpTasks       FollowUpTask[]
+  documents           CompanyDocument[]
+  communications      ClientCommunication[]
 
   @@index([businessStatus])
   @@index([criticality])
@@ -873,8 +921,9 @@ model CompanyProject {
   createdAt      DateTime  @default(now()) @map("created_at")
   updatedAt      DateTime  @updatedAt @map("updated_at")
 
-  company      ClientCompany @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  leadEmployee Employee?     @relation("ProjectLead", fields: [leadEmployeeId], references: [id])
+  company             ClientCompany        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  leadEmployee        Employee?            @relation("ProjectLead", fields: [leadEmployeeId], references: [id])
+  auditReadinessItems AuditReadinessItem[]
 
   @@map("company_projects")
 }
@@ -1080,4 +1129,111 @@ model FaceEmbedding {
   employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
   @@map("face_embeddings")
+}
+
+// ─── Tier 1 Models ────────────────────────────────────────────────────────────
+
+model AuditReadinessItem {
+  id               String               @id @default(uuid())
+  projectId        String               @map("project_id")
+  title            String
+  category         String
+  status           AuditChecklistStatus @default(PENDING)
+  responsibleId    String?              @map("responsible_id")
+  dueDate          DateTime?            @map("due_date") @db.Date
+  notes            String?
+  auditType        String?              @map("audit_type")
+  linkedDocumentId String?              @map("linked_document_id")
+  sortOrder        Int                  @default(0) @map("sort_order")
+  createdAt        DateTime             @default(now()) @map("created_at")
+  updatedAt        DateTime             @updatedAt @map("updated_at")
+
+  project        CompanyProject   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  responsible    Employee?        @relation("AuditItemResponsible", fields: [responsibleId], references: [id])
+  linkedDocument CompanyDocument? @relation(fields: [linkedDocumentId], references: [id])
+
+  @@index([projectId])
+  @@map("audit_readiness_items")
+}
+
+model AIChatMessage {
+  id        String   @id @default(uuid())
+  sessionId String   @map("session_id")
+  role      String
+  content   String
+  createdBy String   @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  author Employee @relation(fields: [createdBy], references: [id])
+
+  @@index([sessionId, createdAt])
+  @@map("ai_chat_messages")
+}
+
+model FollowUpTask {
+  id             String             @id @default(uuid())
+  companyId      String             @map("company_id")
+  assignedTo     String             @map("assigned_to")
+  dueDate        DateTime           @map("due_date") @db.Date
+  reason         String
+  status         FollowUpTaskStatus @default(OPEN)
+  completionNote String?            @map("completion_note")
+  snoozedUntil   DateTime?          @map("snoozed_until") @db.Date
+  completedAt    DateTime?          @map("completed_at") @db.Timestamptz
+  createdAt      DateTime           @default(now()) @map("created_at")
+  updatedAt      DateTime           @updatedAt @map("updated_at")
+
+  company  ClientCompany @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  assignee Employee      @relation("FollowUpAssignee", fields: [assignedTo], references: [id])
+
+  @@index([status, dueDate])
+  @@index([companyId])
+  @@map("follow_up_tasks")
+}
+
+// ─── Tier 2 Models ────────────────────────────────────────────────────────────
+
+model CompanyDocument {
+  id           String           @id @default(uuid())
+  companyId    String           @map("company_id")
+  docName      String           @map("doc_name")
+  docType      String           @map("doc_type")
+  status       CompanyDocStatus @default(PENDING)
+  fileS3Key    String?          @map("file_s3_key")
+  expiresAt    DateTime?        @map("expires_at") @db.Date
+  uploadedBy   String           @map("uploaded_by")
+  notes        String?
+  zohoDocId    String?          @map("zoho_doc_id")
+  // TIER3: AI document OCR pipeline — add processingStatus field here
+  createdAt    DateTime         @default(now()) @map("created_at")
+  updatedAt    DateTime         @updatedAt @map("updated_at")
+
+  company    ClientCompany       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  uploader   Employee            @relation("DocUploader", fields: [uploadedBy], references: [id])
+  auditItems AuditReadinessItem[]
+
+  @@index([companyId, status])
+  @@index([expiresAt])
+  @@map("company_documents")
+}
+
+model ClientCommunication {
+  id          String         @id @default(uuid())
+  companyId   String         @map("company_id")
+  type        ClientCommType
+  commDate    DateTime       @map("comm_date") @db.Date
+  summary     String
+  outcome     String?
+  nextAction  String?        @map("next_action")
+  createdBy   String         @map("created_by")
+  zohoEmailId String?        @map("zoho_email_id")
+  // TIER3: Zoho Mail sync — zohoEmailId populated when email pulled from Zoho API
+  createdAt   DateTime       @default(now()) @map("created_at")
+  updatedAt   DateTime       @updatedAt @map("updated_at")
+
+  company ClientCompany @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  author  Employee      @relation("CommAuthor", fields: [createdBy], references: [id])
+
+  @@index([companyId, commDate])
+  @@map("client_communications")
 }

@@ -118,4 +118,54 @@ export class CompanyCalendarService {
       daysUntil: Math.ceil((e.startDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)),
     })).filter(e => e.daysUntil >= 0).sort((a, b) => a.daysUntil - b.daysUntil);
   }
+
+  private readonly REGULATORY_TYPES = [
+    'WHO_AUDIT', 'GMP_RENEWAL', 'CDSCO_SUBMISSION',
+    'FDA_INSPECTION', 'DRUG_LICENSE_RENEWAL',
+  ];
+
+  async findRegulatory(companyId?: string) {
+    return this.prisma.calendarEvent.findMany({
+      where: {
+        eventType: { in: this.REGULATORY_TYPES as any[] },
+        ...(companyId && { companyId }),
+      },
+      include: {
+        company: { select: { id: true, name: true } },
+        assignee: { select: { id: true, firstName: true, lastName: true } },
+        creator: { select: { id: true, firstName: true, lastName: true } },
+      },
+      orderBy: { startDate: 'asc' },
+    });
+  }
+
+  async seedRegulatoryEvents(createdBy: string) {
+    const companies = await this.prisma.clientCompany.findMany({
+      where: { isArchived: false, nextAuditDate: { not: null } },
+      select: { id: true, name: true, nextAuditDate: true },
+    });
+
+    let count = 0;
+    for (const c of companies) {
+      if (!c.nextAuditDate) continue;
+      const existing = await this.prisma.calendarEvent.findFirst({
+        where: { companyId: c.id, eventType: 'WHO_AUDIT', startDate: c.nextAuditDate },
+      });
+      if (existing) continue;
+
+      await this.prisma.calendarEvent.create({
+        data: {
+          title: `${c.name} — Scheduled Audit`,
+          eventType: 'WHO_AUDIT',
+          startDate: c.nextAuditDate,
+          allDay: true,
+          companyId: c.id,
+          createdBy,
+          reminderDays: 30,
+        },
+      });
+      count++;
+    }
+    return { seeded: count };
+  }
 }

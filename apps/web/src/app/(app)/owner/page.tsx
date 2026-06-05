@@ -21,7 +21,7 @@ const STATUS_BG: Record<string, string> = {
 
 export default function OwnerPage() {
   const [weeklyText, setWeeklyText] = useState<string | null>(null);
-  const [activeSection, setActiveSection] = useState<'attention' | 'visits' | 'audits' | 'employees'>('attention');
+  const [activeSection, setActiveSection] = useState<'attention' | 'visits' | 'audits' | 'employees' | 'performance'>('attention');
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['owner-dashboard'],
@@ -37,6 +37,12 @@ export default function OwnerPage() {
   const { data: employeeMap = [], isLoading: loadingMap } = useQuery({
     queryKey: ['employee-work-map'],
     queryFn: () => apiClient.get('/ai-overview/employee-work-map').then(r => r.data),
+  });
+
+  const { data: perfData } = useQuery({
+    queryKey: ['employee-performance'],
+    queryFn: () => apiClient.get('/management-review/employee-performance').then(r => r.data),
+    enabled: activeSection === 'performance',
   });
 
   if (isLoading) {
@@ -69,8 +75,13 @@ export default function OwnerPage() {
         title="Owner AI Dashboard"
         subtitle="Complete company intelligence — restricted to owners only"
         actions={
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             <Button variant="secondary" size="sm" onClick={() => refetch()}><RefreshCw size={14} /></Button>
+            <Link href="/chat-ai">
+              <Button variant="secondary" size="sm" className="flex items-center gap-1">
+                <BrainCircuit size={13} /> AI Chat
+              </Button>
+            </Link>
             <Button
               size="sm"
               onClick={() => generateWeekly()}
@@ -120,6 +131,7 @@ export default function OwnerPage() {
           { key: 'visits', label: 'No Recent Visit', count: notVisitedRecently.length },
           { key: 'audits', label: 'Upcoming Audits', count: upcomingAudits.length },
           { key: 'employees', label: 'Employee Map', count: employeeContributions.length },
+          { key: 'performance', label: 'Performance', count: 0 },
         ].map(t => (
           <button
             key={t.key}
@@ -266,6 +278,50 @@ export default function OwnerPage() {
           {employeeContributions.length === 0 && (
             <div className="brutal-border p-8 text-center text-brutal-ink/40 font-display">No employee updates this week</div>
           )}
+        </div>
+      )}
+
+      {/* Performance section */}
+      {activeSection === 'performance' && (
+        <div className="space-y-4">
+          {perfData?.aiSummary && (
+            <div className="bg-purple-50 border-2 border-purple-300 p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <BrainCircuit size={13} className="text-purple-700" />
+                <span className="font-display font-bold text-[11px] tracking-widest uppercase text-purple-700">AI Team Summary ({perfData.days}d)</span>
+              </div>
+              <p className="text-sm text-purple-900">{perfData.aiSummary}</p>
+            </div>
+          )}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {(perfData?.report ?? []).map((r: any) => (
+              <div key={r.employee.id} className="brutal-border p-4 bg-white">
+                <div className="flex items-start justify-between mb-3">
+                  <div>
+                    <div className="font-display font-bold">{r.employee.name}</div>
+                    <div className="text-[11px] text-brutal-ink/50">{r.employee.designation}</div>
+                  </div>
+                  <div className={`font-display font-bold text-xl ${r.activityScore >= 20 ? 'text-green-600' : r.activityScore >= 10 ? 'text-orange-500' : 'text-brutal-ink/40'}`}>
+                    {r.activityScore}
+                    <div className="text-[9px] text-brutal-ink/40 font-normal">score</div>
+                  </div>
+                </div>
+                <div className="grid grid-cols-4 gap-2">
+                  {[
+                    { label: 'Updates', value: r.updatesCount },
+                    { label: 'Companies', value: r.companiesCovered },
+                    { label: 'Visits', value: r.visitCount },
+                    { label: 'Follow-ups', value: r.followUpCompleted },
+                  ].map(s => (
+                    <div key={s.label} className="text-center brutal-border p-1.5 bg-brutal-surface">
+                      <div className="font-display font-bold text-lg">{s.value}</div>
+                      <div className="font-display text-[8px] uppercase text-brutal-ink/50">{s.label}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>

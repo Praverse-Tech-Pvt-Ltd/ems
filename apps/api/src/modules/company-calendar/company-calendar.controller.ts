@@ -2,11 +2,13 @@ import { Controller, Get, Post, Patch, Delete, Body, Param, Query, UseGuards } f
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { CompanyCalendarService } from './company-calendar.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
 @ApiTags('company-calendar')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('company-calendar')
 export class CompanyCalendarController {
   constructor(private readonly service: CompanyCalendarService) {}
@@ -29,6 +31,17 @@ export class CompanyCalendarController {
   @Get('audit-countdowns')
   auditCountdowns() {
     return this.service.getAuditCountdowns();
+  }
+
+  @Get('regulatory')
+  findRegulatory(@Query('companyId') companyId?: string) {
+    return this.service.findRegulatory(companyId);
+  }
+
+  @Post('seed-regulatory')
+  @Roles('ADMIN', 'SUPER_ADMIN')
+  seedRegulatory(@CurrentUser('id') userId: string) {
+    return this.service.seedRegulatoryEvents(userId);
   }
 
   @Patch(':id')
