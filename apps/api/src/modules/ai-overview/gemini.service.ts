@@ -10,7 +10,7 @@ export class GeminiService {
 
   constructor(private config: ConfigService) {
     const apiKey = this.config.get<string>('GEMINI_API_KEY');
-    this.modelName = this.config.get<string>('GEMINI_MODEL', 'gemini-1.5-flash');
+    this.modelName = this.config.get<string>('GEMINI_MODEL', 'gemini-2.5-flash');
     if (apiKey && apiKey !== 'AIzaSy_your_gemini_api_key_here') {
       this.genAI = new GoogleGenerativeAI(apiKey);
     } else {
@@ -26,12 +26,37 @@ export class GeminiService {
   async generateText(prompt: string): Promise<string> {
     if (!this.model) return '[AI summary unavailable — configure GEMINI_API_KEY]';
     try {
-      const result = await this.model.generateContent(prompt);
+      const result = await this.generateWithFallback(prompt);
       return result.response.text();
     } catch (err) {
       this.logger.error('Gemini generation failed', err);
       return '[AI generation error]';
     }
+  }
+
+  private async generateWithFallback(prompt: string) {
+    const candidateModels = [
+      this.modelName,
+      'gemini-2.5-flash',
+      'gemini-2.0-flash',
+      'gemini-1.5-flash-latest',
+    ].filter((model, index, models) => model && models.indexOf(model) === index);
+
+    let lastError: unknown;
+    for (const modelName of candidateModels) {
+      try {
+        const model = this.genAI!.getGenerativeModel({ model: modelName });
+        return await model.generateContent(prompt);
+      } catch (error) {
+        lastError = error;
+        const message = error instanceof Error ? error.message : String(error);
+        if (!message.includes('404') && !message.includes('not found') && !message.includes('not supported')) {
+          throw error;
+        }
+      }
+    }
+
+    throw lastError;
   }
 
   async extractMeetingNote(rawText: string): Promise<Record<string, string>> {

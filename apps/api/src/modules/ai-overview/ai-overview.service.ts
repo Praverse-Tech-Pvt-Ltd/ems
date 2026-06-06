@@ -47,6 +47,12 @@ export class AIOverviewService {
         responsibleEmployee: { select: { id: true, firstName: true, lastName: true } },
         workUpdates: { orderBy: { createdAt: 'desc' }, take: 3 },
         meetingNotes: { orderBy: { createdAt: 'desc' }, take: 2 },
+        followUpTasks: {
+          where: { status: { in: ['OPEN', 'SNOOZED'] as any } },
+          orderBy: { dueDate: 'asc' },
+          take: 5,
+          include: { assignee: { select: { id: true, firstName: true, lastName: true } } },
+        },
         alerts: { where: { isResolved: false } },
       },
       orderBy: [{ criticality: 'asc' }, { businessStatus: 'asc' }],
@@ -76,6 +82,25 @@ export class AIOverviewService {
         : daysSinceVisit >= alertMild ? 'MILD'
         : null;
 
+      const hasStuckWork = c.workUpdates.some(
+        (update) =>
+          update.workStatus?.toLowerCase().includes('blocked') ||
+          update.pendingTask ||
+          update.nextAction,
+      );
+      const openFollowUps = c.followUpTasks.length;
+      const health =
+        c.businessStatus === 'LOST' || c.businessStatus === 'AT_RISK' || c.alerts.some(a => a.severity === 'CRITICAL')
+          ? 'RED'
+          : c.businessStatus === 'DORMANT' ||
+            c.businessStatus === 'DELAYED' ||
+            c.criticality === 'HIGH' ||
+            openFollowUps > 0 ||
+            hasStuckWork ||
+            (daysSinceComm !== null && daysSinceComm >= alertMild)
+            ? 'YELLOW'
+            : 'GREEN';
+
       return {
         ...c,
         daysSinceVisit,
@@ -83,6 +108,9 @@ export class AIOverviewService {
         daysToAudit,
         visitAlert,
         activeAlerts: c.alerts.length,
+        openFollowUps,
+        hasStuckWork,
+        health,
       };
     });
 
@@ -130,6 +158,77 @@ export class AIOverviewService {
       where: { needsAdminReview: true, adminReviewedBy: null },
     });
 
+    const openFollowUps = await this.prisma.followUpTask.findMany({
+      where: { status: { in: ['OPEN', 'SNOOZED'] as any } },
+      include: {
+        company: { select: { id: true, name: true, criticality: true, businessStatus: true } },
+        assignee: { select: { id: true, firstName: true, lastName: true } },
+      },
+      orderBy: { dueDate: 'asc' },
+      take: 20,
+    });
+
+    const repeatedIssues = enriched
+      .map((company) => {
+        const issueTexts = [
+          ...company.workUpdates.map((u) => u.pendingTask ?? u.workStatus ?? ''),
+          ...company.meetingNotes.map((m) => m.pendingGap ?? m.followUpAction ?? ''),
+          ...company.alerts.map((a) => a.message),
+        ].filter(Boolean);
+        const repeated = ['delay', 'pending', 'blocked', 'document', 'audit', 'dossier', 'query', 'follow']
+          .map((keyword) => ({
+            keyword,
+            count: issueTexts.filter((text) => text.toLowerCase().includes(keyword)).length,
+          }))
+          .filter((item) => item.count >= 2);
+        return repeated.length ? { companyId: company.id, company: company.name, repeated } : null;
+      })
+      .filter(Boolean);
+
+    const teamWorkload = await this.prisma.employee.findMany({
+      where: { status: 'ACTIVE' },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        designation: true,
+        companiesResponsible: {
+          where: { isArchived: false },
+          select: { id: true, name: true, businessStatus: true, criticality: true },
+        },
+        followUpTasksAssigned: {
+          where: { status: { in: ['OPEN', 'SNOOZED'] as any } },
+          select: { id: true, dueDate: true, reason: true, company: { select: { id: true, name: true } } },
+        },
+      },
+      orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }],
+    });
+
+    const dailyBriefing = {
+      atRiskClients: needsImmediateAttention.slice(0, 8).map(c => c.name),
+      stuckWork: enriched.filter(c => c.hasStuckWork).slice(0, 8).map(c => c.name),
+      overdueFollowUps: openFollowUps.filter(task => task.dueDate < now).map(task => ({
+        company: task.company.name,
+        assignee: `${task.assignee.firstName} ${task.assignee.lastName}`,
+        dueDate: task.dueDate,
+        reason: task.reason,
+      })),
+      nextCalls: enriched
+        .filter(c => c.openFollowUps > 0 || c.health !== 'GREEN')
+        .slice(0, 8)
+        .map(c => ({
+          companyId: c.id,
+          company: c.name,
+          callSummary: [
+            `Health: ${c.health}`,
+            `Status: ${c.businessStatus}`,
+            c.followUpTasks[0]?.reason ? `Follow-up: ${c.followUpTasks[0].reason}` : null,
+            c.meetingNotes[0]?.pendingGap ? `Pending gap: ${c.meetingNotes[0].pendingGap}` : null,
+            c.workUpdates[0]?.pendingTask ? `Pending task: ${c.workUpdates[0].pendingTask}` : null,
+          ].filter(Boolean).join(' | '),
+        })),
+    };
+
     return {
       companies: enriched,
       summary: {
@@ -139,12 +238,19 @@ export class AIOverviewService {
         dormant: enriched.filter(c => c.businessStatus === 'DORMANT').length,
         lost: enriched.filter(c => c.businessStatus === 'LOST').length,
         high: enriched.filter(c => c.criticality === 'HIGH').length,
+        green: enriched.filter(c => c.health === 'GREEN').length,
+        yellow: enriched.filter(c => c.health === 'YELLOW').length,
+        red: enriched.filter(c => c.health === 'RED').length,
       },
       needsImmediateAttention,
       notVisitedRecently,
       upcomingAudits,
       employeeContributions,
       pendingMeetingReviews,
+      openFollowUps,
+      repeatedIssues,
+      teamWorkload,
+      dailyBriefing,
     };
   }
 

@@ -1,80 +1,93 @@
 import type { Config } from 'tailwindcss';
 
 const config: Config = {
+  darkMode: 'class',
   content: ['./src/**/*.{js,ts,jsx,tsx,mdx}'],
   theme: {
     extend: {
       colors: {
         // ── NexGen Enterprise Design System ─────────────────────────────────
         // Surface scale
-        surface:                    '#faf8ff',
-        'surface-dim':              '#d2d9f4',
-        'surface-bright':           '#faf8ff',
-        'surface-container-lowest': '#ffffff',
-        'surface-container-low':    '#f2f3ff',
-        'surface-container':        '#eaedff',
-        'surface-container-high':   '#e1e7ff',
-        'surface-container-highest':'#dae2fc',
+        surface:                    'var(--color-surface)',
+        'surface-dim':              'var(--color-surface-dim)',
+        'surface-bright':           'var(--color-surface-bright)',
+        'surface-container-lowest': 'var(--color-surface-container-lowest)',
+        'surface-container-low':    'var(--color-surface-container-low)',
+        'surface-container':        'var(--color-surface-container)',
+        'surface-container-high':   'var(--color-surface-container-high)',
+        'surface-container-highest':'var(--color-surface-container-highest)',
 
         // On-surface
-        'on-surface':               '#131b2e',
-        'on-surface-variant':       '#59413a',
-        'inverse-surface':          '#283044',
-        'inverse-on-surface':       '#eef0ff',
+        'on-surface':               'var(--color-on-surface)',
+        'on-surface-variant':       'var(--color-on-surface-variant)',
+        'inverse-surface':          'var(--color-inverse-surface)',
+        'inverse-on-surface':       'var(--color-inverse-on-surface)',
 
         // Outline
-        outline:                    '#8d7169',
-        'outline-variant':          '#e2bfb5',
+        outline:                    'var(--color-outline)',
+        'outline-variant':          'var(--color-outline-variant)',
 
-        // Primary — burnt orange
-        primary:                    '#812200',
-        'on-primary':               '#ffffff',
-        'primary-container':        '#aa3000',
-        'on-primary-container':     '#ffc8b9',
-        'inverse-primary':          '#ffb59f',
-        'primary-fixed':            '#ffdbd0',
-        'primary-fixed-dim':        '#ffb59f',
-        'on-primary-fixed':         '#3a0a00',
-        'on-primary-fixed-variant': '#852400',
-        'surface-tint':             '#ad3202',
+        // Primary
+        primary:                    'var(--color-primary)',
+        'on-primary':               'var(--color-on-primary)',
+        'primary-container':        'var(--color-primary-container)',
+        'on-primary-container':     'var(--color-on-primary-container)',
+        'inverse-primary':          'var(--color-inverse-primary)',
+        'primary-fixed':            'var(--color-primary-fixed)',
+        'primary-fixed-dim':        'var(--color-primary-fixed-dim)',
+        'on-primary-fixed':         'var(--color-on-primary-fixed)',
+        'on-primary-fixed-variant': 'var(--color-on-primary-fixed-variant)',
+        'surface-tint':             'var(--color-surface-tint)',
 
-        // Secondary — professional teal
-        secondary:                  '#01677d',
-        'on-secondary':             '#ffffff',
-        'secondary-container':      '#9ae5fe',
-        'on-secondary-container':   '#03687e',
-        'secondary-fixed':          '#b3ebff',
-        'secondary-fixed-dim':      '#86d1ea',
-        'on-secondary-fixed':       '#001f27',
-        'on-secondary-fixed-variant':'#004e5f',
+        // Secondary
+        secondary:                  'var(--color-secondary)',
+        'on-secondary':             'var(--color-on-secondary)',
+        'secondary-container':      'var(--color-secondary-container)',
+        'on-secondary-container':   'var(--color-on-secondary-container)',
+        'secondary-fixed':          'var(--color-secondary-fixed)',
+        'secondary-fixed-dim':      'var(--color-secondary-fixed-dim)',
+        'on-secondary-fixed':       'var(--color-on-secondary-fixed)',
+        'on-secondary-fixed-variant':'var(--color-on-secondary-fixed-variant)',
 
-        // Tertiary — amber/gold
-        tertiary:                   '#5b4000',
-        'on-tertiary':              '#ffffff',
-        'tertiary-container':       '#795600',
-        'on-tertiary-container':    '#ffce74',
-        'tertiary-fixed':           '#ffdea7',
-        'tertiary-fixed-dim':       '#efbf67',
-        'on-tertiary-fixed':        '#271900',
-        'on-tertiary-fixed-variant':'#5e4200',
+        // Tertiary
+        tertiary:                   'var(--color-tertiary)',
+        'on-tertiary':              'var(--color-on-tertiary)',
+        'tertiary-container':       'var(--color-tertiary-container)',
+        'on-tertiary-container':    'var(--color-on-tertiary-container)',
+        'tertiary-fixed':           'var(--color-tertiary-fixed)',
+        'tertiary-fixed-dim':       'var(--color-tertiary-fixed-dim)',
+        'on-tertiary-fixed':        'var(--color-on-tertiary-fixed)',
+        'on-tertiary-fixed-variant':'var(--color-on-tertiary-fixed-variant)',
 
         // Semantic
-        error:                      '#ba1a1a',
-        'on-error':                 '#ffffff',
-        'error-container':          '#ffdad6',
-        'on-error-container':       '#93000a',
-        'success-emerald':          '#059669',
+        error:                      'var(--color-error)',
+        'on-error':                 'var(--color-on-error)',
+        'error-container':          'var(--color-error-container)',
+        'on-error-container':       'var(--color-on-error-container)',
+        'success-emerald':          'var(--color-success-emerald)',
 
-        background:                 '#faf8ff',
-        'on-background':            '#131b2e',
-        'surface-variant':          '#dae2fc',
+        background:                 'var(--color-background)',
+        'on-background':            'var(--color-on-background)',
+        'surface-variant':          'var(--color-surface-variant)',
 
-        // Legacy aliases kept so old class references don't break
-        brand: {
-          DEFAULT: '#812200',
-          light:   '#aa3000',
+        // Legacy aliases
+        brutal: {
+          ink:      'var(--color-brutal-ink)',
+          yellow:   'var(--color-brutal-yellow)',
+          red:      'var(--color-brutal-red)',
+          blue:     'var(--color-brutal-blue)',
+          cream:    'var(--color-brutal-cream)',
+          surface:  'var(--color-brutal-surface)',
+          'surface-lo': 'var(--color-brutal-surface-lo)',
+          'surface-hi': 'var(--color-brutal-surface-hi)',
+          'surface-dim': 'var(--color-brutal-surface-dim)',
+          white:    'var(--color-brutal-white)',
         },
-        accent: '#059669',
+        brand: {
+          DEFAULT: 'var(--color-brand)',
+          light:   'var(--color-brand-light)',
+        },
+        accent: 'var(--color-accent)',
       },
 
       fontFamily: {
@@ -97,6 +110,12 @@ const config: Config = {
       },
 
       boxShadow: {
+        // Legacy brutalist shadows
+        brutal:      'var(--shadow-brutal)',
+        'brutal-lg': 'var(--shadow-brutal-lg)',
+        'brutal-sm': 'var(--shadow-brutal-sm)',
+        'brutal-yellow': 'var(--shadow-brutal-yellow)',
+
         // Tonal layering — no harsh offset shadows
         sm:      '0 1px 3px 0 rgb(0 0 0 / 0.06), 0 1px 2px -1px rgb(0 0 0 / 0.04)',
         DEFAULT: '0 2px 8px 0 rgb(0 0 0 / 0.08), 0 1px 3px -1px rgb(0 0 0 / 0.04)',

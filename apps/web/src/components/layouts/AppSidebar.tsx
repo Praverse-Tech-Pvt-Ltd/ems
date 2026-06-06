@@ -11,6 +11,7 @@ import { useAuthStore } from '@/store/auth.store';
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api-client';
 import type { ChatChannel } from '@/types';
+import { ThemeToggle } from '@/components/ui/ThemeToggle';
 
 interface Props { open: boolean; onClose: () => void; }
 
@@ -122,6 +123,7 @@ export function AppSidebar({ open, onClose }: Props) {
             <div className="text-sm font-bold text-on-surface tracking-tight leading-none">NexGen</div>
             <div className="text-[10px] font-medium text-on-surface-variant mt-0.5 tracking-wide">Employee OS</div>
           </div>
+          <ThemeToggle />
           {/* Mobile close */}
           <button
             onClick={onClose}

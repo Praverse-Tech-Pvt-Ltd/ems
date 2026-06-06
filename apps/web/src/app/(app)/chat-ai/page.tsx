@@ -15,6 +15,7 @@ const EXAMPLE_QUESTIONS = [
   'Which companies are at risk right now?',
   'Who is working on what this week?',
   'Which companies have no recent communication?',
+  'Record: Vemed dossier review is pending; follow up tomorrow',
 ];
 
 type Message = { role: 'user' | 'assistant'; content: string; time: string };

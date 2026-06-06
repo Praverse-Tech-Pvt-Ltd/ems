@@ -20,13 +20,11 @@ export class AIChatService {
     }
   }
 
-  // Context builder — uses only models that exist in the current schema
   private async buildContext(): Promise<string> {
     const now = new Date();
     const lines: string[] = ['=== NEXGEN EMS LIVE DATA ===', `Date: ${now.toISOString().split('T')[0]}`, ''];
 
     try {
-      // Employees summary
       const employees = await this.prisma.employee.findMany({
         where: { status: 'ACTIVE' },
         select: { firstName: true, lastName: true, designation: true, role: true },
@@ -34,18 +32,126 @@ export class AIChatService {
       });
       lines.push('--- ACTIVE EMPLOYEES ---');
       for (const e of employees) {
-        lines.push(`• ${e.firstName} ${e.lastName} | ${e.designation ?? 'N/A'} | ${e.role}`);
+        lines.push(`- ${e.firstName} ${e.lastName} | ${e.designation ?? 'N/A'} | ${e.role}`);
       }
 
-      // Recent attendance
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const todayAttendance = await this.prisma.attendanceRecord.count({
         where: { date: { gte: today } },
       });
-      lines.push('', `--- TODAY'S ATTENDANCE ---`);
-      lines.push(`• ${todayAttendance} employees have marked attendance today`);
+      lines.push('', "--- TODAY'S ATTENDANCE ---");
+      lines.push(`- ${todayAttendance} employees have marked attendance today`);
 
+      const companies = await this.prisma.clientCompany.findMany({
+        where: { isArchived: false },
+        include: {
+          responsibleEmployee: { select: { firstName: true, lastName: true } },
+          alerts: { where: { isResolved: false }, select: { severity: true, alertType: true, message: true } },
+          workUpdates: {
+            orderBy: { updateDate: 'desc' },
+            take: 3,
+            select: {
+              updateDate: true,
+              rawText: true,
+              taskCompleted: true,
+              pendingTask: true,
+              workStatus: true,
+              nextAction: true,
+              employee: { select: { firstName: true, lastName: true } },
+            },
+          },
+          meetingNotes: {
+            orderBy: { meetingDate: 'desc' },
+            take: 3,
+            select: {
+              meetingDate: true,
+              workDiscussed: true,
+              assignedTo: true,
+              pendingGap: true,
+              followUpAction: true,
+              priorityLevel: true,
+              needsAdminReview: true,
+            },
+          },
+          followUpTasks: {
+            where: { status: { in: ['OPEN', 'SNOOZED'] as any } },
+            orderBy: { dueDate: 'asc' },
+            take: 3,
+            select: {
+              reason: true,
+              dueDate: true,
+              status: true,
+              assignee: { select: { firstName: true, lastName: true } },
+            },
+          },
+        },
+        orderBy: [{ riskScore: 'desc' }, { name: 'asc' }],
+        take: 30,
+      });
+
+      lines.push('', '--- CLIENT PORTFOLIO ---');
+      lines.push(`Total active client companies: ${companies.length}`);
+      for (const c of companies) {
+        const owner = c.responsibleEmployee
+          ? `${c.responsibleEmployee.firstName} ${c.responsibleEmployee.lastName}`
+          : 'Unassigned';
+        lines.push(
+          `- ${c.name} | status=${c.businessStatus} | criticality=${c.criticality} | risk=${c.riskScore} | owner=${owner}`,
+        );
+        if (c.currentStage) lines.push(`  stage: ${c.currentStage}`);
+        if (c.notes) lines.push(`  notes: ${c.notes}`);
+        if (c.lastCommunicationDate) {
+          lines.push(`  last communication: ${c.lastCommunicationDate.toISOString().split('T')[0]}`);
+        }
+        if (c.lastVisitDate) lines.push(`  last visit: ${c.lastVisitDate.toISOString().split('T')[0]}`);
+        if (c.nextAuditDate) lines.push(`  next audit: ${c.nextAuditDate.toISOString().split('T')[0]}`);
+
+        for (const alert of c.alerts) {
+          lines.push(`  alert: ${alert.severity} ${alert.alertType} - ${alert.message}`);
+        }
+        for (const update of c.workUpdates) {
+          const employee = update.employee
+            ? `${update.employee.firstName} ${update.employee.lastName}`
+            : 'Unknown';
+          lines.push(
+            `  update ${update.updateDate.toISOString().split('T')[0]} by ${employee}: ${
+              update.taskCompleted ?? update.workStatus ?? update.rawText
+            }`,
+          );
+          if (update.pendingTask) lines.push(`    pending: ${update.pendingTask}`);
+          if (update.nextAction) lines.push(`    next action: ${update.nextAction}`);
+        }
+        for (const note of c.meetingNotes) {
+          lines.push(
+            `  meeting ${note.meetingDate.toISOString().split('T')[0]}: ${
+              note.workDiscussed ?? 'discussion recorded'
+            }`,
+          );
+          if (note.pendingGap) lines.push(`    gap: ${note.pendingGap}`);
+          if (note.followUpAction) lines.push(`    follow-up: ${note.followUpAction}`);
+          if (note.assignedTo) lines.push(`    assigned to: ${note.assignedTo}`);
+          if (note.priorityLevel) lines.push(`    priority: ${note.priorityLevel}`);
+          if (note.needsAdminReview) lines.push('    needs admin review');
+        }
+        for (const task of c.followUpTasks) {
+          const assignee = task.assignee
+            ? `${task.assignee.firstName} ${task.assignee.lastName}`
+            : 'Unassigned';
+          const due = task.dueDate ? task.dueDate.toISOString().split('T')[0] : 'no due date';
+          lines.push(`  follow-up task: ${task.reason} | ${task.status} | ${due} | ${assignee}`);
+        }
+      }
+
+      const [workReviews, meetingReviews, openAlerts] = await Promise.all([
+        this.prisma.workUpdate.count({ where: { needsAdminReview: true } }),
+        this.prisma.meetingNote.count({ where: { needsAdminReview: true } }),
+        this.prisma.companyAlert.count({ where: { isResolved: false } }),
+      ]);
+      lines.push('', '--- OPERATIONS QUEUE ---');
+      lines.push(`Work updates needing review: ${workReviews}`);
+      lines.push(`Meeting notes needing review: ${meetingReviews}`);
+      lines.push(`Open company alerts: ${openAlerts}`);
     } catch {
       lines.push('(Live data temporarily unavailable)');
     }
@@ -53,14 +159,313 @@ export class AIChatService {
     return lines.join('\n');
   }
 
+  private looksLikeOperationalUpdate(text: string): boolean {
+    const normalized = text.trim().toLowerCase();
+    if (!normalized || normalized.includes('?')) return false;
+
+    const commandStyle = /^(record|log|add|note|update|save)\b/.test(normalized);
+    const updateWords = [
+      'pending',
+      'completed',
+      'done',
+      'blocked',
+      'delay',
+      'delayed',
+      'issue',
+      'follow up',
+      'follow-up',
+      'audit',
+      'visit',
+      'call',
+      'meeting',
+      'document',
+      'dossier',
+      'query',
+      'commitment',
+    ];
+
+    return commandStyle || updateWords.some((word) => normalized.includes(word));
+  }
+
+  private looksLikeMeetingMinutes(text: string): boolean {
+    const normalized = text.trim().toLowerCase();
+    return /\b(mom|minutes|meeting note|discussed|discussion|team meeting|internal meeting|review meeting)\b/.test(
+      normalized,
+    );
+  }
+
+  private getCommunicationType(text: string) {
+    const normalized = text.toLowerCase();
+    if (normalized.includes('whatsapp')) return 'WHATSAPP';
+    if (normalized.includes('email') || normalized.includes('mail')) return 'EMAIL';
+    if (normalized.includes('call')) return 'PHONE_CALL';
+    return null;
+  }
+
+  private parseDueDate(text: string): Date {
+    const normalized = text.toLowerCase();
+    const now = new Date();
+    const due = new Date(now);
+
+    if (normalized.includes('tomorrow')) {
+      due.setDate(now.getDate() + 1);
+      return due;
+    }
+
+    const weekdays = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const weekday = weekdays.findIndex((day) => normalized.includes(`by ${day}`) || normalized.includes(day));
+    if (weekday >= 0) {
+      const daysUntil = (weekday - now.getDay() + 7) % 7 || 7;
+      due.setDate(now.getDate() + daysUntil);
+      return due;
+    }
+
+    const iso = normalized.match(/\b(20\d{2}-\d{2}-\d{2})\b/);
+    if (iso?.[1]) return new Date(iso[1]);
+
+    const days = normalized.match(/\b(?:in|after)\s+(\d{1,2})\s+days?\b/);
+    if (days) {
+      due.setDate(now.getDate() + Number(days[1]));
+      return due;
+    }
+
+    due.setDate(now.getDate() + 2);
+    return due;
+  }
+
+  private async resolveCompany(question: string, extractedCompanyName?: string | null) {
+    if (extractedCompanyName) {
+      const found = await this.prisma.clientCompany.findFirst({
+        where: { name: { contains: extractedCompanyName, mode: 'insensitive' as any }, isArchived: false },
+      });
+      if (found) return found;
+    }
+
+    const companies = await this.prisma.clientCompany.findMany({
+      where: { isArchived: false },
+      select: { id: true, name: true, responsibleEmployeeId: true },
+    });
+    const normalized = question.toLowerCase();
+    return (
+      companies.find((company) => normalized.includes(company.name.toLowerCase())) ??
+      companies.find((company) =>
+        company.name
+          .toLowerCase()
+          .split(/\s+/)
+          .filter((part) => part.length >= 5)
+          .some((part) => normalized.includes(part)),
+      ) ??
+      null
+    );
+  }
+
+  private async resolveEmployee(question: string, assignedTo?: string | null) {
+    const employees = await this.prisma.employee.findMany({
+      where: { status: 'ACTIVE' },
+      select: { id: true, firstName: true, lastName: true, email: true },
+    });
+    const normalized = `${question} ${assignedTo ?? ''}`.toLowerCase();
+    return (
+      employees.find((employee) =>
+        [employee.firstName, employee.lastName, `${employee.firstName} ${employee.lastName}`, employee.email]
+          .filter(Boolean)
+          .some((value) => normalized.includes(value!.toLowerCase())),
+      ) ?? null
+    );
+  }
+
+  private async recordOperationalUpdate(question: string, userId: string) {
+    if (!this.looksLikeOperationalUpdate(question)) return null;
+
+    const isMeetingMinutes = this.looksLikeMeetingMinutes(question);
+    const communicationType = this.getCommunicationType(question);
+    const extracted = isMeetingMinutes
+      ? await this.gemini.extractMeetingNote(question)
+      : await this.gemini.structureWorkUpdate(question);
+    const companyName =
+      typeof extracted.companyName === 'string' && extracted.companyName.trim()
+        ? extracted.companyName.trim()
+        : null;
+
+    const foundCompany = await this.resolveCompany(question, companyName);
+    const assignedEmployee = await this.resolveEmployee(question, extracted.assignedTo ?? null);
+
+    const updateDate = new Date();
+    if (communicationType && foundCompany) {
+      const communication = await this.prisma.clientCommunication.create({
+        data: {
+          companyId: foundCompany.id,
+          type: communicationType as any,
+          commDate: updateDate,
+          summary: question,
+          outcome: extracted.currentStatus ?? extracted.workStatus ?? null,
+          nextAction: extracted.followUpAction ?? extracted.nextAction ?? extracted.pendingTask ?? null,
+          createdBy: userId,
+        },
+      });
+
+      await this.prisma.companyTimelineEntry.create({
+        data: {
+          companyId: foundCompany.id,
+          entryType: communicationType === 'WHATSAPP' ? 'CLIENT_CALL' : 'CLIENT_CALL',
+          title: `AI logged ${communicationType.toLowerCase()} communication`,
+          description: question.substring(0, 200),
+          employeeId: userId,
+          referenceId: communication.id,
+          referenceType: 'ClientCommunication',
+          entryDate: updateDate,
+        },
+      });
+
+      await this.prisma.clientCompany.update({
+        where: { id: foundCompany.id },
+        data: { lastCommunicationDate: updateDate },
+      });
+    }
+
+    if (isMeetingMinutes) {
+      const note = await this.prisma.meetingNote.create({
+        data: {
+          enteredBy: userId,
+          companyId: foundCompany?.id ?? null,
+          rawText: question,
+          meetingDate: updateDate,
+          extractedData: extracted as any,
+          companyName: companyName ?? foundCompany?.name ?? null,
+          employeeName: extracted.employeeName ?? null,
+          workDiscussed: extracted.workDiscussed ?? null,
+          assignedTo: extracted.assignedTo ?? assignedEmployee?.firstName ?? null,
+          deadline: extracted.deadline ? new Date(extracted.deadline) : this.parseDueDate(question),
+          currentStatus: extracted.currentStatus ?? null,
+          pendingGap: extracted.pendingGap ?? null,
+          followUpAction: extracted.followUpAction ?? extracted.pendingGap ?? null,
+          priorityLevel: extracted.priorityLevel ?? (question.toLowerCase().includes('urgent') ? 'HIGH' : 'MEDIUM'),
+          ownerNote: extracted.ownerNote ?? null,
+          needsAdminReview: !foundCompany || !assignedEmployee,
+        },
+      });
+
+      if (foundCompany) {
+        await this.prisma.companyTimelineEntry.create({
+          data: {
+            companyId: foundCompany.id,
+            entryType: 'MEETING_NOTE',
+            title: `AI MOM: ${(extracted.workDiscussed ?? question).substring(0, 60)}`,
+            description: extracted.followUpAction ?? extracted.pendingGap ?? question.substring(0, 200),
+            employeeId: userId,
+            referenceId: note.id,
+            referenceType: 'MeetingNote',
+            entryDate: updateDate,
+          },
+        });
+
+        await this.prisma.clientCompany.update({
+          where: { id: foundCompany.id },
+          data: { lastCommunicationDate: updateDate },
+        });
+
+        if (assignedEmployee && (extracted.followUpAction || extracted.pendingGap || /\bassign\b/i.test(question))) {
+          const assignedReason =
+            /\bassign\b/i.test(question)
+              ? [
+                  extracted.workDiscussed ? `Complete/review: ${extracted.workDiscussed}` : null,
+                  extracted.pendingGap ? `Pending gap: ${extracted.pendingGap}` : null,
+                  extracted.followUpAction ? `Next action: ${extracted.followUpAction}` : null,
+                ].filter(Boolean).join(' | ') || question.substring(0, 250)
+              : extracted.followUpAction ?? extracted.pendingGap ?? question.substring(0, 250);
+
+          const task = await this.prisma.followUpTask.create({
+            data: {
+              companyId: foundCompany.id,
+              assignedTo: assignedEmployee.id,
+              dueDate: extracted.deadline ? new Date(extracted.deadline) : this.parseDueDate(question),
+              reason: assignedReason,
+            },
+          });
+
+          await this.prisma.companyTimelineEntry.create({
+            data: {
+              companyId: foundCompany.id,
+              entryType: 'PENDING_TASK',
+              title: `AI follow-up assigned to ${assignedEmployee.firstName} ${assignedEmployee.lastName}`,
+              description: task.reason,
+              employeeId: userId,
+              referenceId: task.id,
+              referenceType: 'FollowUpTask',
+              entryDate: updateDate,
+            },
+          });
+        }
+      }
+
+      return {
+        updateId: note.id,
+        updateType: 'meeting note',
+        companyName: foundCompany?.name ?? companyName,
+        needsAdminReview: note.needsAdminReview,
+      };
+    }
+
+    const update = await this.prisma.workUpdate.create({
+      data: {
+        employeeId: userId,
+        companyId: foundCompany?.id ?? null,
+        rawText: question,
+        updateDate,
+        extractedData: extracted as any,
+        companyName: companyName ?? foundCompany?.name ?? null,
+        taskCompleted: extracted.taskCompleted ?? null,
+        pendingTask: extracted.pendingTask ?? null,
+        progress: extracted.progress ?? null,
+        contribution: extracted.contribution ?? null,
+        workStatus: extracted.workStatus ?? null,
+        nextAction: extracted.nextAction ?? null,
+        needsAdminReview: !foundCompany || String(extracted.needsAdminReview) === 'true',
+      },
+    });
+
+    if (foundCompany) {
+      await this.prisma.companyTimelineEntry.create({
+        data: {
+          companyId: foundCompany.id,
+          entryType: 'EMPLOYEE_UPDATE',
+          title: `AI chat update: ${(extracted.taskCompleted ?? question).substring(0, 60)}`,
+          description: extracted.pendingTask ?? extracted.nextAction ?? question.substring(0, 200),
+          employeeId: userId,
+          referenceId: update.id,
+          referenceType: 'WorkUpdate',
+          entryDate: updateDate,
+        },
+      });
+
+      await this.prisma.clientCompany.update({
+        where: { id: foundCompany.id },
+        data: { lastCommunicationDate: updateDate },
+      });
+    }
+
+    return {
+      updateId: update.id,
+      updateType: 'work update',
+      companyName: foundCompany?.name ?? companyName,
+      needsAdminReview: update.needsAdminReview,
+    };
+  }
+
   async sendMessage(sessionId: string, question: string, userId: string, userEmail: string) {
     this.assertOwner(userEmail);
 
+    const recordedUpdate = await this.recordOperationalUpdate(question, userId);
     const context = await this.buildContext();
 
-    const prompt = `You are an intelligent assistant for Nexgen Pharma Solutions, a pharma consultancy.
-You have access to live EMS data shown below. Answer the owner's question using ONLY this data.
-Be concise, direct, and actionable. If the data doesn't contain the answer, say so clearly.
+    const prompt = `You are an intelligent operations assistant for Nexgen Pharma Solutions, a pharma consultation team.
+You help Pratham/Ashwani monitor clients, team updates, pending gaps, follow-ups, audits, and service quality.
+Use ONLY the live EMS data shown below. Be concise, direct, and actionable.
+When a client issue is mentioned, identify the likely company, summarize what is known, highlight risks/gaps, and suggest the next operational action.
+If the data does not contain the answer, say what is missing and what should be captured in EMS.
+MOM/team-discussion messages are automatically saved as meeting notes, linked to company timelines, and can create follow-up tasks when assignee/deadline/action is present.
+Work-update messages are automatically saved as work updates and linked to company timelines.
+${recordedUpdate ? `\nThe owner's latest message was saved as a ${recordedUpdate.updateType}. Saved company: ${recordedUpdate.companyName ?? 'needs review'}. Needs admin review: ${recordedUpdate.needsAdminReview}. Mention this briefly before analysis.` : ''}
 
 ${context}
 
@@ -68,11 +473,10 @@ OWNER'S QUESTION: ${question}`;
 
     const answer = await this.gemini.generateText(prompt);
 
-    // Store in chatMessage table (using the existing schema model)
-    await this.prisma.chatMessage.createMany({
+    await this.prisma.aIChatMessage.createMany({
       data: [
-        { channelId: sessionId, senderId: userId, content: `[USER] ${question}` },
-        { channelId: sessionId, senderId: userId, content: `[AI] ${answer}` },
+        { sessionId, createdBy: userId, role: 'USER', content: question },
+        { sessionId, createdBy: userId, role: 'AI', content: answer },
       ],
     });
 
@@ -81,16 +485,16 @@ OWNER'S QUESTION: ${question}`;
 
   async getHistory(sessionId: string, userId: string, userEmail: string) {
     this.assertOwner(userEmail);
-    return this.prisma.chatMessage.findMany({
-      where: { channelId: sessionId, senderId: userId },
+    return this.prisma.aIChatMessage.findMany({
+      where: { sessionId, createdBy: userId },
       orderBy: { createdAt: 'asc' },
     });
   }
 
   async clearHistory(sessionId: string, userId: string, userEmail: string) {
     this.assertOwner(userEmail);
-    await this.prisma.chatMessage.deleteMany({
-      where: { channelId: sessionId, senderId: userId },
+    await this.prisma.aIChatMessage.deleteMany({
+      where: { sessionId, createdBy: userId },
     });
     return { cleared: true };
   }

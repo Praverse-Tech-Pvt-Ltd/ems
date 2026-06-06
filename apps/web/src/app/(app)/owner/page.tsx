@@ -67,7 +67,18 @@ export default function OwnerPage() {
     );
   }
 
-  const { summary, needsImmediateAttention, notVisitedRecently, upcomingAudits, employeeContributions, pendingMeetingReviews } = data;
+  const {
+    summary,
+    needsImmediateAttention,
+    notVisitedRecently,
+    upcomingAudits,
+    employeeContributions,
+    pendingMeetingReviews,
+    dailyBriefing,
+    repeatedIssues = [],
+    openFollowUps = [],
+    teamWorkload = [],
+  } = data;
 
   return (
     <div className="p-4 lg:p-6">
@@ -104,6 +115,9 @@ export default function OwnerPage() {
           { label: 'High Priority', value: summary.high, color: 'bg-yellow-50' },
           { label: 'Dormant', value: summary.dormant, color: 'bg-purple-50' },
           { label: 'Pending Reviews', value: pendingMeetingReviews, color: pendingMeetingReviews > 0 ? 'bg-orange-50 border-orange-300' : 'bg-brutal-surface' },
+          { label: 'Green', value: summary.green ?? 0, color: 'bg-green-50' },
+          { label: 'Yellow', value: summary.yellow ?? 0, color: 'bg-yellow-50' },
+          { label: 'Red', value: summary.red ?? 0, color: 'bg-red-50 border-red-300' },
         ].map(k => (
           <div key={k.label} className={`brutal-border p-3 ${k.color}`}>
             <div className="font-display font-bold text-2xl">{k.value}</div>
@@ -111,6 +125,58 @@ export default function OwnerPage() {
           </div>
         ))}
       </div>
+
+      {/* Daily briefing */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 mb-6">
+        <div className="brutal-border p-4 bg-red-50">
+          <div className="font-display font-bold text-[11px] tracking-widest uppercase mb-2">Daily Owner Briefing</div>
+          <div className="text-xs font-bold">At-risk clients</div>
+          <p className="text-xs text-brutal-ink/70 mt-1">{dailyBriefing?.atRiskClients?.join(', ') || 'None'}</p>
+          <div className="text-xs font-bold mt-3">Stuck work</div>
+          <p className="text-xs text-brutal-ink/70 mt-1">{dailyBriefing?.stuckWork?.join(', ') || 'None'}</p>
+        </div>
+        <div className="brutal-border p-4 bg-orange-50">
+          <div className="font-display font-bold text-[11px] tracking-widest uppercase mb-2">Overdue Follow-ups</div>
+          {(dailyBriefing?.overdueFollowUps ?? []).slice(0, 4).map((task: any) => (
+            <div key={`${task.company}-${task.reason}`} className="text-xs border-b border-brutal-ink/10 py-1">
+              <b>{task.company}</b>: {task.reason}
+            </div>
+          ))}
+          {(dailyBriefing?.overdueFollowUps ?? []).length === 0 && <p className="text-xs text-brutal-ink/60">None overdue</p>}
+        </div>
+        <div className="brutal-border p-4 bg-brutal-surface">
+          <div className="font-display font-bold text-[11px] tracking-widest uppercase mb-2">Call Prep</div>
+          {(dailyBriefing?.nextCalls ?? []).slice(0, 3).map((item: any) => (
+            <Link key={item.companyId} href={`/companies/${item.companyId}`}>
+              <div className="text-xs border-b border-brutal-ink/10 py-1 hover:text-brutal-blue">
+                <b>{item.company}</b>: {item.callSummary}
+              </div>
+            </Link>
+          ))}
+        </div>
+      </div>
+
+      {(repeatedIssues.length > 0 || openFollowUps.length > 0) && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 mb-6">
+          <div className="brutal-border p-4 bg-white">
+            <div className="font-display font-bold text-[11px] tracking-widest uppercase mb-2">Repeated Issues</div>
+            {repeatedIssues.slice(0, 6).map((issue: any) => (
+              <div key={issue.companyId} className="text-xs py-1">
+                <b>{issue.company}</b>: {issue.repeated.map((r: any) => `${r.keyword} x${r.count}`).join(', ')}
+              </div>
+            ))}
+          </div>
+          <div className="brutal-border p-4 bg-white">
+            <div className="font-display font-bold text-[11px] tracking-widest uppercase mb-2">Team Workload</div>
+            {teamWorkload.filter((e: any) => e.companiesResponsible.length || e.assignedFollowUps.length).slice(0, 6).map((emp: any) => (
+              <div key={emp.id} className="text-xs py-1 flex justify-between gap-2">
+                <span><b>{emp.firstName} {emp.lastName}</b></span>
+                <span>{emp.companiesResponsible.length} clients / {emp.assignedFollowUps.length} follow-ups</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Weekly AI summary */}
       {weeklyText && (

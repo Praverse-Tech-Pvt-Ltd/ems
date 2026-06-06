@@ -3,6 +3,181 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    /* ── NexGen Enterprise Design System ───────────────────────────────── */
+    /* Surface scale */
+    --color-surface: #f1f5f9;
+    --color-surface-dim: #cbd5e1;
+    --color-surface-bright: #f8fafc;
+    --color-surface-container-lowest: #ffffff;
+    --color-surface-container-low: #f1f5f9;
+    --color-surface-container: #eaedff;
+    --color-surface-container-high: #e1e7ff;
+    --color-surface-container-highest: #dae2fc;
+
+    /* On-surface */
+    --color-on-surface: #131b2e;
+    --color-on-surface-variant: #59413a;
+    --color-inverse-surface: #283044;
+    --color-inverse-on-surface: #eef0ff;
+
+    /* Outline */
+    --color-outline: #8d7169;
+    --color-outline-variant: #e2bfb5;
+
+    /* Primary — burnt orange */
+    --color-primary: #812200;
+    --color-on-primary: #ffffff;
+    --color-primary-container: #aa3000;
+    --color-on-primary-container: #ffc8b9;
+    --color-inverse-primary: #ffb59f;
+    --color-primary-fixed: #ffdbd0;
+    --color-primary-fixed-dim: #ffb59f;
+    --color-on-primary-fixed: #3a0a00;
+    --color-on-primary-fixed-variant: #852400;
+    --color-surface-tint: #ad3202;
+
+    /* Secondary — professional teal */
+    --color-secondary: #01677d;
+    --color-on-secondary: #ffffff;
+    --color-secondary-container: #9ae5fe;
+    --color-on-secondary-container: #03687e;
+    --color-secondary-fixed: #b3ebff;
+    --color-secondary-fixed-dim: #86d1ea;
+    --color-on-secondary-fixed: #001f27;
+    --color-on-secondary-fixed-variant: #004e5f;
+
+    /* Tertiary — amber/gold */
+    --color-tertiary: #5b4000;
+    --color-on-tertiary: #ffffff;
+    --color-tertiary-container: #795600;
+    --color-on-tertiary-container: #ffce74;
+    --color-tertiary-fixed: #ffdea7;
+    --color-tertiary-fixed-dim: #efbf67;
+    --color-on-tertiary-fixed: #271900;
+    --color-on-tertiary-fixed-variant: #5e4200;
+
+    /* Semantic */
+    --color-error: #ba1a1a;
+    --color-on-error: #ffffff;
+    --color-error-container: #ffdad6;
+    --color-on-error-container: #93000a;
+    --color-success-emerald: #059669;
+
+    --color-background: #f1f5f9;
+    --color-on-background: #0f172a;
+    --color-surface-variant: #e2e8f0;
+
+    /* Legacy aliases kept so old class references don't break */
+    --color-brutal-ink: #1a1a1a;
+    --color-brutal-yellow: #ffa23a;
+    --color-brutal-red: #e63b2e;
+    --color-brutal-blue: #0055ff;
+    --color-brutal-cream: #f5f0e8;
+    --color-brutal-surface: #eee9e0;
+    --color-brutal-surface-lo: #f2ede5;
+    --color-brutal-surface-hi: #e8e3da;
+    --color-brutal-surface-dim: #d6d1c9;
+    --color-brutal-white: #ffffff;
+
+    --color-brand: #812200;
+    --color-brand-light: #aa3000;
+    --color-accent: #059669;
+    
+    /* Box shadows */
+    --shadow-brutal: 4px 4px 0px 0px #1a1a1a;
+    --shadow-brutal-lg: 8px 8px 0px 0px #1a1a1a;
+    --shadow-brutal-sm: 2px 2px 0px 0px #1a1a1a;
+    --shadow-brutal-yellow: 4px 4px 0px 0px #ffa23a;
+  }
+
+  .dark {
+    /* Surface scale */
+    --color-surface: #0f172a;
+    --color-surface-dim: #1e293b;
+    --color-surface-bright: #334155;
+    --color-surface-container-lowest: #020617;
+    --color-surface-container-low: #0f172a;
+    --color-surface-container: #1e293b;
+    --color-surface-container-high: #334155;
+    --color-surface-container-highest: #475569;
+
+    /* On-surface */
+    --color-on-surface: #f8fafc;
+    --color-on-surface-variant: #cbd5e1;
+    --color-inverse-surface: #e2e8f0;
+    --color-inverse-on-surface: #0f172a;
+
+    /* Outline */
+    --color-outline: #475569;
+    --color-outline-variant: #334155;
+
+    /* Primary — burnt orange */
+    --color-primary: #ffb59f;
+    --color-on-primary: #3a0a00;
+    --color-primary-container: #aa3000;
+    --color-on-primary-container: #ffdbd0;
+    --color-inverse-primary: #812200;
+    --color-primary-fixed: #ffdbd0;
+    --color-primary-fixed-dim: #ffb59f;
+    --color-on-primary-fixed: #3a0a00;
+    --color-on-primary-fixed-variant: #852400;
+    --color-surface-tint: #ffb59f;
+
+    /* Secondary — professional teal */
+    --color-secondary: #86d1ea;
+    --color-on-secondary: #003542;
+    --color-secondary-container: #004e5f;
+    --color-on-secondary-container: #b3ebff;
+    --color-secondary-fixed: #b3ebff;
+    --color-secondary-fixed-dim: #86d1ea;
+    --color-on-secondary-fixed: #001f27;
+    --color-on-secondary-fixed-variant: #004e5f;
+
+    /* Tertiary — amber/gold */
+    --color-tertiary: #efbf67;
+    --color-on-tertiary: #402d00;
+    --color-tertiary-container: #5e4200;
+    --color-on-tertiary-container: #ffdea7;
+    --color-tertiary-fixed: #ffdea7;
+    --color-tertiary-fixed-dim: #efbf67;
+    --color-on-tertiary-fixed: #271900;
+    --color-on-tertiary-fixed-variant: #5e4200;
+
+    /* Semantic */
+    --color-error: #ffb4ab;
+    --color-on-error: #690005;
+    --color-error-container: #93000a;
+    --color-on-error-container: #ffdad6;
+    --color-success-emerald: #34d399;
+
+    --color-background: #020617;
+    --color-on-background: #f8fafc;
+    --color-surface-variant: #1e293b;
+
+    /* Legacy aliases */
+    --color-brutal-ink: #f8fafc;
+    --color-brutal-yellow: #f59e0b;
+    --color-brutal-red: #ef4444;
+    --color-brutal-blue: #3b82f6;
+    --color-brutal-cream: #1e293b;
+    --color-brutal-surface: #334155;
+    --color-brutal-surface-lo: #475569;
+    --color-brutal-surface-hi: #1e293b;
+    --color-brutal-surface-dim: #0f172a;
+    --color-brutal-white: #020617;
+
+    --color-brand: #ffb59f;
+    --color-brand-light: #ffdbd0;
+    --color-accent: #34d399;
+    
+    /* Box shadows (brutalist shadows shouldn't change shape, but maybe color) */
+    --shadow-brutal: 4px 4px 0px 0px #020617;
+    --shadow-brutal-lg: 8px 8px 0px 0px #020617;
+    --shadow-brutal-sm: 2px 2px 0px 0px #020617;
+    --shadow-brutal-yellow: 4px 4px 0px 0px #b45309;
+  }
+
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
   html {
@@ -12,8 +187,8 @@
 
   body {
     font-family: 'Inter', sans-serif;
-    background-color: #faf8ff;
-    color: #131b2e;
+    background-color: var(--color-background);
+    color: var(--color-on-background);
     line-height: 1.5;
   }
 
@@ -55,34 +230,34 @@
 
 /* ── Focus ring ──────────────────────────────────────────────────────────── */
 :focus-visible {
-  outline: 2px solid #aa3000;
+  outline: 2px solid var(--color-primary-container);
   outline-offset: 2px;
 }
 
 /* ── Scrollbar — subtle ──────────────────────────────────────────────────── */
 ::-webkit-scrollbar       { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #dae2fc; border-radius: 9999px; }
-::-webkit-scrollbar-thumb:hover { background: #8d7169; }
+::-webkit-scrollbar-thumb { background: var(--color-surface-container-highest); border-radius: 9999px; }
+::-webkit-scrollbar-thumb:hover { background: var(--color-outline); }
 
 /* ── Utility helpers ─────────────────────────────────────────────────────── */
 @layer utilities {
   /* Card elevation levels */
-  .card-0  { background: #faf8ff; }
-  .card-1  { background: #ffffff; border: 1px solid #e2bfb5; box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.06); }
-  .card-2  { background: #ffffff; border: 2px solid #aa3000; box-shadow: 0 2px 8px 0 rgba(170,48,0,0.14); }
+  .card-0  { background: var(--color-background); }
+  .card-1  { background: var(--color-surface-container-lowest); border: 1px solid var(--color-surface-dim); box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.06); }
+  .card-2  { background: var(--color-surface-container-lowest); border: 2px solid var(--color-primary-container); box-shadow: 0 2px 8px 0 rgba(170,48,0,0.14); }
 
   /* Inlay (recessed) inputs / secondary buttons */
-  .inlay   { background: #f2f3ff; }
+  .inlay   { background: var(--color-surface-container-low); }
 
   /* Left-border active state for nav items */
-  .nav-active-border { border-left: 2px solid #aa3000; }
+  .nav-active-border { border-left: 2px solid var(--color-primary-container); }
 
   /* Pill / badge helpers */
-  .pill-primary   { background: #aa3000; color: #fff; border-radius: 9999px; }
-  .pill-secondary { background: #f2f3ff; color: #131b2e; border: 1px solid #e2bfb5; border-radius: 9999px; }
+  .pill-primary   { background: var(--color-primary-container); color: var(--color-on-primary); border-radius: 9999px; }
+  .pill-secondary { background: var(--color-surface-container-low); color: var(--color-on-surface); border: 1px solid var(--color-outline-variant); border-radius: 9999px; }
 
   /* Progress bar track */
-  .progress-track { background: #eaedff; border-radius: 9999px; overflow: hidden; }
-  .progress-fill  { background: #01677d; border-radius: 9999px; transition: width 0.4s ease; }
+  .progress-track { background: var(--color-surface-container); border-radius: 9999px; overflow: hidden; }
+  .progress-fill  { background: var(--color-secondary); border-radius: 9999px; transition: width 0.4s ease; }
 }
