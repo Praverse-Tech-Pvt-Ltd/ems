@@ -6,7 +6,7 @@ import { useAuthStore } from '@/store/auth.store';
 import type { LeaveBalance, LeaveRequest } from '@/types';
 
 const LEAVE_LABEL: Record<string, string> = {
-  CL: 'Casual Leave', SL: 'Sick Leave', PL: 'Privilege Leave', UL: 'Unpaid Leave', CO: 'Comp Off',
+  CL: 'Casual Leave', SL: 'Sick Leave', PL: 'Paid Leave', UL: 'Unpaid Leave', CO: 'On Duty (OD)',
 };
 const STATUS_COLOR: Record<string, string> = {
   PENDING: 'bg-primary/10 text-primary border-primary/20',
@@ -156,7 +156,8 @@ export default function LeaveCenterPage() {
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-sm">
             {balances.map((b, i) => {
-              const pct = b.totalDays > 0 ? (b.usedDays / b.totalDays) * 100 : 0;
+              const isUnlimited = b.leaveType === 'UL';
+              const pct = !isUnlimited && b.totalDays > 0 ? (b.usedDays / b.totalDays) * 100 : 0;
               return (
                 <div key={b.leaveType} className="glass-card rounded-2xl p-md border border-outline-variant/30 flex flex-col gap-sm">
                   <div className="flex items-start justify-between">
@@ -164,12 +165,12 @@ export default function LeaveCenterPage() {
                       <p className="font-semibold text-on-surface text-sm">{LEAVE_LABEL[b.leaveType] ?? b.leaveType}</p>
                       <p className="text-[10px] text-on-surface-variant">{b.leaveType}</p>
                     </div>
-                    <span className="font-black text-2xl text-on-surface">{b.totalDays - b.usedDays}</span>
+                    <span className="font-black text-2xl text-on-surface">{isUnlimited ? '∞' : b.totalDays - b.usedDays}</span>
                   </div>
                   <div className="w-full h-1.5 rounded-full bg-surface-container-highest overflow-hidden">
-                    <div className={`h-full rounded-full ${BALANCE_COLORS[i % BALANCE_COLORS.length]}`} style={{ width: `${pct}%` }} />
+                    <div className={`h-full rounded-full ${BALANCE_COLORS[i % BALANCE_COLORS.length]}`} style={{ width: isUnlimited ? '100%' : `${pct}%` }} />
                   </div>
-                  <p className="text-[10px] text-on-surface-variant">{b.usedDays} used · {b.totalDays} total</p>
+                  <p className="text-[10px] text-on-surface-variant">{isUnlimited ? `${b.usedDays} taken · no limit` : `${b.usedDays} used · ${b.totalDays} total`}</p>
                 </div>
               );
             })}
