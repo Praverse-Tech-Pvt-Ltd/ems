@@ -295,7 +295,7 @@ export default function LoginPage() {
 
   /* ── Centered card wrapper, floats over the full-screen backdrop ──────────── */
   const RightPanel = ({ children }: { children: React.ReactNode }) => (
-    <div className="relative z-10 min-h-screen w-full flex items-center justify-center xl:justify-end px-6 py-12 xl:pr-24">
+    <div className="relative z-10 min-h-screen w-full flex items-center justify-center px-6 py-12">
       <div className="w-full max-w-[400px]">
         {/* Logo */}
         <div className="flex items-center gap-3 mb-8">
