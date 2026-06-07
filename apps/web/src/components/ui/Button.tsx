@@ -7,45 +7,40 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const variants = {
-  // Primary — pill-shaped, burnt orange, high contrast
   primary:
-    'bg-primary-container text-on-primary shadow-sm ' +
-    'hover:bg-primary hover:shadow-md ' +
-    'active:scale-[0.98] ' +
-    'disabled:opacity-50 disabled:pointer-events-none',
+    'bg-primary text-white shadow-sm ' +
+    'hover:bg-primary-dim hover:shadow-md ' +
+    'active:scale-[0.97] ' +
+    'disabled:opacity-40 disabled:pointer-events-none',
 
-  // Secondary — ghost with border, inlay fill
   secondary:
-    'bg-surface-container-low text-on-surface border border-outline-variant ' +
-    'hover:bg-surface-container hover:border-outline ' +
-    'active:scale-[0.98] ' +
-    'disabled:opacity-50 disabled:pointer-events-none',
+    'bg-canvas-elevated text-ink border border-border ' +
+    'hover:bg-canvas-sunken hover:border-border-strong ' +
+    'active:scale-[0.97] ' +
+    'disabled:opacity-40 disabled:pointer-events-none',
 
-  // Ghost — no background
   ghost:
-    'text-on-surface-variant hover:bg-surface-container-low ' +
-    'active:scale-[0.98] ' +
-    'disabled:opacity-50 disabled:pointer-events-none',
+    'text-ink-secondary hover:bg-canvas-sunken hover:text-ink ' +
+    'active:scale-[0.97] ' +
+    'disabled:opacity-40 disabled:pointer-events-none',
 
-  // Danger — error red
   danger:
-    'bg-error text-on-error shadow-sm ' +
+    'bg-rose text-white shadow-sm ' +
     'hover:opacity-90 hover:shadow-md ' +
-    'active:scale-[0.98] ' +
-    'disabled:opacity-50 disabled:pointer-events-none',
+    'active:scale-[0.97] ' +
+    'disabled:opacity-40 disabled:pointer-events-none',
 
-  // Teal — secondary brand
   teal:
-    'bg-secondary text-on-secondary shadow-sm ' +
+    'bg-cyan text-white shadow-sm ' +
     'hover:opacity-90 hover:shadow-md ' +
-    'active:scale-[0.98] ' +
-    'disabled:opacity-50 disabled:pointer-events-none',
+    'active:scale-[0.97] ' +
+    'disabled:opacity-40 disabled:pointer-events-none',
 };
 
 const sizes = {
   sm: 'px-3.5 py-1.5 text-xs font-semibold',
-  md: 'px-5 py-2 text-sm font-semibold',
-  lg: 'px-6 py-2.5 text-base font-semibold',
+  md: 'px-4 py-2 text-sm font-semibold',
+  lg: 'px-5 py-2.5 text-sm font-semibold',
 };
 
 export function Button({
@@ -58,7 +53,7 @@ export function Button({
   return (
     <button
       className={cn(
-        'inline-flex items-center justify-center gap-2 rounded-full transition-all duration-150 cursor-pointer',
+        'inline-flex items-center justify-center gap-2 rounded-xl transition-all duration-150 cursor-pointer font-body',
         variants[variant],
         sizes[size],
         className,

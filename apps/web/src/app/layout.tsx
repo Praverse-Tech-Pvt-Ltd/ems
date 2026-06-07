@@ -1,23 +1,16 @@
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
 import './globals.css';
 import { Providers } from './providers';
 
-const inter = Inter({
-  subsets: ['latin'],
-  variable: '--font-inter',
-  display: 'swap',
-});
-
 export const metadata: Metadata = {
-  title: 'NexGen EMS — Employee Management System',
+  title: 'NexGen EMS — Command Center',
   description: 'NexGen Enterprise Employee Management System',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <body className={`${inter.variable} font-sans bg-surface text-on-surface antialiased`}>
+    <html lang="en" className="light" suppressHydrationWarning>
+      <body className="bg-background text-on-background font-body-lg text-body-lg min-h-screen flex flex-col md:flex-row antialiased">
         <Providers>{children}</Providers>
       </body>
     </html>

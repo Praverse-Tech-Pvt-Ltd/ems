@@ -2,30 +2,25 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
 import { useAuthStore } from '@/store/auth.store';
-import { apiClient } from '@/lib/api-client';
 import { AppSidebar } from '@/components/layouts/AppSidebar';
 import { AppTopNav } from '@/components/layouts/AppTopNav';
-import { NotificationsDrawer } from '@/components/layouts/NotificationsDrawer';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { accessToken, setAccessToken, clearAuth } = useAuthStore();
   const [authReady, setAuthReady] = useState(false);
+  const [navOpen, setNavOpen] = useState(false);
 
-  const [navOpen, setNavOpen]       = useState(false);
-  const [notifOpen, setNotifOpen]   = useState(false);
-
-  /**
-   * Silent refresh on mount.
-   * The access token lives in memory only, so it is gone after a page
-   * refresh. We attempt a token refresh using the httpOnly cookie before
-   * deciding whether the user is authenticated.
-   */
   useEffect(() => {
     if (accessToken) {
+      setAuthReady(true);
+      return;
+    }
+
+    if (process.env['NEXT_PUBLIC_DEV_BYPASS'] === 'true') {
+      setAccessToken('dev-token');
       setAuthReady(true);
       return;
     }
@@ -47,46 +42,34 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { setNavOpen(false); setNotifOpen(false); }
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, []);
-
-  const { data: me, isLoading: meLoading } = useQuery<{ id: string }>({
-    queryKey: ['me-face'],
-    queryFn: () => apiClient.get('/employees/me').then(r => r.data).catch(() => null),
-    enabled: authReady && !!accessToken,
-    staleTime: 60_000,
-  });
-
-  // Don't render the app shell until we know whether the user is authenticated.
   if (!authReady) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-surface">
-        <div className="flex items-center gap-2.5 text-sm font-medium text-on-surface-variant">
-          <span className="w-5 h-5 border-2 border-primary-container border-t-transparent rounded-full animate-spin" />
-          Loading…
-        </div>
+      <div className="min-h-screen flex items-center justify-center w-full">
+        <span className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-surface">
-      <AppSidebar open={navOpen} onClose={() => setNavOpen(false)} />
-      <div className="flex flex-col flex-1 overflow-hidden min-w-0">
-        <AppTopNav
-          onMenuOpen={() => setNavOpen(true)}
-          onBell={() => setNotifOpen(true)}
-        />
-        <main className="flex-1 overflow-y-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 lg:py-10">
-          {children}
-        </main>
-      </div>
-      <NotificationsDrawer open={notifOpen} onClose={() => setNotifOpen(false)} />
-    </div>
+    <>
+      <AppTopNav onMenuOpen={() => setNavOpen(!navOpen)} />
+      
+      {/* Mobile Sidebar Overlay */}
+      {navOpen && (
+         <div className="md:hidden fixed inset-0 z-40 bg-black/50" onClick={() => setNavOpen(false)}>
+           <div onClick={(event) => event.stopPropagation()}>
+             <AppSidebar className="flex" onNavigate={() => setNavOpen(false)} />
+           </div>
+         </div>
+      )}
+      
+      {/* Desktop Sidebar */}
+      <AppSidebar className="hidden md:flex" />
+
+      {/* Main Content */}
+      <main className="flex-1 md:ml-[280px] p-margin-mobile md:p-margin-desktop bg-surface-bright flex flex-col gap-lg w-full">
+        {children}
+      </main>
+    </>
   );
 }

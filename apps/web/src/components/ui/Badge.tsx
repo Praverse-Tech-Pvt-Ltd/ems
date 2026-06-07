@@ -4,21 +4,24 @@ interface BadgeProps {
   label: string;
   colorClass?: string;
   className?: string;
+  dot?: boolean;
 }
 
 export function Badge({
   label,
-  colorClass = 'bg-surface-container text-on-surface border border-outline-variant',
+  colorClass = 'bg-canvas text-ink-secondary border border-border',
   className,
+  dot,
 }: BadgeProps) {
   return (
     <span
       className={cn(
-        'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold tracking-wide',
+        'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold font-body tracking-wide',
         colorClass,
         className,
       )}
     >
+      {dot && <span className="w-1.5 h-1.5 rounded-full bg-current opacity-70 flex-shrink-0" />}
       {label}
     </span>
   );
