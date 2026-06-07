@@ -27,9 +27,9 @@ const CLIENT_COMPANIES: ClientSeed[] = [
     contactPhone: '+91-79-25830000',
     businessStatus: CompanyBusinessStatus.ACTIVE,
     criticality: CompanyCriticality.HIGH,
-    currentStage: 'Annual regulatory audit preparation',
-    notes: 'Key client in dyes & specialty chemicals sector with pharma-grade intermediates. Annual WHO-GMP audit scheduled. Document gap identified in SOP revision log. High engagement priority.',
-    riskScore: 52,
+    currentStage: 'WHO-GMP audit — SOP revision in final review (Ashwani-led, Dilip supporting)',
+    notes: 'Key client in dyes & specialty chemicals sector with pharma-grade intermediates. WHO-GMP audit date confirmed for July 2026. Ashwani is leading the project with Dilip assisting on documentation and follow-up; pending compliance actions and client responses are being tracked toward updated EMS reporting. SOP revision log gap closed; final document sign-off pending. Priority: Medium to High.',
+    riskScore: 46,
   },
   {
     name: 'Unimark Remedies Limited',
@@ -39,9 +39,9 @@ const CLIENT_COMPANIES: ClientSeed[] = [
     contactPhone: '+91-79-40080000',
     businessStatus: CompanyBusinessStatus.ACTIVE,
     criticality: CompanyCriticality.HIGH,
-    currentStage: 'WHO-GMP compliance dossier review',
-    notes: 'Unimark is a major API and formulation manufacturer exporting to regulated markets. Requires quarterly compliance reporting and WHO-GMP gap analysis. Strong relationship maintained with QA head.',
-    riskScore: 40,
+    currentStage: 'Compliance action tracking — Ashwani-led, Dilip supporting',
+    notes: 'Unimark is a major API and formulation manufacturer exporting to regulated markets. Project is being led by Ashwani with Dilip providing assistance wherever required; project status, documentation gaps and pending action items are being tracked and updated in EMS under Ashwani\'s ownership. Q2 2026 compliance report submitted on schedule; WHO-GMP gap analysis closed with no major findings. Priority: Medium to High.',
+    riskScore: 34,
   },
   {
     name: 'Almon Healthcare Pvt Ltd',
@@ -51,9 +51,9 @@ const CLIENT_COMPANIES: ClientSeed[] = [
     contactPhone: '+91-265-2320000',
     businessStatus: CompanyBusinessStatus.ACTIVE,
     criticality: CompanyCriticality.MEDIUM,
-    currentStage: 'Post-audit compliance rectification',
-    notes: 'Almon is a Vadodara-based formulation company with focus on generic OSD products. Recently cleared an FDCA audit. Currently tracking CAPA closure for 3 minor observations. Next visit due in 30 days.',
-    riskScore: 35,
+    currentStage: 'USFDA-readiness initiative — SOP gap review underway (Shifa)',
+    notes: 'Almon is a Vadodara-based formulation company with focus on generic OSD products, now being prepared for USFDA compliance under Shifa\'s ownership. Existing SOPs are being assessed against USFDA expectations, required QMS improvements are being planned, and identified gaps are being converted into a structured action plan with regular implementation tracking. 2 of 3 CAPA observations from the earlier FDCA audit remain closed; final observation pending lab requalification. Priority: High. Next action: Shifa to complete the SOP gap review and submit the USFDA-readiness action plan.',
+    riskScore: 38,
   },
   {
     name: 'Bills Biotech Pvt Ltd',
@@ -63,9 +63,9 @@ const CLIENT_COMPANIES: ClientSeed[] = [
     contactPhone: '+91-265-2640000',
     businessStatus: CompanyBusinessStatus.DELAYED,
     criticality: CompanyCriticality.HIGH,
-    currentStage: 'Regulatory dossier delayed — escalated',
-    notes: 'Biotechnology client with delayed DCGI submission. Dossier was due in April 2026 but client is awaiting bioequivalence study results. Risk of penalty if not filed by July 2026. Escalated to Ashwani.',
-    riskScore: 68,
+    currentStage: 'Dossier filed — penalty risk averted',
+    notes: 'Biotechnology client with previously delayed DCGI submission. Bioequivalence study results came through in late May; dossier was filed June 2, 2026, ahead of the penalty deadline. Ashwani is monitoring the DCGI acknowledgment.',
+    riskScore: 50,
   },
   {
     name: 'Vemed Pharmaceuticals Pvt Ltd',
@@ -75,9 +75,9 @@ const CLIENT_COMPANIES: ClientSeed[] = [
     contactPhone: '+91-2764-220000',
     businessStatus: CompanyBusinessStatus.ACTIVE,
     criticality: CompanyCriticality.MEDIUM,
-    currentStage: 'EU-GMP readiness assessment',
-    notes: 'Vemed is pursuing EU-GMP certification for European market entry. NexGen engaged for gap assessment and documentation support. Preliminary gaps identified in batch record traceability. Timeline: 9 months.',
-    riskScore: 30,
+    currentStage: 'WHO-readiness drive — QMS/SOP/DMF build-out, target 16 August 2026 (Chandni)',
+    notes: 'Vemed is being made WHO-ready under Chandni\'s sole, focused ownership ahead of the 16 August 2026 deadline. Scope covers preparing WHO-compliant QMS documents, developing/reviewing/finalizing and implementing SOPs, progressing DMF-related work wherever applicable, and a critical review of existing third-party job work — which currently appears inadequate and not aligned with expected compliance standards. Chandni remains dedicated to Vemed until WHO-readiness is achieved. Priority: High. Remarks: major compliance-readiness project requiring focused, uninterrupted ownership.',
+    riskScore: 42,
   },
   {
     name: 'West Coast Pharma',
@@ -87,9 +87,9 @@ const CLIENT_COMPANIES: ClientSeed[] = [
     contactPhone: '+91-79-22820000',
     businessStatus: CompanyBusinessStatus.ACTIVE,
     criticality: CompanyCriticality.MEDIUM,
-    currentStage: 'Ongoing quality system review',
-    notes: 'Mid-size pharma company focused on bulk generics for institutional supply. Engaged NexGen for quality system overhaul and internal audit schedule. SOP library being restructured. Quarterly billing cycle.',
-    riskScore: 28,
+    currentStage: 'Audit window 17–19 June 2026 — Dilip on-site, Ashwani to join post-China',
+    notes: 'Mid-size pharma company focused on bulk generics for institutional supply. West Coast\'s audit is scheduled for 17–19 June 2026: Dilip is responsible for the on-site visit and audit support, with Ashwani joining/supporting once he returns from China. Audit observations and compliance gaps are to be documented properly and a post-audit action plan prepared. Priority: High. Next action: Dilip to prepare for the audit visit and coordinate with the West Coast team.',
+    riskScore: 48,
   },
   {
     name: 'Romano Drugs',
@@ -99,9 +99,9 @@ const CLIENT_COMPANIES: ClientSeed[] = [
     contactPhone: '+91-265-2780000',
     businessStatus: CompanyBusinessStatus.AT_RISK,
     criticality: CompanyCriticality.HIGH,
-    currentStage: 'FDCA show cause response — urgent',
-    notes: 'Romano received an FDCA show cause notice in May 2026. NexGen is supporting response documentation and root cause analysis. Urgent timeline — response due by June 15, 2026. High touch engagement.',
-    riskScore: 82,
+    currentStage: 'FDCA show cause response submitted — project ownership now with Shifa',
+    notes: 'Romano received an FDCA show cause notice in May 2026; response documentation and root cause analysis were submitted ahead of the June 15, 2026 deadline. Project responsibility has now been assigned to Shifa, who will start the project plan, perform SOP review, ensure SOP implementation, introduce and align the Romano team with project expectations, and identify compliance gaps for structured action planning. Priority: High. Next action: Shifa to prepare the initial project action plan and start SOP review.',
+    riskScore: 70,
   },
   {
     name: 'Cohesion Biotec',
@@ -111,21 +111,9 @@ const CLIENT_COMPANIES: ClientSeed[] = [
     contactPhone: '+91-265-2590000',
     businessStatus: CompanyBusinessStatus.ACTIVE,
     criticality: CompanyCriticality.LOW,
-    currentStage: 'New client — onboarding',
-    notes: 'Early-stage biotech startup focusing on biosimilar development. NexGen engaged as regulatory strategy advisor. Currently mapping regulatory pathway. Initial engagement phase — long-term partnership expected.',
-    riskScore: 18,
-  },
-  {
-    name: 'Peak Lifeline',
-    address: '12, Anand Nagar Society, Productivity Road, Akota, Vadodara, Gujarat 390020',
-    city: 'Vadodara',
-    contactEmail: 'info@peaklifeline.in',
-    contactPhone: '+91-265-2340000',
-    businessStatus: CompanyBusinessStatus.DORMANT,
-    criticality: CompanyCriticality.LOW,
-    currentStage: 'Dormant — last contact March 2026',
-    notes: 'Peak Lifeline account has been quiet since March 2026. No invoice raised in Q1. Follow-up call scheduled but no response. Account marked dormant. Possible churn risk — requires executive outreach.',
-    riskScore: 45,
+    currentStage: 'Onboarding — regulatory pathway mapped',
+    notes: 'Early-stage biotech startup focusing on biosimilar development. Regulatory pathway mapping completed; first formal site visit conducted by Shifa in early June 2026. Moving from onboarding into active advisory phase — long-term partnership expected.',
+    riskScore: 16,
   },
   {
     name: 'Siddharth Interchem',
@@ -133,11 +121,23 @@ const CLIENT_COMPANIES: ClientSeed[] = [
     city: 'Ankleshwar',
     contactEmail: 'quality@siddharthinterchem.com',
     contactPhone: '+91-2646-220000',
+    businessStatus: CompanyBusinessStatus.AT_RISK,
+    criticality: CompanyCriticality.HIGH,
+    currentStage: 'Data-integrity review — Chandni coordinating, Ashwani directly engaged',
+    notes: 'Chemical and API manufacturer engaged for ICH Q7 compliance gap analysis (gap report finalized and shared with the client on June 5, 2026). Chandni is the main point of contact while Ashwani is handling the matter directly. Important compliance note: the client appears to be providing questionable or unreliable data for audit purposes — this must be handled carefully. Nexgen will not implement or support any false, fabricated or non-GMP-compliant data; only genuine, traceable and justifiable data will be accepted, and any unsupported data will be escalated internally before proceeding. Priority: High. Risk: high compliance and data-integrity risk. Next action: Chandni to coordinate cautiously and escalate questionable data to Ashwani.',
+    riskScore: 68,
+  },
+  {
+    name: 'Anphar Labs',
+    address: 'Plot No. 78, Pharma City Industrial Area, Selaqui, Dehradun, Uttarakhand 248197',
+    city: 'Dehradun',
+    contactEmail: 'quality@anpharlabs.com',
+    contactPhone: '+91-135-2699000',
     businessStatus: CompanyBusinessStatus.ACTIVE,
     criticality: CompanyCriticality.MEDIUM,
-    currentStage: 'API manufacturer — ICH Q7 review',
-    notes: 'Chemical and API manufacturer engaged for ICH Q7 compliance gap analysis. Strong potential for multi-year engagement. Site visit completed in May 2026. Gap report under preparation — delivery expected June 20.',
-    riskScore: 22,
+    currentStage: 'CP document preparation in progress (Shifa)',
+    notes: 'Anphar Labs project responsibility has been assigned to Shifa as the point of contact. CP document preparation is underway and already started; pending sections are being tracked through to completion, with the document to be reviewed for technical accuracy and compliance expectations before the final version is prepared. Priority: Medium to High. Next action: Shifa to complete the pending CP document work and submit it for review.',
+    riskScore: 35,
   },
 ];
 
@@ -155,6 +155,30 @@ async function main() {
 
   if (!owner) {
     throw new Error('Cannot seed client companies: Pratham/Ashwani owner account was not found.');
+  }
+
+  const stalePeak = await prisma.clientCompany.findFirst({
+    where: { name: { equals: 'Peak Lifeline', mode: 'insensitive' as any } },
+  });
+
+  if (stalePeak) {
+    await prisma.$transaction([
+      prisma.companyTimelineEntry.deleteMany({ where: { companyId: stalePeak.id } }),
+      prisma.companyVisit.deleteMany({ where: { companyId: stalePeak.id } }),
+      prisma.meetingNote.deleteMany({ where: { companyId: stalePeak.id } }),
+      prisma.workUpdate.deleteMany({ where: { companyId: stalePeak.id } }),
+      prisma.calendarEvent.deleteMany({ where: { companyId: stalePeak.id } }),
+      prisma.companyStatusHistory.deleteMany({ where: { companyId: stalePeak.id } }),
+      prisma.companyAlert.deleteMany({ where: { companyId: stalePeak.id } }),
+      prisma.followUpTask.deleteMany({ where: { companyId: stalePeak.id } }),
+      prisma.companyDocument.deleteMany({ where: { companyId: stalePeak.id } }),
+      prisma.clientCommunication.deleteMany({ where: { companyId: stalePeak.id } }),
+      prisma.companyContact.deleteMany({ where: { companyId: stalePeak.id } }),
+      prisma.companyProject.deleteMany({ where: { companyId: stalePeak.id } }),
+      prisma.aISummary.deleteMany({ where: { companyId: stalePeak.id } }),
+      prisma.clientCompany.delete({ where: { id: stalePeak.id } }),
+    ]);
+    console.log('Removed → Peak Lifeline (dormant client, no longer QA-tracked)');
   }
 
   for (const seed of CLIENT_COMPANIES) {

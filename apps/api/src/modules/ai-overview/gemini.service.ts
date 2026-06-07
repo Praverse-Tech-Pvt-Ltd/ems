@@ -118,6 +118,42 @@ Return only the JSON, no explanation.`;
     }
   }
 
+  /**
+   * Detects whether a chat message is asking the assistant to take a concrete
+   * EMS action (assign a visit, create a follow-up, schedule an event, or
+   * update a company's notes/stage) and extracts the parameters needed to
+   * actually perform it — this is what gives the AI chat "write access":
+   * recognized actions are executed by AIChatService, not just described.
+   */
+  async detectActionRequest(question: string): Promise<Record<string, any>> {
+    const prompt = `You are an operations assistant for a pharma consultancy EMS that can directly perform actions when asked.
+
+Message: "${question}"
+
+Decide if the message is asking you to DO something actionable in the system (not just answer a question). If so, return ONLY a valid JSON object:
+{
+  "action": "ASSIGN_VISIT" | "CREATE_FOLLOW_UP" | "SCHEDULE_EVENT" | "UPDATE_COMPANY_NOTE" | null,
+  "companyName": "client company name mentioned, or null",
+  "employeeName": "team member's first name to assign/notify, or null",
+  "date": "ISO date YYYY-MM-DD for the visit/event/deadline, or null",
+  "title": "short title for the calendar event/task, or null",
+  "reason": "purpose / notes / what to record, or null"
+}
+
+Examples of actionable requests: "assign Shifa to visit Romano Drugs next Tuesday", "schedule an audit prep meeting with Bhageria on June 20", "create a follow-up for Dilip on Vemed's batch record gap by Friday", "update Cohesion Biotec's stage to onboarding complete".
+If the message is just a question, observation, or update (not a request to schedule/assign/create/update something), return {"action": null}.
+
+Return only the JSON, no explanation.`;
+
+    const text = await this.generateText(prompt);
+    try {
+      const match = text.match(/\{[\s\S]*\}/);
+      return match ? JSON.parse(match[0]) : { action: null };
+    } catch {
+      return { action: null };
+    }
+  }
+
   async generateCompanySummary(companyData: {
     name: string;
     businessStatus: string;

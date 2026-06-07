@@ -18,6 +18,22 @@ const CRITICALITY_COLOR: Record<string, string> = {
   CRITICAL: 'text-error',
 };
 
+const TIMELINE_ICON: Record<string, string> = {
+  VISIT: 'directions_walk',
+  AUDIT_PREP: 'fact_check',
+  DOCUMENT_REVIEW: 'description',
+  CLIENT_CALL: 'call',
+  INTERNAL_MEETING: 'groups',
+  EMPLOYEE_UPDATE: 'person',
+  MEETING_NOTE: 'edit_note',
+  PENDING_TASK: 'pending_actions',
+  COMPLETED_TASK: 'task_alt',
+  AI_SUMMARY: 'auto_awesome',
+  NEXT_ACTION: 'arrow_forward',
+  STATUS_CHANGE: 'sync_alt',
+  ALERT: 'warning',
+};
+
 function HealthRing({ score }: { score: number }) {
   const r = 22;
   const circ = 2 * Math.PI * r;
@@ -45,6 +61,9 @@ export default function ClientCompaniesOverviewPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [generatingAI, setGeneratingAI] = useState<string | null>(null);
+  const [detailCompany, setDetailCompany] = useState<any | null>(null);
+  const [timeline, setTimeline] = useState<any[]>([]);
+  const [timelineLoading, setTimelineLoading] = useState(false);
 
   const load = async () => {
     try {
@@ -67,6 +86,18 @@ export default function ClientCompaniesOverviewPage() {
     stage: s,
     count: companies.filter(c => c.status === s).length,
   }));
+
+  const openDetails = async (company: any) => {
+    setDetailCompany(company);
+    setTimeline([]);
+    setTimelineLoading(true);
+    try {
+      const data = await clientsService.timeline(company.id, 30).catch(() => []);
+      setTimeline(Array.isArray(data) ? data : data?.data ?? []);
+    } finally {
+      setTimelineLoading(false);
+    }
+  };
 
   const handleAiSummary = async (id: string) => {
     setGeneratingAI(id);
@@ -185,7 +216,8 @@ export default function ClientCompaniesOverviewPage() {
                 )}
 
                 <div className="flex gap-xs border-t border-outline-variant/20 pt-sm">
-                  <button className="flex-1 text-[10px] text-primary border border-primary/20 px-2 py-1.5 rounded-lg hover:bg-primary/5 transition-colors">
+                  <button onClick={() => openDetails(company)}
+                    className="flex-1 text-[10px] text-primary border border-primary/20 px-2 py-1.5 rounded-lg hover:bg-primary/5 transition-colors">
                     View Details
                   </button>
                   {isAdmin && (
@@ -198,6 +230,101 @@ export default function ClientCompaniesOverviewPage() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Company analytics drawer — timestamped timeline of visits, gaps, action plans */}
+      {detailCompany && (
+        <div className="fixed inset-0 z-50 flex justify-end" role="dialog" aria-modal="true">
+          <div className="absolute inset-0 bg-on-surface/30 backdrop-blur-sm" onClick={() => setDetailCompany(null)} />
+          <div className="relative w-full max-w-lg h-full bg-surface-container-lowest border-l border-outline-variant/30 overflow-y-auto p-lg flex flex-col gap-lg">
+            <div className="flex items-start justify-between gap-sm">
+              <div className="flex items-center gap-sm">
+                <div className="w-12 h-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-black shrink-0">
+                  {detailCompany.name?.slice(0, 2).toUpperCase()}
+                </div>
+                <div>
+                  <h3 className="font-semibold text-on-surface text-lg leading-tight">{detailCompany.name}</h3>
+                  <p className="text-[11px] text-on-surface-variant">{detailCompany.industry ?? 'Pharma'} · {detailCompany.criticality} criticality</p>
+                </div>
+              </div>
+              <button onClick={() => setDetailCompany(null)} className="text-on-surface-variant hover:text-on-surface">
+                <span className="material-symbols-outlined text-[22px]">close</span>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-sm">
+              <div className="glass-card rounded-xl p-sm border border-outline-variant/30">
+                <p className="text-[10px] text-on-surface-variant tracking-widest font-label-caps">RISK SCORE</p>
+                <p className="font-black text-xl text-on-surface mt-1">{detailCompany.riskScore ?? '—'}</p>
+              </div>
+              <div className="glass-card rounded-xl p-sm border border-outline-variant/30">
+                <p className="text-[10px] text-on-surface-variant tracking-widest font-label-caps">LAST VISIT</p>
+                <p className="font-semibold text-sm text-on-surface mt-1">
+                  {detailCompany.lastVisitDate ? new Date(detailCompany.lastVisitDate).toLocaleDateString('en-IN') : 'No visits logged'}
+                </p>
+              </div>
+            </div>
+
+            {detailCompany.currentStage && (
+              <div className="glass-card rounded-xl p-sm border border-outline-variant/30">
+                <p className="text-[10px] text-on-surface-variant tracking-widest font-label-caps mb-1">CURRENT STAGE</p>
+                <p className="text-body-sm text-on-surface">{detailCompany.currentStage}</p>
+              </div>
+            )}
+
+            {detailCompany.notes && (
+              <div className="glass-card rounded-xl p-sm border border-outline-variant/30">
+                <p className="text-[10px] text-on-surface-variant tracking-widest font-label-caps mb-1">NOTES</p>
+                <p className="text-body-sm text-on-surface-variant leading-relaxed">{detailCompany.notes}</p>
+              </div>
+            )}
+
+            <div>
+              <p className="font-label-caps text-label-caps text-on-surface-variant tracking-widest mb-sm">
+                TIMESTAMPED ACTIVITY — VISITS, GAPS &amp; ACTION PLANS
+              </p>
+              {timelineLoading ? (
+                <div className="flex flex-col gap-sm">
+                  {[1, 2, 3].map(i => <div key={i} className="h-14 rounded-xl bg-surface-container-high animate-pulse" />)}
+                </div>
+              ) : timeline.length === 0 ? (
+                <div className="glass-card rounded-xl p-lg text-center text-on-surface-variant border border-outline-variant/30 text-body-sm">
+                  No timeline activity recorded for this company yet.
+                </div>
+              ) : (
+                <div className="relative flex flex-col gap-sm">
+                  <div className="absolute left-[13px] top-2 bottom-2 w-px bg-outline-variant/30" />
+                  {timeline.map((entry: any, i: number) => (
+                    <div key={entry.id ?? i} className="relative pl-lg">
+                      <div className="absolute left-0 top-1 w-7 h-7 rounded-full bg-primary/10 text-primary flex items-center justify-center border border-primary/20">
+                        <span className="material-symbols-outlined text-[14px]">{TIMELINE_ICON[entry.entryType] ?? 'circle'}</span>
+                      </div>
+                      <div className="glass-card rounded-xl p-sm border border-outline-variant/30">
+                        <div className="flex items-start justify-between gap-sm">
+                          <p className="font-semibold text-on-surface text-sm leading-snug">{entry.title}</p>
+                          <span className="text-[9px] font-bold text-on-surface-variant bg-surface-container-high px-2 py-0.5 rounded-full border border-outline-variant/30 shrink-0">
+                            {entry.entryType?.replace(/_/g, ' ')}
+                          </span>
+                        </div>
+                        {entry.description && (
+                          <p className="text-[11px] text-on-surface-variant leading-relaxed mt-1">{entry.description}</p>
+                        )}
+                        <div className="flex items-center justify-between mt-2 pt-1 border-t border-outline-variant/20">
+                          <span className="text-[10px] text-on-surface-variant">
+                            {entry.entryDate ? new Date(entry.entryDate).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}
+                          </span>
+                          {entry.employee && (
+                            <span className="text-[10px] text-on-surface-variant">{entry.employee.firstName} {entry.employee.lastName}</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>

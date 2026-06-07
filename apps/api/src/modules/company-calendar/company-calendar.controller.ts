@@ -45,8 +45,8 @@ export class CompanyCalendarController {
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() dto: any) {
-    return this.service.update(id, dto);
+  update(@Param('id') id: string, @Body() dto: any, @CurrentUser('id') userId: string) {
+    return this.service.update(id, dto, userId);
   }
 
   @Delete(':id')

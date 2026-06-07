@@ -1,9 +1,37 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { NotificationsGateway } from '../notifications/notifications.gateway';
 
 @Injectable()
 export class CompanyCalendarService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private notifications: NotificationsService,
+    private notificationsGateway: NotificationsGateway,
+  ) {}
+
+  private async notifyAssignee(event: any, createdBy: string) {
+    if (!event.assignedTo || event.assignedTo === createdBy) return;
+
+    const companyName = event.company?.name ? ` for ${event.company.name}` : '';
+    const title = `New visit assigned: ${event.title}`;
+    const body = `You've been assigned to "${event.title}"${companyName} on ${new Date(event.startDate).toLocaleDateString()}.`;
+
+    const notification = await this.notifications.send(
+      event.assignedTo,
+      'CALENDAR_EVENT_ASSIGNED',
+      title,
+      body,
+      event.id,
+      'CalendarEvent',
+    );
+
+    this.notificationsGateway.sendToEmployee(event.assignedTo, 'calendar:assigned', {
+      notification,
+      event,
+    });
+  }
 
   async create(dto: {
     title: string;
@@ -55,6 +83,8 @@ export class CompanyCalendarService {
       });
     }
 
+    await this.notifyAssignee(event, createdBy);
+
     return event;
   }
 
@@ -95,15 +125,28 @@ export class CompanyCalendarService {
   async update(id: string, dto: Partial<{
     title: string; description: string; startDate: string; endDate: string;
     assignedTo: string; reminderDays: number;
-  }>) {
-    return this.prisma.calendarEvent.update({
+  }>, updatedBy?: string) {
+    const before = await this.prisma.calendarEvent.findUnique({ where: { id } });
+
+    const event = await this.prisma.calendarEvent.update({
       where: { id },
       data: {
         ...dto,
         startDate: dto.startDate ? new Date(dto.startDate) : undefined,
         endDate: dto.endDate ? new Date(dto.endDate) : undefined,
       },
+      include: {
+        company: { select: { id: true, name: true } },
+        assignee: { select: { id: true, firstName: true, lastName: true } },
+        creator: { select: { id: true, firstName: true, lastName: true } },
+      },
     });
+
+    if (updatedBy && dto.assignedTo && dto.assignedTo !== before?.assignedTo) {
+      await this.notifyAssignee(event, updatedBy);
+    }
+
+    return event;
   }
 
   async remove(id: string) {

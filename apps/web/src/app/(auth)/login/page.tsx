@@ -127,39 +127,19 @@ function RingDecor() {
   );
 }
 
-/* ── Left decorative panel ─────────────────────────────────────────────────── */
-function BrandPanel() {
+/* ── Full-screen branded background (sits behind everything) ──────────────── */
+function FullScreenBackdrop() {
   return (
     <div
-      className="hidden lg:flex flex-col justify-between w-[52%] flex-shrink-0 relative overflow-hidden"
-      style={{ background: 'linear-gradient(145deg, #fef3ee 0%, #e5eeff 60%, #dce9ff 100%)' }}
+      className="fixed inset-0 overflow-hidden"
+      style={{ background: 'linear-gradient(145deg, #fef3ee 0%, #e5eeff 55%, #dce9ff 100%)' }}
     >
       <DecorBlobs />
       <DotGrid />
       <RingDecor />
 
-      {/* Top logo */}
-      <div className="relative z-10 p-10">
-        <div className="flex items-center gap-3">
-          <div
-            className="w-10 h-10 rounded-xl flex items-center justify-center shadow-md"
-            style={{ background: 'linear-gradient(135deg,#aa3000,#d04411)' }}
-          >
-            <img
-              src="/brand/nexgen-logo-mark.png"
-              alt="NexGen"
-              className="w-6 h-6 object-contain brightness-0 invert"
-            />
-          </div>
-          <div>
-            <div className="font-bold text-base text-[#0b1c30] leading-tight tracking-tight">NexGen</div>
-            <div className="text-[10px] tracking-[0.2em] uppercase text-[#8e7068] font-semibold">Employee OS</div>
-          </div>
-        </div>
-      </div>
-
-      {/* Centre headline */}
-      <div className="relative z-10 px-10 pb-6">
+      {/* Headline, anchored to the left so the card can float center/right */}
+      <div className="hidden xl:block absolute left-16 top-1/2 -translate-y-1/2 max-w-md z-10">
         <div
           className="inline-flex items-center gap-2 rounded-full px-3 py-1 mb-5 text-[11px] font-semibold tracking-widest uppercase"
           style={{ background: 'rgba(170,48,0,0.08)', color: '#aa3000' }}
@@ -175,36 +155,37 @@ function BrandPanel() {
           <span style={{ color: '#aa3000' }}>every</span> employee<br />
           workflow.
         </h2>
-        <p className="text-sm text-[#5a4139] leading-relaxed max-w-xs">
+        <p className="text-sm text-[#5a4139] leading-relaxed max-w-xs mb-8">
           Attendance, payroll, expenses, leaves, and performance — all unified for NexGen Pharma teams.
         </p>
+
+        <div className="relative h-44">
+          <StatCard
+            icon="📍"
+            label="GPS Attendance"
+            value="Geo-fenced"
+            sub="Live location validation"
+            className="top-0 left-0 rotate-[2deg]"
+          />
+          <StatCard
+            icon="💰"
+            label="Payroll"
+            value="Auto-processed"
+            sub="Slips + deductions"
+            className="top-16 left-16 rotate-[-1.5deg]"
+          />
+          <StatCard
+            icon="🔔"
+            label="Alerts"
+            value="Real-time"
+            sub="Socket.io powered"
+            className="top-32 left-4 rotate-[1deg]"
+          />
+        </div>
       </div>
 
-      {/* Floating stat cards */}
-      <StatCard
-        icon="📍"
-        label="GPS Attendance"
-        value="Geo-fenced"
-        sub="Live location validation"
-        className="top-[28%] right-8 rotate-[2deg]"
-      />
-      <StatCard
-        icon="💰"
-        label="Payroll"
-        value="Auto-processed"
-        sub="Slips + deductions"
-        className="top-[50%] right-[-18px] rotate-[-1.5deg]"
-      />
-      <StatCard
-        icon="🔔"
-        label="Alerts"
-        value="Real-time"
-        sub="Socket.io powered"
-        className="top-[68%] right-10 rotate-[1deg]"
-      />
-
-      {/* Bottom tag */}
-      <div className="relative z-10 p-10 pt-0">
+      {/* Bottom-left tag */}
+      <div className="hidden xl:block absolute left-16 bottom-8 z-10">
         <p className="text-[10px] text-[#8e7068] tracking-wider font-semibold uppercase">
           NexGen Pharma Solutions · Confidential
         </p>
@@ -312,17 +293,12 @@ export default function LoginPage() {
     </button>
   );
 
-  /* ── Right panel wrapper ──────────────────────────────────────────────────── */
+  /* ── Centered card wrapper, floats over the full-screen backdrop ──────────── */
   const RightPanel = ({ children }: { children: React.ReactNode }) => (
-    <div className="flex-1 flex items-center justify-center px-6 py-12 bg-[#f0f4f8]">
-      {/* subtle top accent line */}
-      <div
-        className="absolute top-0 left-0 right-0 h-1 lg:hidden"
-        style={{ background: 'linear-gradient(90deg,#aa3000,#d04411,#00628d)' }}
-      />
-      <div className="w-full max-w-[380px]">
-        {/* Mobile logo */}
-        <div className="flex items-center gap-3 mb-10 lg:hidden">
+    <div className="relative z-10 min-h-screen w-full flex items-center justify-center xl:justify-end px-6 py-12 xl:pr-24">
+      <div className="w-full max-w-[400px]">
+        {/* Logo */}
+        <div className="flex items-center gap-3 mb-8">
           <div
             className="w-10 h-10 rounded-xl flex items-center justify-center shadow-md"
             style={{ background: 'linear-gradient(135deg,#aa3000,#d04411)' }}
@@ -331,7 +307,7 @@ export default function LoginPage() {
           </div>
           <div>
             <div className="text-sm font-bold text-[#0b1c30]">NexGen</div>
-            <div className="text-[10px] text-[#8e7068] tracking-wider">Employee OS</div>
+            <div className="text-[10px] text-[#8e7068] tracking-wider uppercase">Employee OS</div>
           </div>
         </div>
 
@@ -339,9 +315,10 @@ export default function LoginPage() {
         <div
           className="rounded-2xl p-8 shadow-2xl"
           style={{
-            background: 'rgba(255,255,255,0.95)',
+            background: 'rgba(255,255,255,0.92)',
+            backdropFilter: 'blur(20px)',
             border: '1px solid rgba(226,191,181,0.4)',
-            boxShadow: '0 20px 60px rgba(11,28,48,0.10), 0 4px 16px rgba(11,28,48,0.06)',
+            boxShadow: '0 20px 60px rgba(11,28,48,0.12), 0 4px 16px rgba(11,28,48,0.08)',
           }}
         >
           {children}
@@ -357,8 +334,8 @@ export default function LoginPage() {
   /* ── Forgot password ─────────────────────────────────────────────────────── */
   if (view === 'forgot') {
     return (
-      <div className="min-h-screen flex relative">
-        <BrandPanel />
+      <div className="min-h-screen relative">
+        <FullScreenBackdrop />
         <RightPanel>
           {resetDone ? (
             <div className="space-y-5">
@@ -419,8 +396,8 @@ export default function LoginPage() {
 
   /* ── Login ───────────────────────────────────────────────────────────────── */
   return (
-    <div className="min-h-screen flex relative">
-      <BrandPanel />
+    <div className="min-h-screen relative">
+      <FullScreenBackdrop />
 
       <RightPanel>
         <div className="mb-7">

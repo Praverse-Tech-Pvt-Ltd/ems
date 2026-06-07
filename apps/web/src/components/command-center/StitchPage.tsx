@@ -1,8 +1,50 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api-client';
+import { PunchModal } from '@/components/PunchModal';
+
+/* Maps generic dashboard action labels to the dedicated page that implements them. */
+const ACTION_ROUTES: Record<string, string> = {
+  'Apply Leave': '/leave-center',
+  'Apply': '/leave-center',
+  'Approve': '/leave-center',
+  'View Balance': '/leave-center',
+  'View Payslip': '/salary-payslips',
+  'Download PDF': '/salary-payslips',
+  'Generate': '/salary-payslips',
+  'Regularize': '/attendance-punch-station',
+  'Add Employee': '/employee-directory',
+  'Review Docs': '/employee-directory',
+  'Departments': '/employee-directory',
+  'Create Claim': '/expense-tracker',
+  'Approve L1': '/expense-tracker',
+  'Mark Paid': '/expense-tracker',
+  'Add Client': '/client-companies-overview',
+  'Run Alerts': '/client-companies-overview',
+  'View Invoices': '/client-companies-overview',
+  'AI Summary': '/client-detail-gap-analysis',
+  'Add Visit': '/client-detail-gap-analysis',
+  'Open Timeline': '/client-detail-gap-analysis',
+  'Add Event': '/calendar-meeting-notes',
+  'Add Note': '/calendar-meeting-notes',
+  'Seed Regulatory': '/calendar-meeting-notes',
+  'New Direct': '/messaging-chat-hub',
+  'New Group': '/messaging-chat-hub',
+  'Mark Read': '/messaging-chat-hub',
+  'Export PDF': '/management-review-hub',
+  'Export Excel': '/management-review-hub',
+  'Refresh AI': '/management-review-hub',
+  'Open Logs': '/audit-compliance-log',
+  'Seed Checklist': '/audit-compliance-log',
+  'Open Work Map': '/ai-talent-mapping',
+  'Review Updates': '/ai-talent-mapping',
+  'Open Review': '/management-review-hub',
+  'Export Snapshot': '/management-review-hub',
+  'Run AI Summary': '/ai-work-intelligence',
+};
 
 type Metric = {
   label: string;
@@ -95,7 +137,20 @@ function DataBadge({ children, tone = 'muted' }: { children: React.ReactNode; to
 }
 
 export function StitchPage({ config }: { config: StitchPageConfig }) {
+  const router = useRouter();
   const [question, setQuestion] = useState('');
+  const [punchType, setPunchType] = useState<'in' | 'out' | null>(null);
+  const [actionNote, setActionNote] = useState('');
+
+  const runAction = (label: string) => {
+    if (label === 'Punch In') { setPunchType('in'); return; }
+    if (label === 'Punch Out') { setPunchType('out'); return; }
+    const route = ACTION_ROUTES[label];
+    if (route) { router.push(route); return; }
+    setActionNote(`"${label}" lives on this workspace's detail screens — open the records below to act on it.`);
+    window.setTimeout(() => setActionNote(''), 4000);
+  };
+
   const query = useQuery({
     queryKey: ['stitch-page', config.title, config.endpoints],
     queryFn: async () => {
@@ -247,6 +302,13 @@ export function StitchPage({ config }: { config: StitchPageConfig }) {
     return (
       <div className="max-w-[980px] mx-auto w-full flex flex-col gap-lg">
         {header}
+      {actionNote && (
+        <div className="rounded-xl px-4 py-3 text-sm bg-primary/10 text-primary border border-primary/20 flex items-center gap-sm">
+          <span className="material-symbols-outlined text-[18px]">info</span>
+          {actionNote}
+        </div>
+      )}
+      {punchType && <PunchModal punchType={punchType} onClose={() => setPunchType(null)} />}
         <section className="bg-surface-container-lowest rounded-xl border border-outline-variant/30 shadow-sm p-lg flex flex-col md:flex-row items-center justify-between gap-lg relative overflow-hidden">
           <div className="absolute -top-24 -right-24 w-48 h-48 bg-primary/10 rounded-full blur-3xl pointer-events-none" />
           <div className="flex flex-col items-center md:items-start gap-sm z-10 text-center md:text-left">
@@ -259,7 +321,7 @@ export function StitchPage({ config }: { config: StitchPageConfig }) {
           </div>
           <div className="flex flex-col sm:flex-row gap-sm w-full md:w-auto z-10">
             {(config.actions ?? []).slice(0, 3).map((action, index) => (
-              <button key={action} className={`${index === 0 ? 'bg-primary text-on-primary' : 'bg-surface text-on-surface border border-outline-variant'} font-title-md text-title-md py-sm px-xl rounded-lg shadow-sm hover:shadow-md transition-all active:scale-95 flex items-center justify-center gap-xs`}>
+              <button key={action} onClick={() => runAction(action)} className={`${index === 0 ? 'bg-primary text-on-primary' : 'bg-surface text-on-surface border border-outline-variant'} font-title-md text-title-md py-sm px-xl rounded-lg shadow-sm hover:shadow-md transition-all active:scale-95 flex items-center justify-center gap-xs cursor-pointer`}>
                 <span className="material-symbols-outlined">{index === 0 ? 'fingerprint' : 'arrow_forward'}</span>
                 {action}
               </button>
@@ -295,12 +357,19 @@ export function StitchPage({ config }: { config: StitchPageConfig }) {
     return (
       <div className="flex flex-col gap-lg">
         {header}
+      {actionNote && (
+        <div className="rounded-xl px-4 py-3 text-sm bg-primary/10 text-primary border border-primary/20 flex items-center gap-sm">
+          <span className="material-symbols-outlined text-[18px]">info</span>
+          {actionNote}
+        </div>
+      )}
+      {punchType && <PunchModal punchType={punchType} onClose={() => setPunchType(null)} />}
         <div className="grid grid-cols-1 xl:grid-cols-[300px_1fr] gap-lg">
           <aside className="flex flex-col gap-md">
             {aiPanelCompact}
             <div className="glass-card rounded-xl p-sm flex flex-col gap-xs">
               {(config.actions ?? []).map((action) => (
-                <button key={action} className="flex items-center justify-between rounded-lg bg-surface-container-lowest px-sm py-3 text-left font-label-caps text-label-caps text-primary hover:bg-surface-container-high">
+                <button key={action} onClick={() => runAction(action)} className="flex items-center justify-between rounded-lg bg-surface-container-lowest px-sm py-3 text-left font-label-caps text-label-caps text-primary hover:bg-surface-container-high cursor-pointer">
                   {action}
                   <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
                 </button>
@@ -336,6 +405,13 @@ export function StitchPage({ config }: { config: StitchPageConfig }) {
     return (
       <div className="flex flex-col gap-lg">
         {header}
+      {actionNote && (
+        <div className="rounded-xl px-4 py-3 text-sm bg-primary/10 text-primary border border-primary/20 flex items-center gap-sm">
+          <span className="material-symbols-outlined text-[18px]">info</span>
+          {actionNote}
+        </div>
+      )}
+      {punchType && <PunchModal punchType={punchType} onClose={() => setPunchType(null)} />}
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-sm">
           {config.metrics.map((metric) => (
             <div key={metric.label} className="glass-card rounded-xl p-md min-h-[150px] flex flex-col justify-between">
@@ -379,6 +455,13 @@ export function StitchPage({ config }: { config: StitchPageConfig }) {
     return (
       <div className="flex flex-col gap-lg">
         {header}
+      {actionNote && (
+        <div className="rounded-xl px-4 py-3 text-sm bg-primary/10 text-primary border border-primary/20 flex items-center gap-sm">
+          <span className="material-symbols-outlined text-[18px]">info</span>
+          {actionNote}
+        </div>
+      )}
+      {punchType && <PunchModal punchType={punchType} onClose={() => setPunchType(null)} />}
         <div className="grid grid-cols-1 xl:grid-cols-[1fr_380px] gap-lg">
           <section className="glass-card rounded-xl p-md">
             <h3 className="font-label-caps text-label-caps text-on-surface-variant mb-md tracking-widest">TIMELINE</h3>
@@ -413,6 +496,13 @@ export function StitchPage({ config }: { config: StitchPageConfig }) {
     return (
       <div className="flex flex-col gap-lg">
         {header}
+      {actionNote && (
+        <div className="rounded-xl px-4 py-3 text-sm bg-primary/10 text-primary border border-primary/20 flex items-center gap-sm">
+          <span className="material-symbols-outlined text-[18px]">info</span>
+          {actionNote}
+        </div>
+      )}
+      {punchType && <PunchModal punchType={punchType} onClose={() => setPunchType(null)} />}
         <div className="grid grid-cols-1 xl:grid-cols-[320px_1fr_320px] gap-md min-h-[640px]">
           <aside className="glass-card rounded-xl overflow-hidden">
             <div className="p-md border-b border-outline-variant/30">
@@ -461,6 +551,13 @@ export function StitchPage({ config }: { config: StitchPageConfig }) {
   return (
     <div className="flex flex-col gap-lg">
       {header}
+      {actionNote && (
+        <div className="rounded-xl px-4 py-3 text-sm bg-primary/10 text-primary border border-primary/20 flex items-center gap-sm">
+          <span className="material-symbols-outlined text-[18px]">info</span>
+          {actionNote}
+        </div>
+      )}
+      {punchType && <PunchModal punchType={punchType} onClose={() => setPunchType(null)} />}
       {layout === 'command' ? aiPanel : metricGrid}
       {layout === 'command' ? metricGrid : aiPanel}
 
@@ -490,7 +587,7 @@ export function StitchPage({ config }: { config: StitchPageConfig }) {
           </div>
           <div className="glass-card rounded-xl p-sm flex flex-wrap gap-xs mt-xs">
             {(config.actions ?? ['Export', 'Review', 'Notify']).map((action) => (
-              <button key={action} className="text-label-caps font-label-caps text-primary border border-outline-variant px-3 py-2 rounded-full hover:bg-surface-container-high transition-colors">
+              <button key={action} onClick={() => runAction(action)} className="text-label-caps font-label-caps text-primary border border-outline-variant px-3 py-2 rounded-full hover:bg-surface-container-high transition-colors cursor-pointer">
                 {action}
               </button>
             ))}

@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
-
-const clients = ['All Clients', 'Zynova Pharma', 'Suncure Biotech', 'LifePath Clinics'];
+import { useEffect, useState } from 'react';
+import { clientsService, followUpService } from '@/lib/api/clients';
+import { employeesService } from '@/lib/api/employees';
 
 const gapCategories = [
   { label: 'Document Compliance', score: 62, gaps: 5, icon: 'description', color: 'text-error', bar: 'bg-error', actions: ['Upload renewal form', 'Request ISO certificate', 'Verify audit pack'] },
@@ -16,8 +16,45 @@ const gapCategories = [
 const overallGapScore = Math.round(gapCategories.reduce((s, c) => s + c.score, 0) / gapCategories.length);
 
 export default function ClientDetailGapAnalysisPage() {
+  const [companies, setCompanies] = useState<any[]>([]);
+  const [employees, setEmployees] = useState<any[]>([]);
   const [selected, setSelected] = useState('All Clients');
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [assigning, setAssigning] = useState<string | null>(null);
+  const [assignEmployeeId, setAssignEmployeeId] = useState('');
+  const [assignNote, setAssignNote] = useState<string | null>(null);
+
+  useEffect(() => {
+    Promise.all([clientsService.list().catch(() => []), employeesService.list().catch(() => [])]).then(([c, e]) => {
+      setCompanies(Array.isArray(c) ? c : c?.data ?? []);
+      setEmployees(Array.isArray(e) ? e : e?.data ?? []);
+    });
+  }, []);
+
+  const clientNames = ['All Clients', ...companies.map((c: any) => c.name)];
+  const selectedCompany = companies.find((c: any) => c.name === selected);
+
+  async function handleAssign(actionLabel: string) {
+    if (!assignEmployeeId) return;
+    const company = selectedCompany ?? companies[0];
+    if (!company) return;
+    const dueDate = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString();
+    try {
+      await followUpService.create({
+        companyId: company.id,
+        assignedTo: assignEmployeeId,
+        dueDate,
+        reason: actionLabel,
+      });
+      const employee = employees.find((e: any) => e.id === assignEmployeeId);
+      setAssignNote(`Assigned "${actionLabel}" to ${employee?.firstName ?? employee?.name ?? 'team member'} for ${company.name} — they've been notified.`);
+    } catch {
+      setAssignNote('Could not create the assignment — please try again.');
+    } finally {
+      setAssigning(null);
+      setAssignEmployeeId('');
+    }
+  }
 
   return (
     <div className="flex flex-col gap-lg">
@@ -35,7 +72,7 @@ export default function ClientDetailGapAnalysisPage() {
           </div>
           {/* Client selector */}
           <div className="flex gap-xs flex-wrap shrink-0">
-            {clients.map(c => (
+            {clientNames.map(c => (
               <button key={c} onClick={() => setSelected(c)}
                 className={`px-3 py-1.5 rounded-full text-label-caps font-label-caps text-[11px] border transition-all ${selected === c ? 'bg-primary text-on-primary border-primary' : 'border-outline-variant/50 text-on-surface-variant hover:border-primary/40'}`}>
                 {c}
@@ -44,6 +81,16 @@ export default function ClientDetailGapAnalysisPage() {
           </div>
         </div>
       </div>
+
+      {assignNote && (
+        <div className="rounded-xl border border-tertiary/30 bg-tertiary/10 px-md py-sm flex items-center gap-sm text-body-sm text-on-surface">
+          <span className="material-symbols-outlined text-tertiary text-[18px]">task_alt</span>
+          <span className="flex-1">{assignNote}</span>
+          <button onClick={() => setAssignNote(null)} className="text-on-surface-variant hover:text-on-surface">
+            <span className="material-symbols-outlined text-[16px]">close</span>
+          </button>
+        </div>
+      )}
 
       {/* Overall score banner */}
       <div className={`rounded-2xl p-lg flex items-center gap-lg border ${overallGapScore >= 80 ? 'bg-tertiary/5 border-tertiary/20' : overallGapScore >= 60 ? 'bg-primary/5 border-primary/20' : 'bg-error/5 border-error/20'}`}>
@@ -106,10 +153,38 @@ export default function ClientDetailGapAnalysisPage() {
                 <div className="px-md pb-sm pt-xs border-t border-outline-variant/20 flex flex-col gap-xs">
                   <p className="font-label-caps text-[10px] text-on-surface-variant tracking-widest">ACTION ITEMS</p>
                   {cat.actions.map(a => (
-                    <div key={a} className="flex items-center gap-sm">
-                      <span className="material-symbols-outlined text-[14px] text-primary">arrow_right</span>
-                      <span className="text-body-sm text-on-surface">{a}</span>
-                      <button className="ml-auto text-[10px] text-primary font-label-caps font-bold hover:underline">Assign</button>
+                    <div key={a} className="flex flex-col gap-xs">
+                      <div className="flex items-center gap-sm">
+                        <span className="material-symbols-outlined text-[14px] text-primary">arrow_right</span>
+                        <span className="text-body-sm text-on-surface">{a}</span>
+                        <button
+                          onClick={() => { setAssigning(assigning === a ? null : a); setAssignEmployeeId(''); }}
+                          className="ml-auto text-[10px] text-primary font-label-caps font-bold hover:underline"
+                        >
+                          {assigning === a ? 'Cancel' : 'Assign'}
+                        </button>
+                      </div>
+                      {assigning === a && (
+                        <div className="ml-lg flex items-center gap-xs flex-wrap">
+                          <select
+                            value={assignEmployeeId}
+                            onChange={e => setAssignEmployeeId(e.target.value)}
+                            className="text-[11px] rounded-lg border border-outline-variant/50 bg-surface-container-low px-2 py-1 text-on-surface"
+                          >
+                            <option value="">Select team member…</option>
+                            {employees.map((emp: any) => (
+                              <option key={emp.id} value={emp.id}>{emp.firstName ?? emp.name} {emp.lastName ?? ''}</option>
+                            ))}
+                          </select>
+                          <button
+                            onClick={() => handleAssign(a)}
+                            disabled={!assignEmployeeId}
+                            className="text-[10px] font-label-caps font-bold bg-primary text-on-primary px-2.5 py-1 rounded-full disabled:opacity-40"
+                          >
+                            Confirm assignment
+                          </button>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

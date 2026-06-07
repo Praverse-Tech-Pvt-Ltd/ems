@@ -1,6 +1,9 @@
 import { Injectable, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { GeminiService } from '../ai-overview/gemini.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { NotificationsGateway } from '../notifications/notifications.gateway';
+import { CompanyCalendarService } from '../company-calendar/company-calendar.service';
 
 const OWNER_EMAILS = [
   'ashwani@nexgenpharmasolutions.com',
@@ -12,6 +15,9 @@ export class AIChatService {
   constructor(
     private prisma: PrismaService,
     private gemini: GeminiService,
+    private notifications: NotificationsService,
+    private notificationsGateway: NotificationsGateway,
+    private companyCalendar: CompanyCalendarService,
   ) {}
 
   private assertOwner(email: string) {
@@ -274,6 +280,147 @@ export class AIChatService {
     );
   }
 
+  /**
+   * Keeps ClientCompany summary fields ("currentStage", "lastVisitDate",
+   * "riskScore") in step with whatever the AI just extracted from chat —
+   * this is the "AI mapping" that ensures the company record always
+   * reflects the latest visit/note/communication, not just lastCommunicationDate.
+   */
+  private async syncCompanyFromActivity(
+    companyId: string,
+    updateDate: Date,
+    extracted: Record<string, any>,
+    question: string,
+  ) {
+    const data: Record<string, any> = { lastCommunicationDate: updateDate };
+
+    const stageSignal =
+      extracted.currentStatus ?? extracted.workStatus ?? extracted.pendingGap ?? extracted.followUpAction;
+    if (typeof stageSignal === 'string' && stageSignal.trim()) {
+      data.currentStage = stageSignal.trim().substring(0, 200);
+    }
+
+    if (/\b(visit|visited|site visit|on[- ]?site)\b/i.test(question)) {
+      data.lastVisitDate = updateDate;
+    }
+
+    const company = await this.prisma.clientCompany.findUnique({
+      where: { id: companyId },
+      select: { riskScore: true },
+    });
+    if (company && typeof company.riskScore === 'number') {
+      const lowered = question.toLowerCase();
+      if (/\b(urgent|escalat|at risk|show cause|non[- ]?compliance|critical)\b/.test(lowered)) {
+        data.riskScore = Math.min(100, company.riskScore + 5);
+      } else if (/\b(resolved|closed|cleared|completed|on track)\b/.test(lowered)) {
+        data.riskScore = Math.max(0, company.riskScore - 5);
+      }
+    }
+
+    await this.prisma.clientCompany.update({ where: { id: companyId }, data });
+  }
+
+  /**
+   * Gives the AI chat write access: when the owner asks it to *do* something
+   * ("assign Shifa to visit Romano Drugs next Tuesday", "create a follow-up
+   * for Dilip on Vemed's batch gap"), this detects the intent via Gemini and
+   * actually performs it — creating the calendar event/task/note through the
+   * same services the UI uses (so notifications + calendar sync fire too) —
+   * rather than just describing what the user should do.
+   */
+  private async tryExecuteAction(question: string, userId: string): Promise<string | null> {
+    const intent = await this.gemini.detectActionRequest(question);
+    if (!intent || !intent.action) return null;
+
+    const foundCompany = await this.resolveCompany(question, intent.companyName ?? null);
+    const assignedEmployee = await this.resolveEmployee(question, intent.employeeName ?? null);
+    const when = intent.date ? new Date(intent.date) : this.parseDueDate(question);
+
+    try {
+      switch (intent.action) {
+        case 'ASSIGN_VISIT':
+        case 'SCHEDULE_EVENT': {
+          if (!assignedEmployee) return null;
+          const title = intent.title?.trim()
+            || `Visit: ${foundCompany?.name ?? 'Client'} — ${assignedEmployee.firstName}`;
+          await this.companyCalendar.create({
+            title,
+            description: intent.reason ?? undefined,
+            eventType: intent.action === 'ASSIGN_VISIT' ? 'CLIENT_VISIT' : 'INTERNAL_MEETING',
+            startDate: when.toISOString(),
+            allDay: true,
+            companyId: foundCompany?.id,
+            assignedTo: assignedEmployee.id,
+          }, userId);
+          return `Done — I've scheduled "${title}" for ${when.toLocaleDateString('en-IN')}, assigned it to ${assignedEmployee.firstName} ${assignedEmployee.lastName}, added it to both calendars, and sent them a notification.`;
+        }
+
+        case 'CREATE_FOLLOW_UP': {
+          if (!foundCompany) return null;
+          const reason = intent.reason ?? intent.title ?? question.substring(0, 250);
+          const task = await this.prisma.followUpTask.create({
+            data: {
+              companyId: foundCompany.id,
+              assignedTo: assignedEmployee?.id ?? userId,
+              dueDate: when,
+              reason,
+            },
+          });
+          await this.prisma.companyTimelineEntry.create({
+            data: {
+              companyId: foundCompany.id,
+              entryType: 'PENDING_TASK',
+              title: `AI created follow-up${assignedEmployee ? ` for ${assignedEmployee.firstName} ${assignedEmployee.lastName}` : ''}`,
+              description: reason,
+              employeeId: userId,
+              referenceId: task.id,
+              referenceType: 'FollowUpTask',
+              entryDate: new Date(),
+            },
+          });
+          if (assignedEmployee) {
+            const notification = await this.notifications.send(
+              assignedEmployee.id,
+              'GENERAL',
+              `New follow-up: ${foundCompany.name}`,
+              reason,
+              task.id,
+              'FollowUpTask',
+            );
+            this.notificationsGateway.sendToEmployee(assignedEmployee.id, 'follow-up:assigned', { notification, task });
+          }
+          return `Done — I've created a follow-up task on ${foundCompany.name} due ${when.toLocaleDateString('en-IN')}${assignedEmployee ? `, assigned to ${assignedEmployee.firstName} ${assignedEmployee.lastName} (notified)` : ''}.`;
+        }
+
+        case 'UPDATE_COMPANY_NOTE': {
+          if (!foundCompany) return null;
+          const stage = intent.title?.trim() || intent.reason?.trim();
+          if (!stage) return null;
+          await this.prisma.clientCompany.update({
+            where: { id: foundCompany.id },
+            data: { currentStage: stage.substring(0, 200) },
+          });
+          await this.prisma.companyTimelineEntry.create({
+            data: {
+              companyId: foundCompany.id,
+              entryType: 'STATUS_CHANGE',
+              title: 'AI updated company stage from chat',
+              description: stage,
+              employeeId: userId,
+              entryDate: new Date(),
+            },
+          });
+          return `Done — I've updated ${foundCompany.name}'s current stage to "${stage}".`;
+        }
+
+        default:
+          return null;
+      }
+    } catch {
+      return null;
+    }
+  }
+
   private async recordOperationalUpdate(question: string, userId: string) {
     if (!this.looksLikeOperationalUpdate(question)) return null;
 
@@ -317,10 +464,7 @@ export class AIChatService {
         },
       });
 
-      await this.prisma.clientCompany.update({
-        where: { id: foundCompany.id },
-        data: { lastCommunicationDate: updateDate },
-      });
+      await this.syncCompanyFromActivity(foundCompany.id, updateDate, extracted, question);
     }
 
     if (isMeetingMinutes) {
@@ -359,10 +503,7 @@ export class AIChatService {
           },
         });
 
-        await this.prisma.clientCompany.update({
-          where: { id: foundCompany.id },
-          data: { lastCommunicationDate: updateDate },
-        });
+        await this.syncCompanyFromActivity(foundCompany.id, updateDate, extracted, question);
 
         if (assignedEmployee && (extracted.followUpAction || extracted.pendingGap || /\bassign\b/i.test(question))) {
           const assignedReason =
@@ -438,10 +579,7 @@ export class AIChatService {
         },
       });
 
-      await this.prisma.clientCompany.update({
-        where: { id: foundCompany.id },
-        data: { lastCommunicationDate: updateDate },
-      });
+      await this.syncCompanyFromActivity(foundCompany.id, updateDate, extracted, question);
     }
 
     return {
@@ -456,6 +594,7 @@ export class AIChatService {
     this.assertOwner(userEmail);
 
     const recordedUpdate = await this.recordOperationalUpdate(question, userId);
+    const actionConfirmation = await this.tryExecuteAction(question, userId);
     const context = await this.buildContext();
 
     const prompt = `You are an intelligent operations assistant for Nexgen Pharma Solutions, a pharma consultation team.
@@ -466,12 +605,16 @@ If the data does not contain the answer, say what is missing and what should be 
 MOM/team-discussion messages are automatically saved as meeting notes, linked to company timelines, and can create follow-up tasks when assignee/deadline/action is present.
 Work-update messages are automatically saved as work updates and linked to company timelines.
 ${recordedUpdate ? `\nThe owner's latest message was saved as a ${recordedUpdate.updateType}. Saved company: ${recordedUpdate.companyName ?? 'needs review'}. Needs admin review: ${recordedUpdate.needsAdminReview}. Mention this briefly before analysis.` : ''}
+${actionConfirmation ? `\nYou were asked to take an action and you ALREADY DID IT. Lead your reply with this exact confirmation, verbatim: "${actionConfirmation}"` : ''}
 
 ${context}
 
 OWNER'S QUESTION: ${question}`;
 
-    const answer = await this.gemini.generateText(prompt);
+    const generated = await this.gemini.generateText(prompt);
+    const answer = actionConfirmation && !generated.includes(actionConfirmation)
+      ? `${actionConfirmation}\n\n${generated}`
+      : generated;
 
     await this.prisma.aIChatMessage.createMany({
       data: [

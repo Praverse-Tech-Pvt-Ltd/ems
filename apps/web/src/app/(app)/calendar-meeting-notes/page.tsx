@@ -3,7 +3,9 @@
 import { useState, useEffect } from 'react';
 import { calendarService, meetingNotesService } from '@/lib/api/management';
 import { clientsService } from '@/lib/api/clients';
+import { employeesService } from '@/lib/api/employees';
 import { useAuthStore } from '@/store/auth.store';
+import { useNotifications } from '@/hooks/useNotifications';
 
 const EVENT_TYPE_COLOR: Record<string, string> = {
   INTERNAL: 'border-l-primary bg-primary/5',
@@ -16,38 +18,78 @@ const EVENT_TYPE_COLOR: Record<string, string> = {
 export default function CalendarMeetingNotesPage() {
   const user = useAuthStore(s => s.user);
   const isAdmin = ['ADMIN', 'SUPER_ADMIN', 'MANAGER'].includes(user?.role ?? '');
+  const { latest: liveAssignment, dismiss: dismissLiveAssignment } = useNotifications();
 
   const [events, setEvents] = useState<any[]>([]);
   const [notes, setNotes] = useState<any[]>([]);
   const [countdowns, setCountdowns] = useState<any[]>([]);
   const [myCompanies, setMyCompanies] = useState<any[]>([]);
+  const [allCompanies, setAllCompanies] = useState<any[]>([]);
+  const [employees, setEmployees] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDay, setSelectedDay] = useState(new Date().getDate());
   const [showAddNote, setShowAddNote] = useState(false);
+  const [showAssign, setShowAssign] = useState(false);
   const [noteForm, setNoteForm] = useState({ rawText: '', meetingDate: new Date().toISOString().slice(0, 10) });
+  const [assignForm, setAssignForm] = useState({
+    companyId: '',
+    employeeId: '',
+    visitDate: new Date().toISOString().slice(0, 10),
+    purpose: '',
+  });
   const [submitting, setSubmitting] = useState(false);
+  const [assignNote, setAssignNote] = useState('');
 
   const load = async () => {
     try {
-      const [upcoming, notesData, cntd, allCompanies] = await Promise.all([
+      const [upcoming, notesData, cntd, companiesRes, employeesRes] = await Promise.all([
         calendarService.upcoming(30).catch(() => []),
         meetingNotesService.list({ limit: 10 }).catch(() => []),
         calendarService.auditCountdowns().catch(() => []),
         clientsService.list().catch(() => []),
+        employeesService.list().catch(() => []),
       ]);
       setEvents(Array.isArray(upcoming) ? upcoming : upcoming?.data ?? []);
       setNotes(Array.isArray(notesData) ? notesData : notesData?.data ?? []);
       setCountdowns(Array.isArray(cntd) ? cntd : cntd?.data ?? []);
-      const companiesArr = Array.isArray(allCompanies) ? allCompanies : allCompanies?.data ?? [];
+      const companiesArr = Array.isArray(companiesRes) ? companiesRes : companiesRes?.data ?? [];
+      setAllCompanies(companiesArr);
       setMyCompanies(companiesArr.filter((c: any) =>
         c.responsibleEmployee?.id === user?.id || c.responsibleEmployeeId === user?.id,
       ));
+      const employeesArr = Array.isArray(employeesRes) ? employeesRes : employeesRes?.data ?? [];
+      setEmployees(employeesArr.filter((e: any) => e.id !== user?.id));
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => { load(); }, []);
+
+  const handleAssignVisit = async () => {
+    if (!assignForm.companyId || !assignForm.employeeId || !assignForm.visitDate) return;
+    setSubmitting(true);
+    try {
+      const company = allCompanies.find((c: any) => c.id === assignForm.companyId);
+      const employee = employees.find((e: any) => e.id === assignForm.employeeId);
+      await calendarService.create({
+        title: `Visit: ${company?.name ?? 'Client'}${employee ? ` — ${employee.firstName}` : ''}`,
+        description: assignForm.purpose || undefined,
+        eventType: 'CLIENT_VISIT',
+        startDate: new Date(assignForm.visitDate).toISOString(),
+        allDay: true,
+        companyId: assignForm.companyId,
+        assignedTo: assignForm.employeeId,
+      });
+      setShowAssign(false);
+      setAssignNote(`Visit assigned to ${employee?.firstName ?? 'employee'} — they've been notified and it's on their calendar.`);
+      window.setTimeout(() => setAssignNote(''), 5000);
+      setAssignForm({ companyId: '', employeeId: '', visitDate: new Date().toISOString().slice(0, 10), purpose: '' });
+      await load();
+    } catch { /* ignore */ } finally {
+      setSubmitting(false);
+    }
+  };
 
   const handleAddNote = async () => {
     if (!noteForm.rawText.trim()) return;
@@ -90,7 +132,14 @@ export default function CalendarMeetingNotesPage() {
             <p className="text-on-surface-variant mt-xs">Company events, meeting notes, and audit countdowns.</p>
           </div>
           <div className="flex gap-sm shrink-0">
-            <button onClick={() => setShowAddNote(!showAddNote)}
+            {isAdmin && (
+              <button onClick={() => { setShowAssign(!showAssign); setShowAddNote(false); }}
+                className="flex items-center gap-xs text-label-caps font-label-caps bg-tertiary text-on-tertiary px-4 py-2 rounded-full hover:opacity-90">
+                <span className="material-symbols-outlined text-[16px]">{showAssign ? 'close' : 'person_add'}</span>
+                {showAssign ? 'Cancel' : 'Assign Visit'}
+              </button>
+            )}
+            <button onClick={() => { setShowAddNote(!showAddNote); setShowAssign(false); }}
               className="flex items-center gap-xs text-label-caps font-label-caps bg-primary text-on-primary px-4 py-2 rounded-full hover:opacity-90">
               <span className="material-symbols-outlined text-[16px]">{showAddNote ? 'close' : 'add'}</span>
               {showAddNote ? 'Cancel' : 'Add Note'}
@@ -98,6 +147,78 @@ export default function CalendarMeetingNotesPage() {
           </div>
         </div>
       </div>
+
+      {liveAssignment && (
+        <div className="rounded-xl px-4 py-3 text-sm bg-primary/10 text-primary border border-primary/20 flex items-center justify-between gap-sm">
+          <div className="flex items-center gap-sm">
+            <span className="material-symbols-outlined text-[18px]">campaign</span>
+            <span>
+              <strong>{liveAssignment.notification.title}</strong> — {liveAssignment.notification.body}
+            </span>
+          </div>
+          <button onClick={() => { dismissLiveAssignment(); load(); }} className="text-primary hover:opacity-70">
+            <span className="material-symbols-outlined text-[18px]">close</span>
+          </button>
+        </div>
+      )}
+
+      {assignNote && (
+        <div className="rounded-xl px-4 py-3 text-sm bg-tertiary/10 text-tertiary border border-tertiary/20 flex items-center gap-sm">
+          <span className="material-symbols-outlined text-[18px]">notifications_active</span>
+          {assignNote}
+        </div>
+      )}
+
+      {/* Assign visit form */}
+      {showAssign && (
+        <div className="glass-card rounded-2xl p-lg border border-tertiary/30">
+          <p className="font-label-caps text-label-caps text-tertiary tracking-widest mb-md">ASSIGN COMPANY VISIT</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-sm mb-sm">
+            <div className="flex flex-col gap-xs">
+              <label className="font-label-caps text-[10px] text-on-surface-variant tracking-widest">COMPANY</label>
+              <select value={assignForm.companyId}
+                onChange={e => setAssignForm(p => ({ ...p, companyId: e.target.value }))}
+                className="border border-outline-variant/50 rounded-xl px-sm py-2 text-body-sm bg-surface-container-lowest focus:border-tertiary focus:outline-none">
+                <option value="">Select a company…</option>
+                {allCompanies.map((c: any) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex flex-col gap-xs">
+              <label className="font-label-caps text-[10px] text-on-surface-variant tracking-widest">ASSIGN TO</label>
+              <select value={assignForm.employeeId}
+                onChange={e => setAssignForm(p => ({ ...p, employeeId: e.target.value }))}
+                className="border border-outline-variant/50 rounded-xl px-sm py-2 text-body-sm bg-surface-container-lowest focus:border-tertiary focus:outline-none">
+                <option value="">Select team member…</option>
+                {employees.map((e: any) => (
+                  <option key={e.id} value={e.id}>{e.firstName} {e.lastName}{e.designation ? ` — ${e.designation}` : ''}</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex flex-col gap-xs">
+              <label className="font-label-caps text-[10px] text-on-surface-variant tracking-widest">VISIT DATE</label>
+              <input type="date" value={assignForm.visitDate}
+                onChange={e => setAssignForm(p => ({ ...p, visitDate: e.target.value }))}
+                className="border border-outline-variant/50 rounded-xl px-sm py-2 text-body-sm bg-surface-container-lowest focus:border-tertiary focus:outline-none" />
+            </div>
+            <div className="flex flex-col gap-xs">
+              <label className="font-label-caps text-[10px] text-on-surface-variant tracking-widest">PURPOSE / NOTES</label>
+              <input type="text" value={assignForm.purpose}
+                onChange={e => setAssignForm(p => ({ ...p, purpose: e.target.value }))}
+                placeholder="e.g. CAPA follow-up visit"
+                className="border border-outline-variant/50 rounded-xl px-sm py-2 text-body-sm bg-surface-container-lowest focus:border-tertiary focus:outline-none" />
+            </div>
+          </div>
+          <button onClick={handleAssignVisit} disabled={submitting || !assignForm.companyId || !assignForm.employeeId}
+            className="bg-tertiary text-on-tertiary font-label-caps text-label-caps px-lg py-2 rounded-full hover:opacity-90 disabled:opacity-50">
+            {submitting ? 'Assigning...' : 'Assign & Notify'}
+          </button>
+          <p className="text-[11px] text-on-surface-variant mt-sm">
+            This adds the visit to your calendar, syncs it to the assignee&apos;s calendar, and sends them a live notification.
+          </p>
+        </div>
+      )}
 
       {/* Add note form */}
       {showAddNote && (
