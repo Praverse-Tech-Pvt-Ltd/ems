@@ -10,7 +10,7 @@ function parseUpdate(text: string) {
   const taskPatterns = [/completed?\s+([^.!,\n]+)/gi, /finished?\s+([^.!,\n]+)/gi, /submitted?\s+([^.!,\n]+)/gi, /deployed?\s+([^.!,\n]+)/gi];
   for (const pat of taskPatterns) {
     let match;
-    while ((match = pat.exec(text)) !== null) tasks.push(match[1].trim().slice(0, 50));
+    while ((match = pat.exec(text)) !== null) tasks.push((match[1] ?? '').trim().slice(0, 50));
   }
   const hasBlocker = /block|stuck|wait(ing)?|pending|delay|issue|problem|can't|cannot/i.test(text);
   const isStressed = /overwhelm|stressed|too much|overload|behind|late|struggle/i.test(text);
@@ -131,7 +131,8 @@ export default function AiWorkIntelligencePage() {
       const week = 11 - Math.floor(diffDays / 7);
       const day = d.getDay();
       if (week >= 0 && week < 12 && day >= 1 && day <= 5) {
-        grid[week][day - 1] = Math.min(4, (grid[week][day - 1] ?? 0) + 2);
+        const row = grid[week];
+        if (row) row[day - 1] = Math.min(4, (row[day - 1] ?? 0) + 2);
       }
     });
     return grid;
