@@ -341,11 +341,11 @@ export class AIChatService {
         case 'ASSIGN_VISIT':
         case 'SCHEDULE_EVENT': {
           if (!assignedEmployee) return null;
-          const title = intent.title?.trim()
-            || `Visit: ${foundCompany?.name ?? 'Client'} — ${assignedEmployee.firstName}`;
+          const title = (intent.title?.trim()
+            || `Visit: ${foundCompany?.name ?? 'Client'} — ${assignedEmployee.firstName}`).substring(0, 200);
           await this.companyCalendar.create({
             title,
-            description: intent.reason ?? undefined,
+            description: intent.reason?.toString().trim().substring(0, 500) || undefined,
             eventType: intent.action === 'ASSIGN_VISIT' ? 'CLIENT_VISIT' : 'INTERNAL_MEETING',
             startDate: when.toISOString(),
             allDay: true,
@@ -357,7 +357,7 @@ export class AIChatService {
 
         case 'CREATE_FOLLOW_UP': {
           if (!foundCompany) return null;
-          const reason = intent.reason ?? intent.title ?? question.substring(0, 250);
+          const reason = (intent.reason ?? intent.title ?? question).toString().trim().substring(0, 500);
           const task = await this.prisma.followUpTask.create({
             data: {
               companyId: foundCompany.id,
@@ -394,7 +394,7 @@ export class AIChatService {
 
         case 'UPDATE_COMPANY_NOTE': {
           if (!foundCompany) return null;
-          const stage = intent.title?.trim() || intent.reason?.trim();
+          const stage = (intent.title?.trim() || intent.reason?.trim() || '').toString();
           if (!stage) return null;
           await this.prisma.clientCompany.update({
             where: { id: foundCompany.id },

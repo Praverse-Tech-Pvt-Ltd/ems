@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { NotificationsGateway } from '../notifications/notifications.gateway';
@@ -149,7 +149,17 @@ export class CompanyCalendarService {
     return event;
   }
 
-  async remove(id: string) {
+  async remove(id: string, requestedBy: string) {
+    const event = await this.prisma.calendarEvent.findUnique({ where: { id } });
+    if (!event) throw new NotFoundException('Calendar event not found');
+
+    if (event.createdBy !== requestedBy && event.assignedTo !== requestedBy) {
+      const requester = await this.prisma.employee.findUnique({ where: { id: requestedBy } });
+      if (!requester || !['ADMIN', 'SUPER_ADMIN'].includes(requester.role)) {
+        throw new ForbiddenException('You can only delete events you created or are assigned to');
+      }
+    }
+
     return this.prisma.calendarEvent.delete({ where: { id } });
   }
 

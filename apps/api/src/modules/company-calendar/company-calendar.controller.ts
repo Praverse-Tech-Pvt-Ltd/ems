@@ -14,6 +14,7 @@ export class CompanyCalendarController {
   constructor(private readonly service: CompanyCalendarService) {}
 
   @Post()
+  @Roles('ADMIN', 'SUPER_ADMIN', 'MANAGER')
   create(@Body() dto: any, @CurrentUser('id') userId: string) {
     return this.service.create(dto, userId);
   }
@@ -45,12 +46,14 @@ export class CompanyCalendarController {
   }
 
   @Patch(':id')
+  @Roles('ADMIN', 'SUPER_ADMIN', 'MANAGER')
   update(@Param('id') id: string, @Body() dto: any, @CurrentUser('id') userId: string) {
     return this.service.update(id, dto, userId);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.service.remove(id);
+  @Roles('ADMIN', 'SUPER_ADMIN', 'MANAGER')
+  remove(@Param('id') id: string, @CurrentUser('id') userId: string) {
+    return this.service.remove(id, userId);
   }
 }
