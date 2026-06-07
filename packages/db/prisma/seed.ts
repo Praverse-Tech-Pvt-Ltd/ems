@@ -223,7 +223,7 @@ async function main() {
         lastName: 'Shrivastav',
         passwordHash: adminHash,
         role: Role.SUPER_ADMIN,
-        designation: 'Director',
+        designation: 'Project Manager',
         salaryGrade: 'PERMANENT_FIXED_VARIABLE',
         grossSalary: 200000,
         joiningDate: new Date('2024-01-01'),
@@ -240,7 +240,7 @@ async function main() {
         role:         Role.SUPER_ADMIN,
         status:       EmployeeStatus.ACTIVE,
         joiningDate:  new Date('2024-01-01'),
-        designation:  'Director',
+        designation:  'Project Manager',
         salaryGrade:  'PERMANENT_FIXED_VARIABLE',
         grossSalary:  200000,
       }
@@ -568,6 +568,98 @@ async function main() {
     );
   }
   console.log(`✓ Employee 4    →  shifa.mobh@nexgenpharmasolutions.com   /  ${shifaPassword}`);
+
+  // 5. Dilip (QA department — same attendance window as Shifa/Chandni)
+  const dilipPassword = 'Dilip@NEX2026';
+  const dilipHash = await bcrypt.hash(dilipPassword, 10);
+
+  let dilipRecord = await prisma.employee.findFirst({
+    where: { OR: [{ employeeCode: 'NEX-QA-002' }, { email: 'dilip@nexgenpharmasolutions.com' }] },
+  });
+
+  if (dilipRecord) {
+    await prisma.employee.update({
+      where: { id: dilipRecord.id },
+      data: {
+        email: 'dilip@nexgenpharmasolutions.com',
+        passwordHash: dilipHash,
+        joiningDate: new Date('2026-01-01'),
+        designation: 'QA Officer',
+        departmentId: qaDept.id,
+        salaryGrade: 'PERMANENT',
+        grossSalary: 25000,
+      },
+    });
+  } else {
+    await prisma.employee.create({
+      data: {
+        employeeCode: 'NEX-QA-002',
+        email:        'dilip@nexgenpharmasolutions.com',
+        passwordHash: dilipHash,
+        firstName:    'Dilip',
+        lastName:     'Mehta',
+        role:         Role.EMPLOYEE,
+        status:       EmployeeStatus.ACTIVE,
+        joiningDate:  new Date('2026-01-01'),
+        designation:  'QA Officer',
+        departmentId: qaDept.id,
+        salaryGrade:  'PERMANENT',
+        grossSalary:  25000,
+      },
+    });
+  }
+
+  const dilip = await prisma.employee.findUnique({ where: { email: 'dilip@nexgenpharmasolutions.com' } });
+  if (dilip) {
+    await seedLeaves(dilip.id);
+    await seedSalaryStructure(dilip.id, '2026-01-01', 25000, 'Permanent employee salary: INR 25,000 per month.', admin?.id);
+    await seedMonthlySlips(dilip, admin?.id ?? dilip.id, 1, 5, year, 25000, 'Monthly salary, no deductions.');
+  }
+  console.log(`✓ Employee 5    →  dilip@nexgenpharmasolutions.com          /  ${dilipPassword}`);
+
+  // ── Set Pratham as manager for all employees ───────────────────────────────
+  console.log(`\n── Setting Pratham as manager for all employees ─`);
+  if (admin) {
+    const allEmployees = await prisma.employee.findMany({ select: { id: true, email: true } });
+    for (const emp of allEmployees) {
+      if (emp.id === admin.id || emp.id === superAdmin?.id) continue; // skip self
+      await prisma.employee.update({
+        where: { id: emp.id },
+        data: { managerId: admin.id },
+      });
+    }
+    console.log(`✓ All employees now report to Pratham (${admin.email})`);
+  }
+
+  // ── Remove unknown employees (keep only the 7 canonical ones) ─────────────
+  console.log(`\n── Cleaning up unknown employee accounts ────────`);
+  const canonicalEmails = new Set([
+    'ashwani@nexgenpharmasolutions.com',
+    'pratham.s@nexgenpharmasolutions.com',
+    'chandni.jha@nexgenpharmasolutions.com',
+    'dev.patel@praversetech.com',
+    'maanav.shah@praversetech.com',
+    'shifa.mobh@nexgenpharmasolutions.com',
+    'dilip@nexgenpharmasolutions.com',
+  ]);
+  const allEmps = await prisma.employee.findMany({ select: { id: true, email: true } });
+  const toDelete = allEmps.filter(e => !canonicalEmails.has(e.email));
+  if (toDelete.length === 0) {
+    console.log(`✓ No unknown employees found — nothing to delete`);
+  } else {
+    for (const emp of toDelete) {
+      // Cascade-delete associated data first
+      await prisma.attendanceRecord.deleteMany({ where: { employeeId: emp.id } });
+      await prisma.leaveBalance.deleteMany({ where: { employeeId: emp.id } });
+      await prisma.leaveRequest.deleteMany({ where: { OR: [{ employeeId: emp.id }, { approverId: emp.id }] } });
+      await prisma.expense.deleteMany({ where: { employeeId: emp.id } });
+      await prisma.salarySlip.deleteMany({ where: { employeeId: emp.id } });
+      await prisma.salaryStructure.deleteMany({ where: { employeeId: emp.id } });
+      await prisma.refreshToken.deleteMany({ where: { employeeId: emp.id } });
+      await prisma.employee.delete({ where: { id: emp.id } });
+      console.log(`✗ Deleted unknown employee: ${emp.email}`);
+    }
+  }
 
   // ── Office Location (Geo-fence) ──────────────────────────────────────────────
   console.log(`\n── Seeding Office Location ──────────────────────`);

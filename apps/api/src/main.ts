@@ -32,13 +32,25 @@ async function bootstrap() {
     }),
   );
 
-  const allowedOrigins = [
+  const explicitOrigins = [
     process.env['FRONTEND_URL'],
     'http://localhost:3000',
+    'http://localhost:3001',
   ].filter(Boolean) as string[];
 
   app.enableCors({
-    origin: allowedOrigins,
+    origin: (origin, callback) => {
+      // Allow requests with no origin (mobile apps, curl, Swagger)
+      if (!origin) return callback(null, true);
+      // Allow any Vercel deployment preview or the explicit FRONTEND_URL
+      if (
+        explicitOrigins.includes(origin) ||
+        /\.vercel\.app$/.test(origin)
+      ) {
+        return callback(null, true);
+      }
+      return callback(new Error(`CORS: origin ${origin} not allowed`), false);
+    },
     credentials: true,
   });
 

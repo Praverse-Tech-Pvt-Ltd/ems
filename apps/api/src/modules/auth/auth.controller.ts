@@ -21,12 +21,17 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto, ChangePasswordDto } from './dto/password.dto';
 
-/** Cookie configuration shared by login and refresh. */
+/** Cookie configuration shared by login and refresh.
+ *  In production the frontend and API are on different domains (Vercel vs Render),
+ *  so we need sameSite:'none' + secure:true to allow cross-site cookie sending.
+ *  In development, 'lax' works fine for same-origin localhost traffic.
+ */
+const isProd = process.env['NODE_ENV'] === 'production';
 const REFRESH_COOKIE_OPTIONS = {
   httpOnly: true,
-  secure: process.env['NODE_ENV'] === 'production',
-  sameSite: 'strict' as const,
-  maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days in ms
+  secure: isProd,
+  sameSite: (isProd ? 'none' : 'lax') as 'none' | 'lax',
+  maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
   path: '/api/v1/auth',
 };
 

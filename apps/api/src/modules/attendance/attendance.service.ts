@@ -38,6 +38,23 @@ export class AttendanceService {
     return new Date(Date.UTC(ist.getFullYear(), ist.getMonth(), ist.getDate()));
   }
 
+  /** Returns true if today is a non-working day for this employee.
+   *  Software Development dept: Saturday + Sunday off.
+   *  All others: Sunday only.
+   */
+  async isWeekOff(employeeId: string, date?: Date): Promise<boolean> {
+    const d = date ?? this.getISTToday();
+    const day = d.getDay(); // 0=Sun, 6=Sat
+    if (day === 0) return true; // Everyone off on Sunday
+    if (day !== 6) return false; // Mon-Fri: never a week-off
+    // Saturday: only off for Software Development
+    const emp = await this.prisma.employee.findUnique({
+      where: { id: employeeId },
+      select: { department: { select: { name: true } } },
+    });
+    return emp?.department?.name?.toLowerCase().includes('software') ?? false;
+  }
+
   private async getEmployeeTimeConstraints(employeeId: string) {
     const employee = await this.prisma.employee.findUnique({
       where: { id: employeeId },
@@ -149,6 +166,12 @@ export class AttendanceService {
     const holiday = await this.prisma.holiday.findFirst({ where: { date: today } });
     if (holiday) {
       throw new BadRequestException(`Today is marked as holiday: ${holiday.title}`);
+    }
+
+    const weekOff = await this.isWeekOff(employeeId, today);
+    if (weekOff) {
+      const day = today.getDay();
+      throw new BadRequestException(day === 0 ? 'Sunday is a holiday — no punch-in required.' : 'Saturday is a weekly off for your department.');
     }
 
     const existing = await this.prisma.attendanceRecord.findUnique({
