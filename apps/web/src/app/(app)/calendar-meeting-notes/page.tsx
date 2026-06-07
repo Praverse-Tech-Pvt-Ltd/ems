@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { calendarService, meetingNotesService } from '@/lib/api/management';
+import { clientsService } from '@/lib/api/clients';
 import { useAuthStore } from '@/store/auth.store';
 
 const EVENT_TYPE_COLOR: Record<string, string> = {
@@ -19,6 +20,7 @@ export default function CalendarMeetingNotesPage() {
   const [events, setEvents] = useState<any[]>([]);
   const [notes, setNotes] = useState<any[]>([]);
   const [countdowns, setCountdowns] = useState<any[]>([]);
+  const [myCompanies, setMyCompanies] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDay, setSelectedDay] = useState(new Date().getDate());
   const [showAddNote, setShowAddNote] = useState(false);
@@ -27,14 +29,19 @@ export default function CalendarMeetingNotesPage() {
 
   const load = async () => {
     try {
-      const [upcoming, notesData, cntd] = await Promise.all([
+      const [upcoming, notesData, cntd, allCompanies] = await Promise.all([
         calendarService.upcoming(30).catch(() => []),
         meetingNotesService.list({ limit: 10 }).catch(() => []),
         calendarService.auditCountdowns().catch(() => []),
+        clientsService.list().catch(() => []),
       ]);
       setEvents(Array.isArray(upcoming) ? upcoming : upcoming?.data ?? []);
       setNotes(Array.isArray(notesData) ? notesData : notesData?.data ?? []);
       setCountdowns(Array.isArray(cntd) ? cntd : cntd?.data ?? []);
+      const companiesArr = Array.isArray(allCompanies) ? allCompanies : allCompanies?.data ?? [];
+      setMyCompanies(companiesArr.filter((c: any) =>
+        c.responsibleEmployee?.id === user?.id || c.responsibleEmployeeId === user?.id,
+      ));
     } finally {
       setLoading(false);
     }
@@ -215,6 +222,44 @@ export default function CalendarMeetingNotesPage() {
           </div>
         </div>
       </div>
+
+      {/* My Assigned Companies */}
+      {myCompanies.length > 0 && (
+        <div>
+          <p className="font-label-caps text-label-caps text-on-surface-variant tracking-widest mb-sm">MY ASSIGNED COMPANIES</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-sm">
+            {myCompanies.map((c: any) => {
+              const statusColor: Record<string, string> = {
+                ACTIVE:  'bg-emerald-50 text-emerald-700 border-emerald-200',
+                DELAYED: 'bg-amber-50 text-amber-700 border-amber-200',
+                AT_RISK: 'bg-rose-50 text-rose-700 border-rose-200',
+                LOST:    'bg-slate-100 text-slate-600 border-slate-200',
+                DORMANT: 'bg-slate-50 text-slate-500 border-slate-200',
+              };
+              return (
+                <div key={c.id} className="glass-card rounded-xl border border-outline-variant/30 p-md flex flex-col gap-xs hover:shadow-md transition-shadow">
+                  <div className="flex items-start justify-between gap-sm">
+                    <div className="flex items-center gap-xs">
+                      <span className="material-symbols-outlined text-[16px] text-primary">domain</span>
+                      <p className="font-semibold text-on-surface text-sm leading-snug line-clamp-1">{c.name}</p>
+                    </div>
+                    <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full border shrink-0 ${statusColor[c.businessStatus] ?? 'bg-surface-container text-on-surface-variant border-outline-variant/30'}`}>
+                      {c.businessStatus}
+                    </span>
+                  </div>
+                  {c.currentStage && (
+                    <p className="text-[11px] text-on-surface-variant leading-snug line-clamp-2">{c.currentStage}</p>
+                  )}
+                  <div className="flex items-center gap-xs border-t border-outline-variant/20 pt-xs mt-xs">
+                    <span className="material-symbols-outlined text-[12px] text-on-surface-variant">location_on</span>
+                    <span className="text-[10px] text-on-surface-variant">{c.industry ?? 'Pharma'} · {c.criticality} criticality</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Meeting notes */}
       <div>

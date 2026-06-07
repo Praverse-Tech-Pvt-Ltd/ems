@@ -1,4 +1,4 @@
-import { PrismaClient, Role, EmployeeStatus, LeaveType } from '@prisma/client';
+import { PrismaClient, Role, EmployeeStatus, LeaveType, AttendanceStatus } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 
 declare const process: any;
@@ -421,6 +421,20 @@ async function main() {
       [4],
     );
   }
+  if (dev) {
+    await prisma.attendanceRecord.upsert({
+      where: { employeeId_date: { employeeId: dev.id, date: new Date('2026-06-02') } },
+      update: { status: AttendanceStatus.ABSENT },
+      create: {
+        employeeId:    dev.id,
+        date:          new Date('2026-06-02'),
+        status:        AttendanceStatus.ABSENT,
+        isRegularized: false,
+        isManualPunch: true,
+      },
+    });
+    console.log(`✓ Dev Patel    →  ABSENT on 2026-06-02 (seeded)`);
+  }
   console.log(`✓ Employee 2    →  dev.patel@praversetech.com    /  ${devPassword}`);
 
   // 3. Maanav Shah
@@ -608,6 +622,29 @@ async function main() {
     },
   });
   console.log(`✓ Company address setting saved`);
+
+  // ── Company Profile Settings ─────────────────────────────────────────────────
+  const companyProfile = {
+    name:        'NexGen Pharma Solutions Pvt. Ltd.',
+    shortName:   'NexGen Pharma',
+    gstin:       '24AAKCN7532Q1ZX',
+    pan:         'AAKCN7532Q',
+    cin:         'U24230GJ2023PTC141580',
+    phone:       '+91-265-2970000',
+    email:       'info@nexgenpharmasolutions.com',
+    website:     'https://nexgenpharmasolutions.com',
+    industry:    'Pharmaceutical Consulting & Regulatory Affairs',
+    description: 'NexGen Pharma Solutions provides end-to-end pharmaceutical consulting, regulatory affairs support, quality assurance, and compliance management services to pharma manufacturers across India.',
+    foundedYear: 2023,
+    state:       'Gujarat',
+    country:     'India',
+  };
+  await prisma.companySetting.upsert({
+    where:  { key: 'company_profile' },
+    update: { value: companyProfile as any, updatedBy: superAdmin?.id ?? '' },
+    create: { key: 'company_profile', value: companyProfile as any, updatedBy: superAdmin?.id ?? '' },
+  });
+  console.log(`✓ Company profile setting saved`);
 
   console.log(`\n── Done ─────────────────────────────────────────\n`);
 }

@@ -7,7 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useAuthStore } from '@/store/auth.store';
 import { apiClient } from '@/lib/api-client';
-import { AlertCircle, Eye, EyeOff, ArrowLeft, CheckCircle, Shield, Zap, Bell } from 'lucide-react';
+import { AlertCircle, Eye, EyeOff, ArrowLeft, CheckCircle } from 'lucide-react';
 
 const loginSchema = z.object({
   email:    z.string().email('Invalid email address'),
@@ -25,51 +25,126 @@ const forgotSchema = z.object({
 });
 type ForgotForm = z.infer<typeof forgotSchema>;
 
-function InputField({
-  label,
-  error,
-  rightLabel,
-  children,
-}: {
-  label: string;
-  error?: string;
-  rightLabel?: React.ReactNode;
-  children: React.ReactNode;
+/* ── Decorative background SVG blobs ──────────────────────────────────────── */
+function DecorBlobs() {
+  return (
+    <svg className="absolute inset-0 w-full h-full" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+      <defs>
+        <radialGradient id="g1" cx="30%" cy="30%" r="60%">
+          <stop offset="0%" stopColor="#ffb59f" stopOpacity="0.55" />
+          <stop offset="100%" stopColor="#ffb59f" stopOpacity="0" />
+        </radialGradient>
+        <radialGradient id="g2" cx="80%" cy="75%" r="50%">
+          <stop offset="0%" stopColor="#89ceff" stopOpacity="0.45" />
+          <stop offset="100%" stopColor="#89ceff" stopOpacity="0" />
+        </radialGradient>
+        <radialGradient id="g3" cx="60%" cy="10%" r="40%">
+          <stop offset="0%" stopColor="#dae2fd" stopOpacity="0.7" />
+          <stop offset="100%" stopColor="#dae2fd" stopOpacity="0" />
+        </radialGradient>
+      </defs>
+      <rect width="100%" height="100%" fill="url(#g1)" />
+      <rect width="100%" height="100%" fill="url(#g2)" />
+      <rect width="100%" height="100%" fill="url(#g3)" />
+    </svg>
+  );
+}
+
+/* ── Dot grid overlay ──────────────────────────────────────────────────────── */
+function DotGrid() {
+  return (
+    <svg
+      className="absolute inset-0 w-full h-full opacity-[0.18]"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden
+    >
+      <defs>
+        <pattern id="dots" x="0" y="0" width="24" height="24" patternUnits="userSpaceOnUse">
+          <circle cx="2" cy="2" r="1.2" fill="#aa3000" />
+        </pattern>
+      </defs>
+      <rect width="100%" height="100%" fill="url(#dots)" />
+    </svg>
+  );
+}
+
+/* ── Floating stat card ────────────────────────────────────────────────────── */
+function StatCard({ icon, label, value, sub, className }: {
+  icon: string; label: string; value: string; sub: string; className?: string;
 }) {
   return (
-    <div>
-      <div className="flex items-center justify-between mb-2">
-        <label className="text-[11px] font-display font-700 text-ink-secondary uppercase tracking-[0.12em]">
-          {label}
-        </label>
-        {rightLabel}
+    <div
+      className={`absolute flex items-center gap-3 rounded-2xl px-4 py-3 shadow-xl ${className ?? ''}`}
+      style={{
+        background: 'rgba(255,255,255,0.88)',
+        backdropFilter: 'blur(14px)',
+        border: '1px solid rgba(255,255,255,0.9)',
+        minWidth: '190px',
+      }}
+    >
+      <div
+        className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 text-lg"
+        style={{ background: 'linear-gradient(135deg,#aa3000,#d04411)' }}
+      >
+        <span className="text-white text-base">{icon}</span>
       </div>
-      {children}
-      {error && (
-        <p className="text-xs text-rose mt-1.5 font-body">{error}</p>
-      )}
+      <div>
+        <p className="text-[10px] font-semibold uppercase tracking-wider text-[#5a4139]">{label}</p>
+        <p className="text-base font-bold text-[#0b1c30] leading-tight">{value}</p>
+        <p className="text-[10px] text-[#8e7068]">{sub}</p>
+      </div>
     </div>
   );
 }
 
+/* ── Big abstract ring decoration ─────────────────────────────────────────── */
+function RingDecor() {
+  return (
+    <>
+      <div
+        className="absolute rounded-full pointer-events-none"
+        style={{
+          width: 420,
+          height: 420,
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-55%, -48%)',
+          border: '1.5px solid rgba(170,48,0,0.12)',
+        }}
+      />
+      <div
+        className="absolute rounded-full pointer-events-none"
+        style={{
+          width: 580,
+          height: 580,
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-55%, -48%)',
+          border: '1px solid rgba(0,98,141,0.08)',
+        }}
+      />
+    </>
+  );
+}
+
+/* ── Left decorative panel ─────────────────────────────────────────────────── */
 function BrandPanel() {
   return (
     <div
-      className="hidden lg:flex flex-col justify-between w-[400px] flex-shrink-0 p-10 relative overflow-hidden"
-      style={{ background: 'var(--color-panel-bg)' }}
+      className="hidden lg:flex flex-col justify-between w-[52%] flex-shrink-0 relative overflow-hidden"
+      style={{ background: 'linear-gradient(145deg, #fef3ee 0%, #e5eeff 60%, #dce9ff 100%)' }}
     >
-      {/* Gradient mesh background */}
-      <div
-        className="absolute inset-0 pointer-events-none"
-        style={{
-          background: 'radial-gradient(ellipse at 30% 40%, rgba(214,88,15,0.15) 0%, transparent 60%), radial-gradient(ellipse at 80% 80%, rgba(15,143,166,0.08) 0%, transparent 50%)',
-        }}
-      />
+      <DecorBlobs />
+      <DotGrid />
+      <RingDecor />
 
-      <div className="relative z-10">
-        {/* Logo */}
-        <div className="flex items-center gap-3 mb-14">
-          <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center shadow-lg">
+      {/* Top logo */}
+      <div className="relative z-10 p-10">
+        <div className="flex items-center gap-3">
+          <div
+            className="w-10 h-10 rounded-xl flex items-center justify-center shadow-md"
+            style={{ background: 'linear-gradient(135deg,#aa3000,#d04411)' }}
+          >
             <img
               src="/brand/nexgen-logo-mark.png"
               alt="NexGen"
@@ -77,52 +152,96 @@ function BrandPanel() {
             />
           </div>
           <div>
-            <div className="font-display font-700 text-base text-white leading-tight">NexGen</div>
-            <div className="text-[10px] tracking-widest uppercase font-body" style={{ color: 'var(--color-panel-text-dim)' }}>Employee OS</div>
+            <div className="font-bold text-base text-[#0b1c30] leading-tight tracking-tight">NexGen</div>
+            <div className="text-[10px] tracking-[0.2em] uppercase text-[#8e7068] font-semibold">Employee OS</div>
           </div>
         </div>
+      </div>
 
-        <h2 className="font-display font-800 text-[2.6rem] text-white leading-[1.05] tracking-tight mb-4">
-          Employee<br />Management<br />System
+      {/* Centre headline */}
+      <div className="relative z-10 px-10 pb-6">
+        <div
+          className="inline-flex items-center gap-2 rounded-full px-3 py-1 mb-5 text-[11px] font-semibold tracking-widest uppercase"
+          style={{ background: 'rgba(170,48,0,0.08)', color: '#aa3000' }}
+        >
+          <span className="w-1.5 h-1.5 rounded-full bg-[#aa3000] animate-pulse" />
+          Internal Platform
+        </div>
+        <h2
+          className="font-extrabold leading-[1.08] tracking-tight mb-4"
+          style={{ fontSize: 'clamp(2rem,3.5vw,2.75rem)', color: '#0b1c30' }}
+        >
+          One place for<br />
+          <span style={{ color: '#aa3000' }}>every</span> employee<br />
+          workflow.
         </h2>
-        <p className="text-sm font-body leading-relaxed" style={{ color: 'var(--color-panel-text)' }}>
-          Unified platform for attendance, payroll, expenses, invoicing, and leave management.
+        <p className="text-sm text-[#5a4139] leading-relaxed max-w-xs">
+          Attendance, payroll, expenses, leaves, and performance — all unified for NexGen Pharma teams.
         </p>
       </div>
 
-      {/* Feature list */}
-      <div className="relative z-10 space-y-4">
-        {[
-          { icon: Shield, label: 'GPS Attendance',     detail: 'Geo-fenced location validation' },
-          { icon: Zap,    label: 'Payroll Automation', detail: 'Automated salary slips & deductions' },
-          { icon: Bell,   label: 'Real-time Alerts',   detail: 'Instant notifications via Socket.io' },
-        ].map(({ icon: Icon, label, detail }, i) => (
-          <div
-            key={label}
-            className="flex items-start gap-4 pt-4"
-            style={{ borderTop: i === 0 ? '1px solid var(--color-panel-border)' : '1px solid var(--color-panel-border)' }}
-          >
-            <div
-              className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--color-panel-border)' }}
-            >
-              <Icon size={15} style={{ color: 'var(--color-primary)' }} />
-            </div>
-            <div>
-              <p className="text-sm font-display font-700 text-white">{label}</p>
-              <p className="text-[11px] font-body mt-0.5" style={{ color: 'var(--color-panel-text)' }}>{detail}</p>
-            </div>
-          </div>
-        ))}
-      </div>
+      {/* Floating stat cards */}
+      <StatCard
+        icon="📍"
+        label="GPS Attendance"
+        value="Geo-fenced"
+        sub="Live location validation"
+        className="top-[28%] right-8 rotate-[2deg]"
+      />
+      <StatCard
+        icon="💰"
+        label="Payroll"
+        value="Auto-processed"
+        sub="Slips + deductions"
+        className="top-[50%] right-[-18px] rotate-[-1.5deg]"
+      />
+      <StatCard
+        icon="🔔"
+        label="Alerts"
+        value="Real-time"
+        sub="Socket.io powered"
+        className="top-[68%] right-10 rotate-[1deg]"
+      />
 
-      <p className="relative z-10 text-[10px] font-body tracking-wider" style={{ color: 'var(--color-panel-text-dim)' }}>
-        NexGen Pharma Solutions · Internal Use Only
-      </p>
+      {/* Bottom tag */}
+      <div className="relative z-10 p-10 pt-0">
+        <p className="text-[10px] text-[#8e7068] tracking-wider font-semibold uppercase">
+          NexGen Pharma Solutions · Confidential
+        </p>
+      </div>
     </div>
   );
 }
 
+/* ── Shared input wrapper ──────────────────────────────────────────────────── */
+function InputField({
+  label, error, rightLabel, children,
+}: {
+  label: string; error?: string; rightLabel?: React.ReactNode; children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1.5">
+        <label className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#5a4139]">
+          {label}
+        </label>
+        {rightLabel}
+      </div>
+      {children}
+      {error && <p className="text-xs text-[#ba1a1a] mt-1.5">{error}</p>}
+    </div>
+  );
+}
+
+const inputCls = [
+  'w-full rounded-xl px-4 py-2.5 text-sm text-[#0b1c30] bg-white',
+  'border border-[#e2bfb5] focus:outline-none focus:ring-2 focus:ring-[#aa3000]/25 focus:border-[#aa3000]',
+  'transition-all duration-150 placeholder:text-[#c4a99e]',
+].join(' ');
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   PAGE
+══════════════════════════════════════════════════════════════════════════════ */
 export default function LoginPage() {
   const router  = useRouter();
   const setAuth = useAuthStore((s) => s.setAuth);
@@ -136,16 +255,8 @@ export default function LoginPage() {
   const loginForm  = useForm<LoginForm>({ resolver: zodResolver(loginSchema) });
   const forgotForm = useForm<ForgotForm>({ resolver: zodResolver(forgotSchema) });
 
-  const inputCls =
-    'w-full rounded-lg px-4 py-2.5 text-sm font-body text-ink transition-all duration-150 focus:outline-none';
-  const inputStyle = {
-    background: 'var(--color-canvas)',
-    border: '1.5px solid var(--color-border)',
-  };
-
   const onLogin = async (data: LoginForm) => {
-    setLoading(true);
-    setError('');
+    setLoading(true); setError('');
     try {
       const res = await apiClient.post('/auth/login', data);
       setAuth(res.data.accessToken, res.data.user);
@@ -155,204 +266,234 @@ export default function LoginPage() {
         ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
         : undefined;
       setError(msg ?? 'Login failed. Please check your credentials.');
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   };
 
   const onForgot = async (data: ForgotForm) => {
-    setLoading(true);
-    setError('');
+    setLoading(true); setError('');
     try {
-      await apiClient.post('/auth/forgot-password', {
-        email: data.email,
-        newPassword: data.newPassword,
-      });
+      await apiClient.post('/auth/forgot-password', { email: data.email, newPassword: data.newPassword });
       setResetDone(true);
     } catch (err: unknown) {
       const msg = err && typeof err === 'object' && 'response' in err
         ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
         : undefined;
       setError(msg ?? 'Reset failed. Check your email and try again.');
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   };
 
-  /* ── Forgot / Reset view ──────────────────────────────────────────────── */
-  if (view === 'forgot') {
-    return (
-      <div className="min-h-screen flex bg-canvas">
-        <BrandPanel />
-        <div className="flex-1 flex items-center justify-center px-8 py-12">
-          <div className="w-full max-w-sm">
-            <button
-              onClick={() => { setView('login'); setError(''); setResetDone(false); forgotForm.reset(); }}
-              className="flex items-center gap-2 text-xs font-semibold text-ink-muted hover:text-ink mb-10 transition-colors cursor-pointer font-body"
-            >
-              <ArrowLeft size={14} /> Back to sign in
-            </button>
+  /* shared error banner */
+  const ErrorBanner = () => error ? (
+    <div className="flex items-start gap-3 rounded-xl px-4 py-3 bg-[#ffdad6] border border-[#ba1a1a]/20">
+      <AlertCircle size={15} className="text-[#ba1a1a] flex-shrink-0 mt-0.5" />
+      <span className="text-xs text-[#ba1a1a]">{error}</span>
+    </div>
+  ) : null;
 
-            {resetDone ? (
-              <div className="space-y-6">
-                <div
-                  className="flex items-start gap-3 rounded-xl px-5 py-4"
-                  style={{ background: 'var(--color-emerald-light)', border: '1px solid rgba(5,150,105,0.2)' }}
-                >
-                  <CheckCircle size={18} style={{ color: 'var(--color-emerald)' }} className="flex-shrink-0 mt-0.5" />
-                  <div>
-                    <p className="text-sm font-display font-700" style={{ color: 'var(--color-emerald)' }}>Password reset</p>
-                    <p className="text-xs font-body mt-0.5" style={{ color: 'var(--color-emerald)' }}>
-                      Your password has been updated. You can now sign in.
-                    </p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => { setView('login'); setResetDone(false); forgotForm.reset(); }}
-                  className="w-full py-2.5 rounded-lg bg-primary text-white text-sm font-display font-700 shadow-sm hover:bg-primary-dim transition-all cursor-pointer"
-                >
-                  Go to sign in →
-                </button>
-              </div>
-            ) : (
-              <>
-                <h1 className="text-3xl font-display font-800 text-ink tracking-tight mb-1">Reset password</h1>
-                <p className="text-sm text-ink-muted font-body mb-8">Enter your email and choose a new password</p>
+  /* shared submit button */
+  const SubmitBtn = ({ label, loadingLabel }: { label: string; loadingLabel: string }) => (
+    <button
+      type="submit"
+      disabled={loading}
+      className="w-full py-3 rounded-xl text-white text-sm font-bold tracking-wide shadow-lg
+        hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-60 disabled:pointer-events-none cursor-pointer"
+      style={{
+        background: 'linear-gradient(135deg,#aa3000,#d04411)',
+        boxShadow: '0 6px 20px rgba(170,48,0,0.35)',
+      }}
+    >
+      {loading
+        ? <span className="inline-flex items-center gap-2">
+            <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            {loadingLabel}
+          </span>
+        : label
+      }
+    </button>
+  );
 
-                <form onSubmit={forgotForm.handleSubmit(onForgot)} className="space-y-4">
-                  <InputField label="Email address" error={forgotForm.formState.errors.email?.message}>
-                    <input {...forgotForm.register('email')} type="email" placeholder="you@nexgen.in" className={inputCls} style={inputStyle} />
-                  </InputField>
-                  <InputField label="New password" error={forgotForm.formState.errors.newPassword?.message}>
-                    <input {...forgotForm.register('newPassword')} type="password" placeholder="••••••••" className={inputCls} style={inputStyle} />
-                  </InputField>
-                  <InputField label="Confirm new password" error={forgotForm.formState.errors.confirm?.message}>
-                    <input {...forgotForm.register('confirm')} type="password" placeholder="••••••••" className={inputCls} style={inputStyle} />
-                  </InputField>
-
-                  {error && (
-                    <div
-                      className="flex items-start gap-3 rounded-lg px-4 py-3"
-                      style={{ background: 'var(--color-rose-light)', border: '1px solid rgba(225,29,72,0.2)' }}
-                    >
-                      <AlertCircle size={15} style={{ color: 'var(--color-rose)' }} className="flex-shrink-0 mt-0.5" />
-                      <span className="text-xs font-body" style={{ color: 'var(--color-rose)' }}>{error}</span>
-                    </div>
-                  )}
-
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="w-full py-2.5 rounded-lg bg-primary text-white text-sm font-display font-700 shadow-sm hover:bg-primary-dim transition-all disabled:opacity-60 disabled:pointer-events-none cursor-pointer"
-                  >
-                    {loading
-                      ? <span className="inline-flex items-center gap-2"><span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" /> Resetting…</span>
-                      : 'Reset password →'
-                    }
-                  </button>
-                </form>
-              </>
-            )}
+  /* ── Right panel wrapper ──────────────────────────────────────────────────── */
+  const RightPanel = ({ children }: { children: React.ReactNode }) => (
+    <div className="flex-1 flex items-center justify-center px-6 py-12 bg-[#f0f4f8]">
+      {/* subtle top accent line */}
+      <div
+        className="absolute top-0 left-0 right-0 h-1 lg:hidden"
+        style={{ background: 'linear-gradient(90deg,#aa3000,#d04411,#00628d)' }}
+      />
+      <div className="w-full max-w-[380px]">
+        {/* Mobile logo */}
+        <div className="flex items-center gap-3 mb-10 lg:hidden">
+          <div
+            className="w-10 h-10 rounded-xl flex items-center justify-center shadow-md"
+            style={{ background: 'linear-gradient(135deg,#aa3000,#d04411)' }}
+          >
+            <img src="/brand/nexgen-logo-mark.png" alt="NexGen" className="w-6 h-6 object-contain brightness-0 invert" />
+          </div>
+          <div>
+            <div className="text-sm font-bold text-[#0b1c30]">NexGen</div>
+            <div className="text-[10px] text-[#8e7068] tracking-wider">Employee OS</div>
           </div>
         </div>
+
+        {/* Card */}
+        <div
+          className="rounded-2xl p-8 shadow-2xl"
+          style={{
+            background: 'rgba(255,255,255,0.95)',
+            border: '1px solid rgba(226,191,181,0.4)',
+            boxShadow: '0 20px 60px rgba(11,28,48,0.10), 0 4px 16px rgba(11,28,48,0.06)',
+          }}
+        >
+          {children}
+        </div>
+
+        <p className="text-center text-[11px] text-[#8e7068] mt-6 tracking-wide">
+          NexGen Pharma Solutions · Internal use only
+        </p>
+      </div>
+    </div>
+  );
+
+  /* ── Forgot password ─────────────────────────────────────────────────────── */
+  if (view === 'forgot') {
+    return (
+      <div className="min-h-screen flex relative">
+        <BrandPanel />
+        <RightPanel>
+          {resetDone ? (
+            <div className="space-y-5">
+              <div className="flex items-start gap-3 rounded-xl px-4 py-4 bg-[#d4edda] border border-emerald-200">
+                <CheckCircle size={18} className="text-emerald-700 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-bold text-emerald-800">Password reset!</p>
+                  <p className="text-xs text-emerald-700 mt-0.5">Your password has been updated. Sign in to continue.</p>
+                </div>
+              </div>
+              <button
+                onClick={() => { setView('login'); setResetDone(false); forgotForm.reset(); }}
+                className="w-full py-3 rounded-xl text-white text-sm font-bold tracking-wide cursor-pointer"
+                style={{ background: 'linear-gradient(135deg,#aa3000,#d04411)', boxShadow: '0 6px 20px rgba(170,48,0,0.3)' }}
+              >
+                Go to sign in →
+              </button>
+            </div>
+          ) : (
+            <>
+              <button
+                onClick={() => { setView('login'); setError(''); setResetDone(false); forgotForm.reset(); }}
+                className="flex items-center gap-1.5 text-xs font-semibold text-[#8e7068] hover:text-[#aa3000] mb-6 transition-colors cursor-pointer"
+              >
+                <ArrowLeft size={13} /> Back to sign in
+              </button>
+
+              <div className="mb-6">
+                <div
+                  className="w-11 h-11 rounded-xl flex items-center justify-center mb-4"
+                  style={{ background: 'rgba(170,48,0,0.08)' }}
+                >
+                  <span className="text-xl">🔑</span>
+                </div>
+                <h1 className="text-2xl font-extrabold text-[#0b1c30] tracking-tight mb-1">Reset password</h1>
+                <p className="text-sm text-[#5a4139]">Enter your email and choose a new password.</p>
+              </div>
+
+              <form onSubmit={forgotForm.handleSubmit(onForgot)} className="space-y-4">
+                <InputField label="Email address" error={forgotForm.formState.errors.email?.message}>
+                  <input {...forgotForm.register('email')} type="email" placeholder="you@nexgen.in" className={inputCls} />
+                </InputField>
+                <InputField label="New password" error={forgotForm.formState.errors.newPassword?.message}>
+                  <input {...forgotForm.register('newPassword')} type="password" placeholder="••••••••" className={inputCls} />
+                </InputField>
+                <InputField label="Confirm new password" error={forgotForm.formState.errors.confirm?.message}>
+                  <input {...forgotForm.register('confirm')} type="password" placeholder="••••••••" className={inputCls} />
+                </InputField>
+                <ErrorBanner />
+                <SubmitBtn label="Reset password →" loadingLabel="Resetting…" />
+              </form>
+            </>
+          )}
+        </RightPanel>
       </div>
     );
   }
 
-  /* ── Login view ─────────────────────────────────────────────────────────── */
+  /* ── Login ───────────────────────────────────────────────────────────────── */
   return (
-    <div className="min-h-screen flex bg-canvas">
+    <div className="min-h-screen flex relative">
       <BrandPanel />
 
-      <div className="flex-1 flex items-center justify-center px-8 py-12">
-        <div className="w-full max-w-sm">
-          {/* Mobile logo */}
-          <div className="flex items-center gap-3 mb-10 lg:hidden">
-            <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center">
-              <img src="/brand/nexgen-logo-mark.png" alt="NexGen" className="w-5 h-5 object-contain brightness-0 invert" />
-            </div>
-            <div>
-              <div className="text-sm font-display font-700 text-ink">NexGen</div>
-              <div className="text-[10px] text-ink-muted font-body">Employee OS</div>
-            </div>
+      <RightPanel>
+        <div className="mb-7">
+          <div
+            className="w-11 h-11 rounded-xl flex items-center justify-center mb-4"
+            style={{ background: 'rgba(170,48,0,0.08)' }}
+          >
+            <span className="text-xl">👋</span>
           </div>
-
-          <div className="mb-8">
-            <h1 className="text-3xl font-display font-800 text-ink tracking-tight mb-1">Welcome back</h1>
-            <p className="text-sm text-ink-muted font-body">Sign in to your employee portal</p>
-          </div>
-
-          <form onSubmit={loginForm.handleSubmit(onLogin)} className="space-y-4">
-            <InputField label="Email address" error={loginForm.formState.errors.email?.message}>
-              <input
-                {...loginForm.register('email')}
-                type="email"
-                placeholder="you@nexgen.in"
-                className={inputCls}
-                style={inputStyle}
-              />
-            </InputField>
-
-            <InputField
-              label="Password"
-              error={loginForm.formState.errors.password?.message}
-              rightLabel={
-                <button
-                  type="button"
-                  onClick={() => { setView('forgot'); setError(''); }}
-                  className="text-[11px] font-display font-700 transition-colors cursor-pointer"
-                  style={{ color: 'var(--color-primary)' }}
-                >
-                  Forgot password?
-                </button>
-              }
-            >
-              <div className="relative">
-                <input
-                  {...loginForm.register('password')}
-                  type={showPass ? 'text' : 'password'}
-                  placeholder="••••••••"
-                  className={inputCls + ' pr-11'}
-                  style={inputStyle}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPass(v => !v)}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-ink-muted hover:text-ink transition-colors cursor-pointer"
-                >
-                  {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
-              </div>
-            </InputField>
-
-            {error && (
-              <div
-                className="flex items-start gap-3 rounded-lg px-4 py-3"
-                style={{ background: 'var(--color-rose-light)', border: '1px solid rgba(225,29,72,0.2)' }}
-              >
-                <AlertCircle size={15} style={{ color: 'var(--color-rose)' }} className="flex-shrink-0 mt-0.5" />
-                <span className="text-xs font-body" style={{ color: 'var(--color-rose)' }}>{error}</span>
-              </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-2.5 mt-1 rounded-lg bg-primary text-white text-sm font-display font-700 shadow-sm hover:bg-primary-dim transition-all disabled:opacity-60 disabled:pointer-events-none cursor-pointer"
-              style={{ boxShadow: '0 4px 12px rgba(214,88,15,0.3)' }}
-            >
-              {loading
-                ? <span className="inline-flex items-center gap-2"><span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" /> Signing in…</span>
-                : 'Sign in →'
-              }
-            </button>
-          </form>
-
-          <p className="text-center text-xs text-ink-faint font-body mt-10">
-            NexGen Pharma Solutions · Internal use only
-          </p>
+          <h1 className="text-2xl font-extrabold text-[#0b1c30] tracking-tight mb-1">Welcome back</h1>
+          <p className="text-sm text-[#5a4139]">Sign in to your employee portal</p>
         </div>
-      </div>
+
+        <form onSubmit={loginForm.handleSubmit(onLogin)} className="space-y-4">
+          <InputField label="Email address" error={loginForm.formState.errors.email?.message}>
+            <input
+              {...loginForm.register('email')}
+              type="email"
+              placeholder="you@nexgen.in"
+              className={inputCls}
+            />
+          </InputField>
+
+          <InputField
+            label="Password"
+            error={loginForm.formState.errors.password?.message}
+            rightLabel={
+              <button
+                type="button"
+                onClick={() => { setView('forgot'); setError(''); }}
+                className="text-[11px] font-bold text-[#aa3000] hover:text-[#d04411] transition-colors cursor-pointer"
+              >
+                Forgot password?
+              </button>
+            }
+          >
+            <div className="relative">
+              <input
+                {...loginForm.register('password')}
+                type={showPass ? 'text' : 'password'}
+                placeholder="••••••••"
+                className={inputCls + ' pr-11'}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPass(v => !v)}
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#8e7068] hover:text-[#aa3000] transition-colors cursor-pointer"
+              >
+                {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
+          </InputField>
+
+          <ErrorBanner />
+
+          <div className="pt-1">
+            <SubmitBtn label="Sign in →" loadingLabel="Signing in…" />
+          </div>
+        </form>
+
+        {/* Feature pills */}
+        <div className="flex flex-wrap gap-2 mt-7 pt-6 border-t border-[#e2bfb5]/60">
+          {['GPS Attendance', 'Auto Payroll', 'Leave Mgmt', 'Expenses'].map(f => (
+            <span
+              key={f}
+              className="text-[10px] font-semibold px-2.5 py-1 rounded-full"
+              style={{ background: 'rgba(170,48,0,0.07)', color: '#aa3000' }}
+            >
+              {f}
+            </span>
+          ))}
+        </div>
+      </RightPanel>
     </div>
   );
 }
