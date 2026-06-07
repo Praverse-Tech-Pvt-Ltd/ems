@@ -223,7 +223,7 @@ async function main() {
         lastName: 'Shrivastav',
         passwordHash: adminHash,
         role: Role.SUPER_ADMIN,
-        designation: 'Project Manager',
+        designation: 'Director',
         salaryGrade: 'PERMANENT_FIXED_VARIABLE',
         grossSalary: 200000,
         joiningDate: new Date('2024-01-01'),
@@ -273,7 +273,23 @@ async function main() {
 
   // ── Departments ──────────────────────────────────────────────────────────────
   console.log(`\n── Seeding Departments ──────────────────────────`);
-  
+
+  const pmDept = await prisma.department.upsert({
+    where: { name: 'Project Management' },
+    update: {},
+    create: { name: 'Project Management' },
+  });
+  console.log(`✓ Department: Project Management`);
+
+  // Assign Ashwani and Pratham to Project Management
+  if (superAdmin) {
+    await prisma.employee.update({ where: { id: superAdmin.id }, data: { departmentId: pmDept.id, designation: 'Managing Director' } });
+  }
+  if (admin) {
+    await prisma.employee.update({ where: { id: admin.id }, data: { departmentId: pmDept.id, designation: 'Director' } });
+  }
+  console.log(`✓ Ashwani & Pratham → Project Management dept`);
+
   const qaDept = await prisma.department.upsert({
     where: { name: 'Quality Assurance' },
     update: {},
