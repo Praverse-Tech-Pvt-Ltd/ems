@@ -334,7 +334,7 @@ export default function LoginPage() {
   /* ── Forgot password ─────────────────────────────────────────────────────── */
   if (view === 'forgot') {
     return (
-      <div className="min-h-screen relative">
+      <div className="min-h-screen w-full flex-1 relative">
         <FullScreenBackdrop />
         <RightPanel>
           {resetDone ? (
@@ -396,7 +396,7 @@ export default function LoginPage() {
 
   /* ── Login ───────────────────────────────────────────────────────────────── */
   return (
-    <div className="min-h-screen relative">
+    <div className="min-h-screen w-full flex-1 relative">
       <FullScreenBackdrop />
 
       <RightPanel>

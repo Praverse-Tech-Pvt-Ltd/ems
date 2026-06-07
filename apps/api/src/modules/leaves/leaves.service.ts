@@ -1,9 +1,19 @@
 import { Injectable, BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../../common/prisma/prisma.service';
 
 // Validated against the DB constraint — Prisma does not export a LeaveRequest
 // status enum; these are the only values the schema accepts.
 const VALID_LEAVE_STATUSES = new Set(['PENDING', 'APPROVED', 'REJECTED']);
+
+// Annual quota refilled fresh each year — unused days do NOT roll over.
+const ANNUAL_LEAVE_QUOTA: { leaveType: 'SL' | 'CL' | 'PL' | 'UL' | 'CO'; totalDays: number }[] = [
+  { leaveType: 'SL', totalDays: 7 },
+  { leaveType: 'CL', totalDays: 7 },
+  { leaveType: 'PL', totalDays: 14 },
+  { leaveType: 'UL', totalDays: 0 },
+  { leaveType: 'CO', totalDays: 0 },
+];
 
 export interface CreateLeaveData {
   leaveType: 'CL' | 'SL' | 'PL' | 'UL' | 'CO';
@@ -135,5 +145,45 @@ export class LeavesService {
     }
 
     return updated;
+  }
+
+  // Refills every active employee's leave balance for the new year with the
+  // standard annual quota — unused days from the previous year are dropped,
+  // not carried over (each year gets its own LeaveBalance row, no rollover).
+  // Fires at 23:59 on Dec 31 — pre-creates next year's balances so every
+  // employee starts the new year freshly refilled with no carried-over days.
+  @Cron('59 23 31 12 *', { timeZone: 'Asia/Kolkata' })
+  async refillAnnualLeaveBalances() {
+    return this.refillLeaveBalancesForYear(new Date().getFullYear() + 1);
+  }
+
+  async refillLeaveBalancesForYear(year: number) {
+    const employees = await this.prisma.employee.findMany({
+      where: { status: { not: 'TERMINATED' } },
+      select: { id: true, salaryGrade: true, designation: true },
+    });
+
+    let refilled = 0;
+    for (const employee of employees) {
+      const isIntern =
+        employee.salaryGrade === 'INTERN' ||
+        employee.designation?.toLowerCase().includes('intern');
+
+      await Promise.all(
+        ANNUAL_LEAVE_QUOTA.map(({ leaveType, totalDays }) => {
+          const quota = isIntern && leaveType !== 'UL' && leaveType !== 'CO' ? 0 : totalDays;
+          return this.prisma.leaveBalance.upsert({
+            where: {
+              employeeId_leaveType_year: { employeeId: employee.id, leaveType, year },
+            },
+            create: { employeeId: employee.id, leaveType, year, totalDays: quota, usedDays: 0 },
+            update: { totalDays: quota, usedDays: 0 },
+          });
+        }),
+      );
+      refilled++;
+    }
+
+    return { year, refilled };
   }
 }
