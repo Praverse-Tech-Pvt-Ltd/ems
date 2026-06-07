@@ -39,10 +39,13 @@ import { ZohoSyncModule } from './modules/zoho-sync/zoho-sync.module';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
-    // Default: 100 requests per 60 s per IP.
+    // Default: 300 requests per 60 s per IP — raised from 100 because the
+    // dashboard fires many parallel widget/detail requests per navigation and
+    // an office shares one IP across the whole team, which was tripping 429s
+    // during normal use.
     // Auth endpoints override this with a stricter 'auth' named throttler (5/60s).
     ThrottlerModule.forRoot([
-      { name: 'default', ttl: 60_000, limit: 100 },
+      { name: 'default', ttl: 60_000, limit: 300 },
       { name: 'auth', ttl: 60_000, limit: 5 },
     ]),
     ScheduleModule.forRoot(),
