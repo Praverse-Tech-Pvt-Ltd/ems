@@ -369,4 +369,5 @@ export const stitchPages: Record<string, StitchPageConfig> = {
 
 export const routeAliases: Record<string, keyof typeof stitchPages> = {
   'owner-command-center': 'nexus-operational-intelligence',
+  'dashboard': 'employee-my-workday',
 };

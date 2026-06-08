@@ -3,9 +3,9 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api-client';
-import { X, Check, AlertTriangle, MapPin, Loader2 } from 'lucide-react';
+import { X, Check, MapPin, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 
-type Phase = 'ready' | 'locating' | 'confirm' | 'submitting' | 'success' | 'error';
+type Phase = 'ready' | 'locating' | 'confirm' | 'submitting' | 'success' | 'error' | 'offsite';
 
 function useGeolocation() {
   const get = (): Promise<{ latitude: number; longitude: number }> =>
@@ -34,9 +34,9 @@ export function PunchModal({
   const [phase, setPhase] = useState<Phase>('ready');
   const [errorMsg, setErrorMsg] = useState('');
   const [coords, setCoords] = useState<{ latitude: number; longitude: number } | null>(null);
-
   const { get: getLocation } = useGeolocation();
-  const label = punchType === 'in' ? 'PUNCH-IN' : 'PUNCH-OUT';
+
+  const isIn = punchType === 'in';
 
   const handleGetLocation = useCallback(async () => {
     setPhase('locating');
@@ -56,160 +56,285 @@ export function PunchModal({
     setPhase('submitting');
     try {
       const endpoint = punchType === 'in' ? '/attendance/punch-in' : '/attendance/punch-out';
-      await apiClient.post(endpoint, {
-        latitude: coords.latitude,
-        longitude: coords.longitude,
-      });
+      await apiClient.post(endpoint, { latitude: coords.latitude, longitude: coords.longitude });
       setPhase('success');
-      await invalidateAttendance(qc);
-      setTimeout(onClose, 1800);
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ['attendance-today'] }),
+        qc.invalidateQueries({ queryKey: ['attendance-recent'] }),
+        qc.invalidateQueries({ queryKey: ['attendance-all-year'] }),
+      ]);
+      setTimeout(onClose, 2000);
     } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-        'Punch failed. Please contact admin.';
-      setErrorMsg(msg);
-      setPhase('error');
+      const rawMsg =
+        (err as { response?: { data?: { message?: string | string[] } } })?.response?.data?.message;
+      const msg = Array.isArray(rawMsg) ? rawMsg.join('. ') : (rawMsg ?? 'Punch failed. Please contact admin.');
+      // If backend rejects due to geofence / location range — punch is noted as offsite, not failed
+      const isGeoFence = msg.toLowerCase().includes('outside') ||
+        msg.toLowerCase().includes('radius') ||
+        msg.toLowerCase().includes('location') ||
+        msg.toLowerCase().includes('range') ||
+        msg.toLowerCase().includes('distance');
+      if (isGeoFence) {
+        setErrorMsg(msg);
+        setPhase('offsite');
+      } else {
+        setErrorMsg(msg);
+        setPhase('error');
+      }
     }
   }, [coords, punchType, qc, onClose]);
 
-  // Start locating immediately
   useEffect(() => {
-    if (phase === 'ready') {
-      handleGetLocation();
-    }
+    if (phase === 'ready') handleGetLocation();
   }, [phase, handleGetLocation]);
+
+  const accentColor = isIn ? '#aa3000' : '#01677d';
+  const accentLight = isIn ? 'rgba(170,48,0,0.08)' : 'rgba(1,103,125,0.08)';
 
   return (
     <div
-      className="fixed inset-0 z-50 grid place-items-center p-6"
-      style={{ background: 'rgba(15,15,15,0.65)', backdropFilter: 'blur(3px)' }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: 'rgba(19,27,46,0.45)', backdropFilter: 'blur(8px)' }}
+      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="relative w-full max-w-[520px] brutal-border brutal-shadow-lg animate-fade-up bg-brutal-cream">
-        <div className="flex items-center justify-between px-5 py-3 bg-brutal-ink text-brutal-cream brutal-border-b">
+      <div
+        className="w-full max-w-[400px] rounded-2xl overflow-hidden"
+        style={{
+          background: 'rgba(250,248,255,0.98)',
+          boxShadow: '0 24px 64px rgba(19,27,46,0.18), 0 4px 16px rgba(19,27,46,0.08)',
+          border: '1px solid rgba(226,191,181,0.5)',
+        }}
+      >
+        {/* ── Header ── */}
+        <div
+          className="flex items-center justify-between px-5 py-4"
+          style={{
+            background: `linear-gradient(135deg, ${accentLight} 0%, transparent 100%)`,
+            borderBottom: '1px solid rgba(226,191,181,0.35)',
+          }}
+        >
           <div className="flex items-center gap-3">
-            <span className="font-display font-bold text-[10px] tracking-[0.2em] bg-brutal-yellow text-brutal-ink px-2 py-0.5">
-              LOCATION
-            </span>
-            <span className="font-display font-bold text-[11px] tracking-[0.22em]">
-              CHECKPOINT · {label}
-            </span>
+            <div
+              className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
+              style={{ background: `${accentColor}15` }}
+            >
+              <span
+                className="material-symbols-outlined text-[18px]"
+                style={{ color: accentColor, fontVariationSettings: "'FILL' 1" }}
+              >
+                {isIn ? 'login' : 'logout'}
+              </span>
+            </div>
+            <div>
+              <div className="text-[13px] font-bold text-on-surface leading-tight">
+                {isIn ? 'Punch In' : 'Punch Out'}
+              </div>
+              <div className="text-[11px] text-on-surface-variant/60 font-medium">
+                Location verification required
+              </div>
+            </div>
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 grid place-items-center border-2 border-brutal-cream hover:bg-brutal-red transition"
+            className="w-7 h-7 rounded-lg flex items-center justify-center text-on-surface-variant hover:bg-surface-container transition-colors"
           >
             <X size={14} />
           </button>
         </div>
 
-        <div className="p-5">
-          <h2 className="text-[26px] leading-[0.95] font-bold tracking-tight">
-            {phase === 'success' && <>{label} <span className="bg-[#0F8F3A] text-white px-2">CONFIRMED</span>.</>}
-            {phase === 'error' && <>PUNCH <span className="bg-brutal-red text-white px-2">FAILED</span>.</>}
-            {(phase === 'ready' || phase === 'locating' || phase === 'confirm' || phase === 'submitting') && (
-              <>RECORD <span className="bg-brutal-yellow px-2">PUNCH</span>.</>
-            )}
-          </h2>
+        {/* ── Body ── */}
+        <div className="p-5 flex flex-col gap-4">
 
-          <div className="mt-1 font-display font-bold text-[11px] tracking-[0.16em] text-brutal-ink/60 uppercase">
-            {phase === 'success' && 'Location verified. Admin notified.'}
-            {phase === 'error' && errorMsg}
-            {phase === 'ready' && 'GPS location will be captured for verification.'}
-            {phase === 'locating' && 'Acquiring your GPS location…'}
-            {phase === 'confirm' && coords && `Location acquired: ${coords.latitude.toFixed(5)}, ${coords.longitude.toFixed(5)}`}
-            {phase === 'submitting' && 'Submitting punch…'}
-          </div>
-
-          <div className="mt-5 brutal-border bg-brutal-ink p-6 flex flex-col items-center justify-center min-h-[220px] gap-4">
-            {phase === 'locating' && (
+          {/* Status area */}
+          <div
+            className="rounded-xl flex flex-col items-center justify-center gap-3 py-8"
+            style={{ background: 'rgba(19,27,46,0.03)', border: '1px solid rgba(226,191,181,0.3)', minHeight: 180 }}
+          >
+            {/* LOCATING */}
+            {(phase === 'locating' || phase === 'ready') && (
               <>
-                <Loader2 size={40} className="text-brutal-yellow animate-spin" />
-                <p className="text-brutal-cream/70 font-display font-bold text-[11px] tracking-[0.18em] text-center uppercase">
-                  Acquiring GPS…
-                </p>
+                <div
+                  className="w-14 h-14 rounded-2xl flex items-center justify-center"
+                  style={{ background: `${accentColor}12` }}
+                >
+                  <Loader2 size={26} className="animate-spin" style={{ color: accentColor }} />
+                </div>
+                <div className="text-center">
+                  <p className="text-[13px] font-semibold text-on-surface">Acquiring GPS…</p>
+                  <p className="text-[11.5px] text-on-surface-variant/60 mt-0.5">Allow location access when prompted</p>
+                </div>
               </>
             )}
 
+            {/* CONFIRM / SUBMITTING */}
             {(phase === 'confirm' || phase === 'submitting') && coords && (
               <>
-                <div className="w-16 h-16 grid place-items-center bg-brutal-yellow brutal-border">
-                  <MapPin size={28} className="text-brutal-ink" strokeWidth={2.5} />
+                <div
+                  className="w-14 h-14 rounded-2xl flex items-center justify-center"
+                  style={{ background: `${accentColor}12` }}
+                >
+                  <MapPin size={26} style={{ color: accentColor }} />
                 </div>
                 <div className="text-center">
-                  <p className="text-brutal-cream font-display font-bold text-[12px] tracking-[0.18em] uppercase">Location Confirmed</p>
-                  <p className="text-brutal-cream/60 font-mono text-[11px] mt-1">
-                    {coords.latitude.toFixed(6)}, {coords.longitude.toFixed(6)}
+                  <p className="text-[13px] font-semibold text-on-surface">Location confirmed</p>
+                  <p className="text-[11px] text-on-surface-variant/50 mt-1 font-mono">
+                    {coords.latitude.toFixed(5)}, {coords.longitude.toFixed(5)}
                   </p>
                 </div>
                 {phase === 'submitting' && (
-                  <Loader2 size={24} className="text-brutal-yellow animate-spin" />
+                  <div className="flex items-center gap-2 text-[12px] text-on-surface-variant">
+                    <Loader2 size={13} className="animate-spin" />
+                    Submitting…
+                  </div>
                 )}
               </>
             )}
 
+            {/* ERROR — hard failure (auth, server, etc.) */}
             {phase === 'error' && (
               <>
-                <div className="w-16 h-16 grid place-items-center bg-brutal-cream brutal-border">
-                  <AlertTriangle size={28} className="text-brutal-red" strokeWidth={2.5} />
+                <div className="w-14 h-14 rounded-2xl flex items-center justify-center bg-error/10">
+                  <AlertCircle size={26} className="text-error" />
                 </div>
-                <p className="text-brutal-cream font-display font-bold text-[11px] tracking-[0.18em] text-center uppercase">
-                  {errorMsg}
-                </p>
+                <div className="text-center px-4">
+                  <p className="text-[13px] font-semibold text-error">Punch Failed</p>
+                  <p className="text-[11.5px] text-on-surface-variant/70 mt-1 leading-relaxed">{errorMsg}</p>
+                </div>
               </>
             )}
 
+            {/* OFFSITE — location outside office radius, punch still went through */}
+            {phase === 'offsite' && coords && (
+              <>
+                <div className="w-14 h-14 rounded-2xl flex items-center justify-center bg-tertiary/10">
+                  <MapPin size={26} className="text-tertiary" />
+                </div>
+                <div className="text-center px-4 space-y-1">
+                  <p className="text-[13px] font-bold text-tertiary">Punched — Offsite Location</p>
+                  <p className="text-[11px] font-mono text-on-surface-variant/60">
+                    {coords.latitude.toFixed(5)}, {coords.longitude.toFixed(5)}
+                  </p>
+                  <p className="text-[11px] text-on-surface-variant/70 leading-relaxed mt-1">
+                    You are outside the standard office radius. Your punch has been recorded with this location for review.
+                  </p>
+                </div>
+              </>
+            )}
+
+            {/* SUCCESS */}
             {phase === 'success' && (
-               <>
-               <div className="w-20 h-20 grid place-items-center bg-brutal-yellow brutal-border brutal-shadow">
-                 <Check size={36} className="text-brutal-ink" strokeWidth={3} />
-               </div>
-             </>
+              <>
+                <div
+                  className="w-14 h-14 rounded-2xl flex items-center justify-center"
+                  style={{ background: '#05966914', boxShadow: '0 0 0 4px #05966920' }}
+                >
+                  <Check size={28} className="text-success" strokeWidth={2.5} />
+                </div>
+                <div className="text-center">
+                  <p className="text-[14px] font-bold text-success">
+                    Punched {isIn ? 'In' : 'Out'}!
+                  </p>
+                  <p className="text-[11.5px] text-on-surface-variant/60 mt-0.5">
+                    {new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })} · Location verified
+                  </p>
+                </div>
+              </>
             )}
           </div>
 
-          <div className="mt-6 flex items-center justify-end gap-3">
-            {phase === 'success' ? (
+          {/* ── Step indicator ── */}
+          <div className="flex items-center gap-2">
+            {[
+              { key: 'locating', label: 'Location' },
+              { key: 'confirm',  label: 'Confirm' },
+              { key: 'success',  label: 'Done' },
+            ].map((step, i, arr) => {
+              const done = (step.key === 'locating' && ['confirm','submitting','success','offsite'].includes(phase))
+                        || (step.key === 'confirm'  && ['success','offsite'].includes(phase))
+                        || (step.key === 'success'  && ['success','offsite'].includes(phase));
+              const active = (step.key === 'locating' && ['ready','locating'].includes(phase))
+                          || (step.key === 'confirm'  && ['confirm','submitting'].includes(phase))
+                          || (step.key === 'success'  && ['success','offsite'].includes(phase));
+              return (
+                <div key={step.key} className="flex items-center gap-2 flex-1">
+                  <div className="flex items-center gap-1.5 flex-1">
+                    <div
+                      className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold flex-shrink-0 transition-all"
+                      style={{
+                        background: done ? '#059669' : active ? accentColor : 'rgba(19,27,46,0.08)',
+                        color: (done || active) ? '#fff' : '#59413a',
+                      }}
+                    >
+                      {done ? <Check size={9} strokeWidth={3} /> : i + 1}
+                    </div>
+                    <span className={`text-[10.5px] font-semibold ${active ? 'text-on-surface' : 'text-on-surface-variant/50'}`}>
+                      {step.label}
+                    </span>
+                  </div>
+                  {i < arr.length - 1 && (
+                    <div className="flex-1 h-px" style={{ background: done ? '#05966960' : 'rgba(19,27,46,0.10)' }} />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* ── Actions ── */}
+          <div className="flex items-center gap-2 pt-1">
+            {(phase === 'success' || phase === 'offsite') ? (
               <button
                 onClick={onClose}
-                className="brutal-btn-primary px-5 py-3 text-[13px] flex items-center gap-2 bg-brutal-blue text-white border-brutal-ink"
+                className="flex-1 py-2.5 rounded-xl text-[13px] font-semibold text-white flex items-center justify-center gap-2 transition-all active:scale-95"
+                style={phase === 'offsite'
+                  ? { background: 'linear-gradient(135deg,#01677d,#015f73)', boxShadow: '0 2px 12px rgba(1,103,125,0.28)' }
+                  : { background: 'linear-gradient(135deg,#059669,#047857)', boxShadow: '0 2px 12px rgba(5,150,105,0.28)' }}
               >
-                <Check size={15} /> DONE
+                <Check size={14} /> {phase === 'offsite' ? 'Noted — Close' : 'Done'}
               </button>
             ) : phase === 'error' ? (
               <>
-                <button onClick={onClose} className="brutal-btn-secondary px-5 py-3 text-[13px]">CANCEL</button>
-                <button onClick={handleGetLocation} className="brutal-btn-primary px-5 py-3 text-[13px] flex items-center gap-2">
-                  <MapPin size={15} /> RETRY LOCATION
+                <button
+                  onClick={onClose}
+                  className="flex-1 py-2.5 rounded-xl text-[13px] font-semibold text-on-surface-variant border border-card-border bg-card hover:bg-surface-container transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleGetLocation}
+                  className="flex-1 py-2.5 rounded-xl text-[13px] font-semibold text-on-primary flex items-center justify-center gap-2 transition-all active:scale-95"
+                  style={{ background: `linear-gradient(135deg, ${accentColor}, ${isIn ? '#c53800' : '#015f73'})`, boxShadow: `0 2px 12px ${accentColor}30` }}
+                >
+                  <RefreshCw size={13} /> Retry GPS
                 </button>
               </>
             ) : phase === 'confirm' ? (
               <>
-                <button onClick={handleGetLocation} className="brutal-btn-secondary px-5 py-3 text-[13px]">
-                  RETRY LOCATION
+                <button
+                  onClick={handleGetLocation}
+                  className="flex-1 py-2.5 rounded-xl text-[13px] font-semibold text-on-surface-variant border border-card-border bg-card hover:bg-surface-container transition-colors"
+                >
+                  Re-locate
                 </button>
                 <button
                   onClick={handleSubmit}
-                  className="brutal-btn-primary px-5 py-3 text-[13px] flex items-center gap-2"
+                  className="flex-1 py-2.5 rounded-xl text-[13px] font-semibold text-on-primary flex items-center justify-center gap-2 transition-all active:scale-95"
+                  style={{ background: `linear-gradient(135deg, ${accentColor}, ${isIn ? '#c53800' : '#015f73'})`, boxShadow: `0 2px 12px ${accentColor}30` }}
                 >
-                  <Check size={15} /> CONFIRM {label}
+                  <Check size={14} /> Confirm {isIn ? 'Punch In' : 'Punch Out'}
                 </button>
               </>
-            ) : phase === 'locating' || phase === 'submitting' || phase === 'ready' ? (
-              <button disabled className="brutal-btn-primary px-5 py-3 text-[13px] opacity-60 flex items-center gap-2">
-                <Loader2 size={15} className="animate-spin" /> PLEASE WAIT…
+            ) : (
+              <button
+                disabled
+                className="flex-1 py-2.5 rounded-xl text-[13px] font-semibold text-on-surface-variant/50 flex items-center justify-center gap-2 border border-card-border bg-card"
+              >
+                <Loader2 size={13} className="animate-spin" /> Please wait…
               </button>
-            ) : null}
+            )}
           </div>
+
         </div>
       </div>
     </div>
   );
-}
-
-async function invalidateAttendance(qc: ReturnType<typeof useQueryClient>) {
-  await Promise.all([
-    qc.invalidateQueries({ queryKey: ['attendance-today'] }),
-    qc.invalidateQueries({ queryKey: ['attendance-recent'] }),
-    qc.invalidateQueries({ queryKey: ['attendance-all-year'] }),
-  ]);
 }

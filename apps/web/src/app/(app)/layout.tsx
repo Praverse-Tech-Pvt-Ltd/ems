@@ -44,32 +44,36 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   if (!authReady) {
     return (
-      <div className="min-h-screen flex items-center justify-center w-full">
+      <div className="min-h-screen flex items-center justify-center bg-background">
         <span className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
   return (
-    <>
-      <AppTopNav onMenuOpen={() => setNavOpen(!navOpen)} />
-      
-      {/* Mobile Sidebar Overlay */}
+    <div className="flex h-screen w-full overflow-hidden bg-background">
+      {/* Mobile sidebar overlay */}
       {navOpen && (
-         <div className="md:hidden fixed inset-0 z-40 bg-black/50" onClick={() => setNavOpen(false)}>
-           <div onClick={(event) => event.stopPropagation()}>
-             <AppSidebar className="flex" onNavigate={() => setNavOpen(false)} />
-           </div>
-         </div>
+        <div
+          className="md:hidden fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
+          onClick={() => setNavOpen(false)}
+        >
+          <div className="absolute left-0 top-0 h-full" onClick={(e) => e.stopPropagation()}>
+            <AppSidebar className="flex h-full" onNavigate={() => setNavOpen(false)} />
+          </div>
+        </div>
       )}
-      
-      {/* Desktop Sidebar */}
+
+      {/* Desktop sidebar — always visible */}
       <AppSidebar className="hidden md:flex" />
 
-      {/* Main Content */}
-      <main className="flex-1 md:ml-[280px] p-margin-mobile md:p-margin-desktop bg-surface-bright flex flex-col gap-lg w-full">
-        {children}
-      </main>
-    </>
+      {/* Right column: top nav + scrollable content */}
+      <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
+        <AppTopNav onMenuOpen={() => setNavOpen(!navOpen)} />
+        <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-8 bg-background">
+          {children}
+        </main>
+      </div>
+    </div>
   );
 }

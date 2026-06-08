@@ -5,17 +5,18 @@ import { clientsService } from '@/lib/api/clients';
 import { useAuthStore } from '@/store/auth.store';
 
 const STATUS_COLOR: Record<string, string> = {
-  ACTIVE: 'bg-tertiary/10 text-tertiary border-tertiary/20',
-  ONBOARDING: 'bg-primary/10 text-primary border-primary/20',
-  AT_RISK: 'bg-error/10 text-error border-error/20',
-  RENEWAL: 'bg-on-surface-variant/10 text-on-surface-variant border-outline-variant/30',
-  INACTIVE: 'bg-on-surface-variant/10 text-on-surface-variant border-outline-variant/30',
+  ACTIVE: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20',
+  ONBOARDING: 'bg-indigo-500/10 text-indigo-500 border-indigo-500/20',
+  AT_RISK: 'bg-rose-500/10 text-rose-500 border-rose-500/20',
+  RENEWAL: 'bg-amber-500/10 text-amber-500 border-amber-500/20',
+  INACTIVE: 'bg-slate-500/10 text-slate-500 border-slate-500/20',
 };
+
 const CRITICALITY_COLOR: Record<string, string> = {
-  LOW: 'text-tertiary',
-  MEDIUM: 'text-primary',
-  HIGH: 'text-error',
-  CRITICAL: 'text-error',
+  LOW: 'bg-slate-500/10 text-slate-500 border-slate-500/20',
+  MEDIUM: 'bg-amber-500/10 text-amber-500 border-amber-500/20',
+  HIGH: 'bg-rose-500/10 text-rose-500 border-rose-500/20',
+  CRITICAL: 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border-rose-500/30',
 };
 
 const TIMELINE_ICON: Record<string, string> = {
@@ -35,20 +36,21 @@ const TIMELINE_ICON: Record<string, string> = {
 };
 
 function HealthRing({ score }: { score: number }) {
-  const r = 22;
+  const r = 20;
   const circ = 2 * Math.PI * r;
   const dash = (score / 100) * circ;
-  const color = score >= 80 ? '#4CAF50' : score >= 60 ? '#2196F3' : '#F44336';
+  const color = score >= 80 ? 'text-emerald-500' : score >= 60 ? 'text-amber-500' : 'text-rose-500';
   return (
-    <svg viewBox="0 0 56 56" className="w-14 h-14 -rotate-90">
-      <circle cx="28" cy="28" r={r} fill="none" strokeWidth="5" stroke="currentColor" className="text-surface-container-highest" />
-      <circle cx="28" cy="28" r={r} fill="none" strokeWidth="5" stroke={color}
-        strokeDasharray={`${dash} ${circ}`} strokeLinecap="round" />
-      <text x="28" y="28" textAnchor="middle" dominantBaseline="middle"
-        className="rotate-90" style={{ transform: 'rotate(90deg)', transformOrigin: '28px 28px', fontSize: '11px', fontWeight: 700, fill: 'currentColor' }}>
+    <div className="relative w-12 h-12 shrink-0">
+      <svg viewBox="0 0 48 48" className="w-full h-full -rotate-90">
+        <circle cx="24" cy="24" r={r} fill="none" strokeWidth="4" className="text-slate-100 dark:text-slate-800" stroke="currentColor" />
+        <circle cx="24" cy="24" r={r} fill="none" strokeWidth="4" className={color} stroke="currentColor"
+          strokeDasharray={`${dash} ${circ}`} strokeLinecap="round" />
+      </svg>
+      <div className="absolute inset-0 flex items-center justify-center text-[10px] font-bold font-mono text-slate-800 dark:text-white">
         {score}
-      </text>
-    </svg>
+      </div>
+    </div>
   );
 }
 
@@ -110,22 +112,22 @@ export default function ClientCompaniesOverviewPage() {
   };
 
   return (
-    <div className="flex flex-col gap-lg">
+    <div className="flex flex-col gap-lg animate-fade-in">
       {/* Header */}
-      <div className="border-b border-outline-variant/30 pb-sm">
-        <div className="font-label-caps text-label-caps text-primary tracking-widest flex items-center gap-xs mb-xs">
-          <span className="material-symbols-outlined text-[18px]">domain</span>
+      <div className="border-b border-slate-200 dark:border-slate-800 pb-sm">
+        <div className="font-label-caps text-label-caps text-indigo-500 dark:text-indigo-400 tracking-widest flex items-center gap-xs mb-xs font-bold">
+          <span className="material-symbols-outlined text-[18px]">corporate_fare</span>
           CLIENTS
         </div>
         <div className="flex items-end justify-between gap-md flex-wrap">
           <div>
-            <h2 className="font-display-lg text-display-lg text-on-surface hidden md:block">Client Companies</h2>
-            <h2 className="font-headline-lg-mobile text-headline-lg-mobile text-on-surface md:hidden">Client Companies</h2>
-            <p className="text-on-surface-variant mt-xs">Portfolio overview, health scores, and relationship status.</p>
+            <h2 className="font-display-lg text-display-lg text-slate-800 dark:text-white hidden md:block">Client Portfolios</h2>
+            <h2 className="font-headline-lg-mobile text-headline-lg-mobile text-slate-800 dark:text-white md:hidden">Client Portfolios</h2>
+            <p className="text-slate-400 dark:text-slate-500 mt-xs text-sm">Portfolio overview, health scores, and critical relationships tracking.</p>
           </div>
           {isAdmin && (
-            <button className="flex items-center gap-xs text-label-caps font-label-caps bg-primary text-on-primary px-4 py-2 rounded-full hover:opacity-90 shrink-0">
-              <span className="material-symbols-outlined text-[16px]">add</span>Add Client
+            <button className="flex items-center gap-xs text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-full shadow-lg shadow-indigo-600/15 transition-all shrink-0">
+              <span className="material-symbols-outlined text-[16px]">add</span>Add Client Portfolio
             </button>
           )}
         </div>
@@ -135,94 +137,121 @@ export default function ClientCompaniesOverviewPage() {
       {!loading && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-sm">
           {pipeline.map(p => (
-            <button key={p.stage} onClick={() => setStatusFilter(p.stage === statusFilter ? '' : p.stage)}
-              className={`glass-card rounded-2xl p-md border text-left transition-all hover:-translate-y-0.5 ${statusFilter === p.stage ? 'border-primary bg-primary/5' : 'border-outline-variant/30'}`}>
-              <p className="font-black text-3xl text-on-surface">{p.count}</p>
-              <p className="text-body-sm text-on-surface-variant mt-xs">{p.stage}</p>
+            <button 
+              key={p.stage} 
+              onClick={() => setStatusFilter(p.stage === statusFilter ? '' : p.stage)}
+              className={`bg-white dark:bg-[#111c2e] rounded-3xl p-5 border text-left transition-all hover:shadow-md ${statusFilter === p.stage ? 'border-indigo-500 shadow-md ring-1 ring-indigo-500' : 'border-slate-200 dark:border-slate-800'}`}
+            >
+              <p className="font-extrabold text-2xl text-slate-800 dark:text-white font-mono">{p.count}</p>
+              <p className="text-[11px] font-bold tracking-wider text-slate-400 dark:text-slate-500 uppercase mt-1">{p.stage.replace(/_/g, ' ')}</p>
             </button>
           ))}
         </div>
       )}
 
-      {/* Search */}
+      {/* Search & filters */}
       <div className="flex gap-sm flex-wrap items-center">
-        <div className="relative flex-1 min-w-[200px]">
-          <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-[18px]">search</span>
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search companies..."
-            className="w-full pl-9 pr-sm py-2.5 border border-outline-variant/50 rounded-xl text-body-sm bg-surface-container-lowest focus:border-primary focus:outline-none" />
+        <div className="relative flex-1 min-w-[240px]">
+          <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">search</span>
+          <input 
+            value={search} 
+            onChange={e => setSearch(e.target.value)} 
+            placeholder="Search companies by name or sector..."
+            className="w-full pl-10 pr-4 py-2 border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-[#0f172a] rounded-full text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500" 
+          />
         </div>
         {statusFilter && (
-          <button onClick={() => setStatusFilter('')} className="text-[11px] text-primary border border-primary/30 px-3 py-1.5 rounded-full hover:bg-primary/5">
-            Clear: {statusFilter}
+          <button 
+            onClick={() => setStatusFilter('')} 
+            className="text-[10px] font-bold text-indigo-500 border border-indigo-500/20 bg-indigo-500/5 px-4.5 py-2 rounded-full hover:bg-indigo-500/10 transition-colors"
+          >
+            Clear Filter: {statusFilter.replace(/_/g, ' ')}
           </button>
         )}
       </div>
 
-      {/* Company cards */}
+      {/* Company cards grid */}
       {loading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-sm">
-          {[1, 2, 3, 4, 5, 6].map(i => <div key={i} className="h-48 rounded-2xl bg-surface-container-high animate-pulse" />)}
+          {[1, 2, 3, 4, 5, 6].map(i => (
+            <div key={i} className="h-52 rounded-3xl bg-slate-200 dark:bg-slate-800/50 animate-pulse" />
+          ))}
         </div>
       ) : filtered.length === 0 ? (
-        <div className="glass-card rounded-xl p-lg text-center text-on-surface-variant border border-outline-variant/30">
+        <div className="bg-white dark:bg-[#111c2e] border border-slate-200 dark:border-slate-800 rounded-3xl p-lg text-center text-slate-400 dark:text-slate-500 text-sm">
           {search || statusFilter ? 'No companies match your filters.' : 'No client companies found.'}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-sm">
           {filtered.map(company => (
-            <div key={company.id} className="glass-card rounded-2xl border border-outline-variant/30 overflow-hidden hover:-translate-y-0.5 hover:shadow-md transition-all">
-              <div className="p-md flex flex-col gap-md">
-                <div className="flex items-start justify-between gap-sm">
-                  <div className="flex items-center gap-sm">
-                    <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-black text-sm shrink-0">
-                      {company.name?.slice(0, 2).toUpperCase()}
+            <div 
+              key={company.id} 
+              className="bg-white dark:bg-[#111c2e] border border-slate-200 dark:border-slate-800 rounded-3xl overflow-hidden hover:shadow-lg transition-all"
+            >
+              <div className="p-5 flex flex-col justify-between min-h-[220px]">
+                <div>
+                  <div className="flex items-start justify-between gap-sm">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-2xl bg-indigo-500/10 text-indigo-500 flex items-center justify-center font-extrabold text-sm shrink-0 border border-indigo-500/20">
+                        {company.name?.slice(0, 2).toUpperCase()}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-extrabold text-sm text-slate-800 dark:text-white leading-tight truncate">{company.name}</p>
+                        <p className="text-[10px] text-slate-400 font-semibold mt-0.5">{company.sector ?? 'Pharma'}</p>
+                      </div>
                     </div>
-                    <div className="min-w-0">
-                      <p className="font-semibold text-on-surface text-sm leading-tight">{company.name}</p>
-                      <p className="text-[10px] text-on-surface-variant">{company.sector ?? 'Pharma'}</p>
+                    
+                    <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border shrink-0 ${STATUS_COLOR[company.status] ?? 'bg-slate-500/10 text-slate-500 border-slate-500/20'}`}>
+                      {company.status}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-4 mt-4 py-3 border-t border-slate-100 dark:border-slate-800/60">
+                    <HealthRing score={company.healthScore ?? 75} />
+                    <div className="flex-grow flex flex-col gap-1 text-[11px] text-slate-500 dark:text-slate-400">
+                      <div className="flex justify-between">
+                        <span>Operational Health</span>
+                        <span className="font-bold text-slate-700 dark:text-slate-300 font-mono">{company.healthScore ?? 75}/100</span>
+                      </div>
+                      {company.criticality && (
+                        <div className="flex justify-between">
+                          <span>Risk Profile</span>
+                          <span className={`px-2 py-0.2 rounded-full text-[9px] font-bold border ${CRITICALITY_COLOR[company.criticality]}`}>
+                            {company.criticality}
+                          </span>
+                        </div>
+                      )}
+                      {company.lastVisitDate && (
+                        <div className="flex justify-between">
+                          <span>Last Sync Audit</span>
+                          <span className="text-slate-700 dark:text-slate-300 font-mono">
+                            {new Date(company.lastVisitDate).toLocaleDateString('en-IN')}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
-                  <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full border shrink-0 ${STATUS_COLOR[company.status] ?? 'bg-surface-container-high text-on-surface-variant border-outline-variant/30'}`}>
-                    {company.status}
-                  </span>
+
+                  {company.aiSummary && (
+                    <p className="text-[10px] text-slate-400 dark:text-slate-500 leading-relaxed line-clamp-2 bg-slate-50 dark:bg-slate-900/40 rounded-xl px-3 py-2 italic mt-2 border border-slate-100 dark:border-slate-800">
+                      "{company.aiSummary}"
+                    </p>
+                  )}
                 </div>
 
-                <div className="flex items-center gap-md">
-                  <HealthRing score={company.healthScore ?? 75} />
-                  <div className="flex-1 flex flex-col gap-xs">
-                    <div className="flex justify-between text-xs">
-                      <span className="text-on-surface-variant">Health Score</span>
-                      <span className={`font-bold ${CRITICALITY_COLOR[company.criticality] ?? 'text-on-surface'}`}>{company.healthScore ?? 75}/100</span>
-                    </div>
-                    {company.criticality && (
-                      <div className="flex justify-between text-xs">
-                        <span className="text-on-surface-variant">Priority</span>
-                        <span className={`font-bold ${CRITICALITY_COLOR[company.criticality]}`}>{company.criticality}</span>
-                      </div>
-                    )}
-                    {company.lastVisitDate && (
-                      <div className="flex justify-between text-xs">
-                        <span className="text-on-surface-variant">Last Visit</span>
-                        <span className="text-on-surface">{new Date(company.lastVisitDate).toLocaleDateString('en-IN')}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {company.aiSummary && (
-                  <p className="text-[10px] text-on-surface-variant leading-relaxed line-clamp-2 bg-surface-container-low rounded-lg px-sm py-xs">
-                    {company.aiSummary}
-                  </p>
-                )}
-
-                <div className="flex gap-xs border-t border-outline-variant/20 pt-sm">
-                  <button onClick={() => openDetails(company)}
-                    className="flex-1 text-[10px] text-primary border border-primary/20 px-2 py-1.5 rounded-lg hover:bg-primary/5 transition-colors">
-                    View Details
+                <div className="flex gap-2 border-t border-slate-100 dark:border-slate-800/60 pt-3 mt-4">
+                  <button 
+                    onClick={() => openDetails(company)}
+                    className="flex-1 text-[10px] font-bold text-indigo-500 border border-indigo-500/20 bg-indigo-500/5 px-2.5 py-2 rounded-xl hover:bg-indigo-500/10 transition-colors"
+                  >
+                    View Timeline
                   </button>
                   {isAdmin && (
-                    <button onClick={() => handleAiSummary(company.id)} disabled={generatingAI === company.id}
-                      className="flex-1 text-[10px] text-tertiary border border-tertiary/20 px-2 py-1.5 rounded-lg hover:bg-tertiary/5 transition-colors disabled:opacity-50">
+                    <button 
+                      onClick={() => handleAiSummary(company.id)} 
+                      disabled={generatingAI === company.id}
+                      className="flex-1 text-[10px] font-bold text-purple-500 border border-purple-500/20 bg-purple-500/5 px-2.5 py-2 rounded-xl hover:bg-purple-500/10 transition-colors disabled:opacity-50"
+                    >
                       {generatingAI === company.id ? 'Generating...' : 'AI Summary'}
                     </button>
                   )}
@@ -233,89 +262,99 @@ export default function ClientCompaniesOverviewPage() {
         </div>
       )}
 
-      {/* Company analytics drawer — timestamped timeline of visits, gaps, action plans */}
+      {/* Slide-over details timeline drawer */}
       {detailCompany && (
         <div className="fixed inset-0 z-50 flex justify-end" role="dialog" aria-modal="true">
-          <div className="absolute inset-0 bg-on-surface/30 backdrop-blur-sm" onClick={() => setDetailCompany(null)} />
-          <div className="relative w-full max-w-lg h-full bg-surface-container-lowest border-l border-outline-variant/30 overflow-y-auto p-lg flex flex-col gap-lg">
-            <div className="flex items-start justify-between gap-sm">
-              <div className="flex items-center gap-sm">
-                <div className="w-12 h-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-black shrink-0">
+          <div className="absolute inset-0 bg-slate-900/40 dark:bg-black/60 backdrop-blur-sm" onClick={() => setDetailCompany(null)} />
+          <div className="relative w-full max-w-md h-full bg-white dark:bg-[#111c2e] border-l border-slate-200 dark:border-slate-800 overflow-y-auto p-6 flex flex-col gap-6 shadow-2xl animate-slide-in">
+            <div className="flex items-start justify-between gap-sm border-b border-slate-100 dark:border-slate-800 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 text-indigo-500 flex items-center justify-center font-extrabold shrink-0 border border-indigo-500/20">
                   {detailCompany.name?.slice(0, 2).toUpperCase()}
                 </div>
                 <div>
-                  <h3 className="font-semibold text-on-surface text-lg leading-tight">{detailCompany.name}</h3>
-                  <p className="text-[11px] text-on-surface-variant">{detailCompany.industry ?? 'Pharma'} · {detailCompany.criticality} criticality</p>
+                  <h3 className="font-extrabold text-sm text-slate-800 dark:text-white leading-tight">{detailCompany.name}</h3>
+                  <p className="text-[10px] text-slate-400 font-semibold mt-0.5">{detailCompany.sector ?? 'Pharma'} · {detailCompany.criticality} criticality</p>
                 </div>
               </div>
-              <button onClick={() => setDetailCompany(null)} className="text-on-surface-variant hover:text-on-surface">
-                <span className="material-symbols-outlined text-[22px]">close</span>
+              <button 
+                onClick={() => setDetailCompany(null)} 
+                className="material-symbols-outlined text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+              >
+                close
               </button>
             </div>
 
             <div className="grid grid-cols-2 gap-sm">
-              <div className="glass-card rounded-xl p-sm border border-outline-variant/30">
-                <p className="text-[10px] text-on-surface-variant tracking-widest font-label-caps">RISK SCORE</p>
-                <p className="font-black text-xl text-on-surface mt-1">{detailCompany.riskScore ?? '—'}</p>
+              <div className="bg-slate-50 dark:bg-[#0f172a] rounded-2xl p-4 border border-slate-100 dark:border-slate-800">
+                <p className="text-[9px] text-slate-400 uppercase tracking-widest font-bold">Risk Score</p>
+                <p className="font-extrabold text-lg text-slate-800 dark:text-white mt-1 font-mono">{detailCompany.riskScore ?? '—'}</p>
               </div>
-              <div className="glass-card rounded-xl p-sm border border-outline-variant/30">
-                <p className="text-[10px] text-on-surface-variant tracking-widest font-label-caps">LAST VISIT</p>
-                <p className="font-semibold text-sm text-on-surface mt-1">
-                  {detailCompany.lastVisitDate ? new Date(detailCompany.lastVisitDate).toLocaleDateString('en-IN') : 'No visits logged'}
+              <div className="bg-slate-50 dark:bg-[#0f172a] rounded-2xl p-4 border border-slate-100 dark:border-slate-800">
+                <p className="text-[9px] text-slate-400 uppercase tracking-widest font-bold">Last Visit Logged</p>
+                <p className="font-bold text-xs text-slate-800 dark:text-white mt-2 font-mono">
+                  {detailCompany.lastVisitDate ? new Date(detailCompany.lastVisitDate).toLocaleDateString('en-IN') : 'No logs'}
                 </p>
               </div>
             </div>
 
             {detailCompany.currentStage && (
-              <div className="glass-card rounded-xl p-sm border border-outline-variant/30">
-                <p className="text-[10px] text-on-surface-variant tracking-widest font-label-caps mb-1">CURRENT STAGE</p>
-                <p className="text-body-sm text-on-surface">{detailCompany.currentStage}</p>
+              <div className="bg-slate-50 dark:bg-[#0f172a] rounded-2xl p-4 border border-slate-100 dark:border-slate-800">
+                <p className="text-[9px] text-slate-400 uppercase tracking-widest font-bold mb-1">Current Operations Stage</p>
+                <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">{detailCompany.currentStage}</p>
               </div>
             )}
 
             {detailCompany.notes && (
-              <div className="glass-card rounded-xl p-sm border border-outline-variant/30">
-                <p className="text-[10px] text-on-surface-variant tracking-widest font-label-caps mb-1">NOTES</p>
-                <p className="text-body-sm text-on-surface-variant leading-relaxed">{detailCompany.notes}</p>
+              <div className="bg-slate-50 dark:bg-[#0f172a] rounded-2xl p-4 border border-slate-100 dark:border-slate-800">
+                <p className="text-[9px] text-slate-400 uppercase tracking-widest font-bold mb-1">Strategic Account Notes</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed font-medium">{detailCompany.notes}</p>
               </div>
             )}
 
             <div>
-              <p className="font-label-caps text-label-caps text-on-surface-variant tracking-widest mb-sm">
-                TIMESTAMPED ACTIVITY — VISITS, GAPS &amp; ACTION PLANS
+              <p className="font-label-caps text-label-caps text-slate-400 dark:text-slate-500 tracking-widest mb-sm font-bold">
+                TELEMETRY ACTIVITY FEED
               </p>
+              
               {timelineLoading ? (
                 <div className="flex flex-col gap-sm">
-                  {[1, 2, 3].map(i => <div key={i} className="h-14 rounded-xl bg-surface-container-high animate-pulse" />)}
+                  {[1, 2, 3].map(i => (
+                    <div key={i} className="h-14 rounded-2xl bg-slate-100 dark:bg-slate-800/60 animate-pulse" />
+                  ))}
                 </div>
               ) : timeline.length === 0 ? (
-                <div className="glass-card rounded-xl p-lg text-center text-on-surface-variant border border-outline-variant/30 text-body-sm">
-                  No timeline activity recorded for this company yet.
+                <div className="bg-slate-50 dark:bg-[#0f172a] border border-slate-100 dark:border-slate-800 rounded-2xl p-6 text-center text-slate-400 text-xs">
+                  No activity timelines recorded for this client.
                 </div>
               ) : (
                 <div className="relative flex flex-col gap-sm">
-                  <div className="absolute left-[13px] top-2 bottom-2 w-px bg-outline-variant/30" />
+                  <div className="absolute left-[13px] top-2 bottom-2 w-px bg-slate-200 dark:bg-slate-800" />
+                  
                   {timeline.map((entry: any, i: number) => (
                     <div key={entry.id ?? i} className="relative pl-lg">
-                      <div className="absolute left-0 top-1 w-7 h-7 rounded-full bg-primary/10 text-primary flex items-center justify-center border border-primary/20">
-                        <span className="material-symbols-outlined text-[14px]">{TIMELINE_ICON[entry.entryType] ?? 'circle'}</span>
+                      <div className="absolute left-0 top-1 w-7 h-7 rounded-full bg-slate-100 dark:bg-slate-800 text-indigo-500 flex items-center justify-center border border-slate-200 dark:border-slate-700">
+                        <span className="material-symbols-outlined text-[13px]">{TIMELINE_ICON[entry.entryType] ?? 'circle'}</span>
                       </div>
-                      <div className="glass-card rounded-xl p-sm border border-outline-variant/30">
+                      
+                      <div className="bg-white dark:bg-[#0f172a] rounded-2xl p-4 border border-slate-200 dark:border-slate-800/80">
                         <div className="flex items-start justify-between gap-sm">
-                          <p className="font-semibold text-on-surface text-sm leading-snug">{entry.title}</p>
-                          <span className="text-[9px] font-bold text-on-surface-variant bg-surface-container-high px-2 py-0.5 rounded-full border border-outline-variant/30 shrink-0">
+                          <p className="font-bold text-xs text-slate-800 dark:text-white leading-snug">{entry.title}</p>
+                          <span className="text-[9px] font-bold text-slate-400 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 px-2 py-0.5 rounded-full shrink-0 uppercase tracking-wider">
                             {entry.entryType?.replace(/_/g, ' ')}
                           </span>
                         </div>
+                        
                         {entry.description && (
-                          <p className="text-[11px] text-on-surface-variant leading-relaxed mt-1">{entry.description}</p>
+                          <p className="text-[10px] text-slate-400 dark:text-slate-500 leading-relaxed mt-1.5">{entry.description}</p>
                         )}
-                        <div className="flex items-center justify-between mt-2 pt-1 border-t border-outline-variant/20">
-                          <span className="text-[10px] text-on-surface-variant">
+                        
+                        <div className="flex items-center justify-between mt-3 pt-2 border-t border-slate-100 dark:border-slate-800/60 text-[9px] text-slate-400 font-semibold font-mono">
+                          <span>
                             {entry.entryDate ? new Date(entry.entryDate).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}
                           </span>
                           {entry.employee && (
-                            <span className="text-[10px] text-on-surface-variant">{entry.employee.firstName} {entry.employee.lastName}</span>
+                            <span className="text-slate-500 dark:text-slate-400">{entry.employee.firstName} {entry.employee.lastName}</span>
                           )}
                         </div>
                       </div>

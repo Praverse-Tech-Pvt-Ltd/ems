@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { employeesService } from '@/lib/api/employees';
 import { useAuthStore } from '@/store/auth.store';
 import type { Employee, Department } from '@/types';
@@ -18,7 +19,8 @@ const STATUS_COLOR: Record<string, string> = {
 };
 
 export default function EmployeeDirectoryPage() {
-  const user = useAuthStore(s => s.user);
+  const router  = useRouter();
+  const user    = useAuthStore(s => s.user);
   const isAdmin = ['ADMIN', 'SUPER_ADMIN'].includes(user?.role ?? '');
 
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -82,7 +84,7 @@ export default function EmployeeDirectoryPage() {
             { label: 'Admins / Managers', value: employees.filter(e => ['ADMIN', 'SUPER_ADMIN', 'MANAGER'].includes(e.role)).length, color: 'text-error', icon: 'admin_panel_settings' },
             { label: 'Departments', value: departments.length, color: 'text-on-surface', icon: 'corporate_fare' },
           ].map(s => (
-            <div key={s.label} className="glass-card rounded-2xl p-md border border-outline-variant/30 flex items-center gap-md">
+            <div key={s.label} className="glass-card rounded-2xl p-md border border-outline-variant/30 flex items-center gap-md card-hover">
               <span className={`material-symbols-outlined text-[28px] ${s.color}`}>{s.icon}</span>
               <div>
                 <p className={`font-black text-2xl ${s.color}`}>{s.value}</p>
@@ -133,7 +135,11 @@ export default function EmployeeDirectoryPage() {
           </div>
           <div className="divide-y divide-outline-variant/20">
             {filtered.map(emp => (
-              <div key={emp.id} className="grid grid-cols-1 md:grid-cols-[2fr_1fr_1fr_1fr_auto] gap-sm items-center p-sm hover:bg-surface-container-low transition-colors group">
+              <div
+                key={emp.id}
+                className="grid grid-cols-1 md:grid-cols-[2fr_1fr_1fr_1fr_auto] gap-sm items-center p-sm hover:bg-surface-container-low transition-colors group cursor-pointer"
+                onClick={() => router.push(`/employee-profile/${emp.id}`)}
+              >
                 <div className="flex items-center gap-sm">
                   <div className="w-10 h-10 rounded-full bg-secondary-container text-on-secondary-container flex items-center justify-center font-bold text-sm shrink-0">
                     {initials(emp)}
@@ -146,12 +152,16 @@ export default function EmployeeDirectoryPage() {
                 <p className="text-body-sm text-on-surface-variant">{emp.department?.name ?? '—'}</p>
                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border w-fit ${ROLE_COLOR[emp.role]}`}>{emp.role}</span>
                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border w-fit ${STATUS_COLOR[emp.status]}`}>{emp.status}</span>
-                <div className="flex gap-xs opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button className="text-on-surface-variant hover:text-primary transition-colors p-1">
+                <div className="flex gap-xs opacity-0 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
+                  <button
+                    onClick={() => router.push(`/employee-profile/${emp.id}`)}
+                    className="text-on-surface-variant hover:text-primary transition-colors p-1"
+                    title="View profile"
+                  >
                     <span className="material-symbols-outlined text-[18px]">visibility</span>
                   </button>
                   {isAdmin && (
-                    <button className="text-on-surface-variant hover:text-primary transition-colors p-1">
+                    <button className="text-on-surface-variant hover:text-primary transition-colors p-1" title="Edit">
                       <span className="material-symbols-outlined text-[18px]">edit</span>
                     </button>
                   )}

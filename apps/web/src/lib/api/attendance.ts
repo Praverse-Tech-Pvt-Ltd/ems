@@ -1,11 +1,11 @@
 import { apiClient } from '@/lib/api-client';
 
 export const attendanceService = {
-  punchIn: (lat?: number, lng?: number) =>
-    apiClient.post('/attendance/punch-in', { lat, lng }).then(r => r.data),
+  punchIn: (latitude?: number, longitude?: number) =>
+    apiClient.post('/attendance/punch-in', { latitude, longitude }).then(r => r.data),
 
-  punchOut: (lat?: number, lng?: number) =>
-    apiClient.post('/attendance/punch-out', { lat, lng }).then(r => r.data),
+  punchOut: (latitude?: number, longitude?: number) =>
+    apiClient.post('/attendance/punch-out', { latitude, longitude }).then(r => r.data),
 
   today: () =>
     apiClient.get('/attendance/today').then(r => r.data),

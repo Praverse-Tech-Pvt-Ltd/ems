@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api-client';
@@ -77,6 +77,30 @@ export type StitchPageConfig = {
   actions?: string[];
 };
 
+function WorkdayClock() {
+  const [time, setTime] = useState({ h: '', m: '', ampm: '' });
+  useEffect(() => {
+    const tick = () => {
+      const d = new Date();
+      const h = d.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', hour12: true }).replace(/\s?(AM|PM)/i, '');
+      const m = d.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', minute: '2-digit' }).padStart(2, '0');
+      const ampm = d.getHours() < 12 ? 'AM' : 'PM';
+      setTime({ h, m, ampm });
+    };
+    tick();
+    const id = setInterval(tick, 10_000);
+    return () => clearInterval(id);
+  }, []);
+  return (
+    <div className="flex items-end gap-1 leading-none">
+      <span className="text-[40px] font-black text-on-surface tabular-nums tracking-tight" style={{ letterSpacing: '-0.03em' }}>
+        {time.h || '--'}:{time.m || '--'}
+      </span>
+      <span className="text-[15px] font-bold text-on-surface-variant mb-1.5">{time.ampm}</span>
+    </div>
+  );
+}
+
 function getByPath(source: unknown, path: string): unknown {
   return path.split('.').reduce<unknown>((value, key) => {
     if (value && typeof value === 'object' && key in value) {
@@ -142,6 +166,17 @@ export function StitchPage({ config }: { config: StitchPageConfig }) {
   const [punchType, setPunchType] = useState<'in' | 'out' | null>(null);
   const [actionNote, setActionNote] = useState('');
 
+  // Fetch today's attendance only for workday layout to determine punch state
+  const todayQuery = useQuery({
+    queryKey: ['attendance-today'],
+    queryFn: () => apiClient.get('/attendance/today').then(r => r.data),
+    enabled: config.layout === 'workday',
+    retry: false,
+  });
+  const todayData = todayQuery.data as { punchInTime?: string | null; punchOutTime?: string | null } | undefined;
+  const isPunchedIn  = !!(todayData?.punchInTime && !todayData?.punchOutTime);
+  const isPunchedOut = !!(todayData?.punchInTime && todayData?.punchOutTime);
+
   const runAction = (label: string) => {
     if (label === 'Punch In') { setPunchType('in'); return; }
     if (label === 'Punch Out') { setPunchType('out'); return; }
@@ -191,12 +226,12 @@ export function StitchPage({ config }: { config: StitchPageConfig }) {
 
   const aiPanel = (
     <section className="grid grid-cols-1 lg:grid-cols-3 gap-md">
-      <div className="glass-card rounded-xl p-md flex flex-col gap-sm border-l-4 border-l-primary ai-shimmer">
+      <div className="glass-card rounded-xl p-md flex flex-col gap-sm border-l-4 border-l-primary ai-shimmer bg-gradient-to-br from-primary/5 via-transparent to-secondary/5">
         <div className="flex items-center gap-sm text-primary">
           <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>psychology</span>
           <h3 className="font-title-md text-title-md">Ask AI</h3>
         </div>
-        <p className="text-body-sm text-on-surface-variant flex-1">{config.aiPrompt}</p>
+        <p className="text-body-sm text-secondary flex-1">{config.aiPrompt}</p>
         <div className="relative mt-auto">
           <input className="w-full border-0 border-b border-outline-variant focus:border-primary focus:ring-0 text-body-sm px-0 py-2 bg-transparent placeholder:text-on-surface-variant/50" placeholder="Ask about this workspace..." value={question} onChange={(event) => setQuestion(event.target.value)} />
           <button className="absolute right-0 top-2 text-primary hover:text-primary-container" aria-label="Send AI question">
@@ -247,7 +282,7 @@ export function StitchPage({ config }: { config: StitchPageConfig }) {
       <h3 className="font-label-caps text-label-caps text-on-surface-variant mb-sm tracking-widest">LIVE OPERATING METRICS</h3>
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-sm">
         {config.metrics.map((metric) => (
-          <div key={metric.label} className="glass-card rounded-lg p-sm flex flex-col gap-xs hover:-translate-y-1 transition-transform duration-300">
+          <div key={metric.label} className={`glass-card rounded-lg p-sm flex flex-col gap-xs card-hover ${metric.tone === 'primary' ? 'border-l-[3px] border-l-primary' : metric.tone === 'tertiary' ? 'border-l-[3px] border-l-tertiary' : metric.tone === 'error' ? 'border-l-[3px] border-l-error' : ''}`}>
             <span className="font-label-caps text-label-caps text-on-surface-variant">{metric.label}</span>
             <div className="font-headline-lg text-headline-lg text-on-surface">{metric.value}</div>
             <div className={`flex items-center gap-xs text-sm font-label-caps text-label-caps ${metric.tone === 'error' ? 'text-error' : metric.tone === 'tertiary' ? 'text-tertiary' : metric.tone === 'primary' ? 'text-primary' : 'text-on-surface-variant'}`}>
@@ -266,7 +301,7 @@ export function StitchPage({ config }: { config: StitchPageConfig }) {
       <h3 className="font-label-caps text-label-caps text-on-surface-variant mb-sm tracking-widest">LIVE OPERATING METRICS</h3>
       <div className="grid grid-cols-2 gap-sm">
         {config.metrics.map((metric) => (
-          <div key={metric.label} className="glass-card rounded-lg p-sm flex flex-col gap-xs hover:-translate-y-1 transition-transform duration-300">
+          <div key={metric.label} className={`glass-card rounded-lg p-sm flex flex-col gap-xs card-hover ${metric.tone === 'primary' ? 'border-l-[3px] border-l-primary' : metric.tone === 'tertiary' ? 'border-l-[3px] border-l-tertiary' : metric.tone === 'error' ? 'border-l-[3px] border-l-error' : ''}`}>
             <span className="font-label-caps text-[10px] text-on-surface-variant truncate">{metric.label}</span>
             <div className="font-title-lg text-title-lg text-on-surface font-bold truncate">{metric.value}</div>
             <div className={`flex items-center gap-xs font-label-caps text-[10px] truncate ${metric.tone === 'error' ? 'text-error' : metric.tone === 'tertiary' ? 'text-tertiary' : metric.tone === 'primary' ? 'text-primary' : 'text-on-surface-variant'}`}>
@@ -299,55 +334,225 @@ export function StitchPage({ config }: { config: StitchPageConfig }) {
   );
 
   if (layout === 'workday') {
+    const actionIcons: Record<string, string> = {
+      'Punch In': 'login', 'Punch Out': 'logout',
+      'Apply Leave': 'event_available', 'View Payslip': 'payments',
+    };
     return (
-      <div className="max-w-[980px] mx-auto w-full flex flex-col gap-lg">
-        {header}
-      {actionNote && (
-        <div className="rounded-xl px-4 py-3 text-sm bg-primary/10 text-primary border border-primary/20 flex items-center gap-sm">
-          <span className="material-symbols-outlined text-[18px]">info</span>
-          {actionNote}
+      <div className="max-w-[1040px] mx-auto w-full flex flex-col gap-5 pb-6">
+        {punchType && <PunchModal punchType={punchType} onClose={() => setPunchType(null)} />}
+
+        {/* ── Page title row ── */}
+        <div className="flex items-start justify-between gap-4 flex-wrap pt-1">
+          <div>
+            <div className="flex items-center gap-2 text-[11px] font-bold text-primary tracking-[0.09em] uppercase mb-1">
+              <span className="material-symbols-outlined text-[15px]">{config.icon}</span>
+              {config.eyebrow}
+            </div>
+            <h1 className="text-[26px] font-black text-on-surface leading-tight tracking-tight" style={{ letterSpacing: '-0.02em' }}>
+              My Workday
+            </h1>
+            <p className="text-[13px] text-on-surface-variant mt-0.5">{config.description}</p>
+          </div>
+          <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold ${
+            isPunchedIn  ? 'bg-success/10 text-success border border-success/20' :
+            isPunchedOut ? 'bg-secondary/10 text-secondary border border-secondary/20' :
+            todayQuery.isLoading ? 'bg-on-surface-variant/8 text-on-surface-variant border border-card-border' :
+                           'bg-tertiary/10 text-tertiary border border-tertiary/20'
+          }`}>
+            <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+              isPunchedIn ? 'bg-success animate-pulse' : isPunchedOut ? 'bg-secondary' : 'bg-tertiary/50'
+            }`} />
+            {todayQuery.isLoading ? 'Syncing…' : isPunchedIn ? 'Punched In' : isPunchedOut ? 'Punched Out' : 'Not Punched'}
+          </div>
         </div>
-      )}
-      {punchType && <PunchModal punchType={punchType} onClose={() => setPunchType(null)} />}
-        <section className="bg-surface-container-lowest rounded-xl border border-outline-variant/30 shadow-sm p-lg flex flex-col md:flex-row items-center justify-between gap-lg relative overflow-hidden">
-          <div className="absolute -top-24 -right-24 w-48 h-48 bg-primary/10 rounded-full blur-3xl pointer-events-none" />
-          <div className="flex flex-col items-center md:items-start gap-sm z-10 text-center md:text-left">
-            <div className="font-label-caps text-label-caps text-on-surface-variant tracking-widest">CURRENT SHIFT</div>
-            <div className="font-display-lg text-display-lg text-on-background tabular-nums">08:42 <span className="text-title-md text-on-surface-variant">AM</span></div>
-            <div className="font-body-sm text-body-sm text-tertiary flex items-center gap-1">
-              <span className="material-symbols-outlined text-[16px]">location_on</span>
-              Headquarters - Zone A
+
+        {actionNote && (
+          <div className="rounded-xl px-4 py-3 text-sm bg-primary/10 text-primary border border-primary/20 flex items-center gap-2">
+            <span className="material-symbols-outlined text-[16px]">info</span>
+            {actionNote}
+          </div>
+        )}
+
+        {/* ── Hero punch card ── */}
+        <div
+          className="rounded-2xl p-5 relative overflow-hidden"
+          style={{
+            background: 'linear-gradient(135deg, rgba(170,48,0,0.08) 0%, rgba(1,103,125,0.06) 60%, rgba(250,248,255,0) 100%)',
+            border: '1px solid rgba(226,191,181,0.5)',
+            boxShadow: '0 4px 24px rgba(19,27,46,0.06)',
+          }}
+        >
+          {/* decorative blobs */}
+          <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(170,48,0,0.09) 0%, transparent 70%)' }} />
+          <div className="absolute -bottom-8 -left-8 w-32 h-32 rounded-full pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(1,103,125,0.08) 0%, transparent 70%)' }} />
+
+          <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-5">
+            {/* Left — time + location */}
+            <div className="flex flex-col gap-2">
+              <div className="text-[10.5px] font-bold text-on-surface-variant/60 tracking-[0.09em] uppercase">Current Shift</div>
+              <WorkdayClock />
+              {isPunchedIn && todayData?.punchInTime && (
+                <div className="flex items-center gap-1.5 text-[11.5px] font-semibold text-success">
+                  <span className="material-symbols-outlined text-[13px]" style={{ fontVariationSettings: "'FILL' 1" }}>login</span>
+                  In since {new Date(todayData.punchInTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
+                </div>
+              )}
+              {isPunchedOut && todayData?.punchOutTime && (
+                <div className="flex items-center gap-1.5 text-[11.5px] font-semibold text-secondary">
+                  <span className="material-symbols-outlined text-[13px]" style={{ fontVariationSettings: "'FILL' 1" }}>logout</span>
+                  Out at {new Date(todayData.punchOutTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
+                </div>
+              )}
+              <div className="flex items-center gap-1.5 text-[12.5px] font-medium text-secondary">
+                <span className="material-symbols-outlined text-[14px]" style={{ fontVariationSettings: "'FILL' 1" }}>location_on</span>
+                Headquarters – Zone A
+              </div>
+            </div>
+
+            {/* Right — action buttons */}
+            <div className="flex flex-col sm:flex-row gap-2.5 w-full md:w-auto">
+              {(config.actions ?? []).slice(0, 3).map((rawAction, index) => {
+                // Dynamically swap "Punch In" → "Punch Out" when user is already clocked in
+                const action = (index === 0 && rawAction === 'Punch In' && isPunchedIn) ? 'Punch Out' : rawAction;
+                const icon = actionIcons[action] ?? (index === 0 ? 'fingerprint' : 'arrow_forward');
+                const isPrimary = index === 0;
+                return (
+                  <button
+                    key={rawAction}
+                    onClick={() => runAction(action)}
+                    className="flex items-center justify-center gap-2 px-5 py-3 rounded-xl text-[13.5px] font-bold transition-all duration-150 active:scale-95"
+                    style={isPrimary ? (
+                      action === 'Punch Out'
+                        ? { background: 'linear-gradient(135deg, #01677d 0%, #015f73 100%)', color: '#fff', boxShadow: '0 4px 16px rgba(1,103,125,0.30)' }
+                        : { background: 'linear-gradient(135deg, #aa3000 0%, #c53800 100%)', color: '#fff', boxShadow: '0 4px 16px rgba(170,48,0,0.30)' }
+                    ) : {
+                      background: 'rgba(255,255,255,0.85)',
+                      border: '1px solid rgba(226,191,181,0.6)',
+                      color: '#131b2e',
+                      boxShadow: '0 2px 8px rgba(19,27,46,0.06)',
+                    }}
+                  >
+                    <span
+                      className="material-symbols-outlined text-[18px]"
+                      style={isPrimary ? { fontVariationSettings: "'FILL' 1" } : {}}
+                    >
+                      {icon}
+                    </span>
+                    {action}
+                  </button>
+                );
+              })}
             </div>
           </div>
-          <div className="flex flex-col sm:flex-row gap-sm w-full md:w-auto z-10">
-            {(config.actions ?? []).slice(0, 3).map((action, index) => (
-              <button key={action} onClick={() => runAction(action)} className={`${index === 0 ? 'bg-primary text-on-primary' : 'bg-surface text-on-surface border border-outline-variant'} font-title-md text-title-md py-sm px-xl rounded-lg shadow-sm hover:shadow-md transition-all active:scale-95 flex items-center justify-center gap-xs cursor-pointer`}>
-                <span className="material-symbols-outlined">{index === 0 ? 'fingerprint' : 'arrow_forward'}</span>
-                {action}
-              </button>
-            ))}
-          </div>
-        </section>
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-md">
-          <section className="lg:col-span-7 glass-card rounded-xl p-md">
-            <h3 className="font-label-caps text-label-caps text-on-surface-variant mb-md tracking-widest">TODAY'S FLOW</h3>
-            <div className="relative flex flex-col gap-md">
-              <div className="absolute left-3 top-2 bottom-2 w-0.5 bg-outline-variant/40" />
-              {items.slice(0, 4).map((item, index) => (
-                <div key={item.title} className="relative z-10 flex gap-md">
-                  <div className={`mt-1 w-6 h-6 rounded-full border-4 ${index === 0 ? 'bg-primary border-primary/20' : 'bg-surface-container-highest border-surface-container-lowest'}`} />
-                  <div className="bg-surface-container-lowest border border-outline-variant/30 rounded-lg p-sm flex-1">
-                    <p className="font-semibold text-on-surface">{item.title}</p>
-                    <p className="text-body-sm text-on-surface-variant">{item.subtitle}</p>
+        </div>
+
+        {/* ── Quick stat chips ── */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {config.metrics.map(metric => {
+            const accent = metric.tone === 'primary' ? '#aa3000' : metric.tone === 'tertiary' ? '#01677d' : metric.tone === 'error' ? '#ba1a1a' : '#59413a';
+            return (
+              <div
+                key={metric.label}
+                className="glass-card rounded-2xl p-4 flex flex-col gap-3 card-hover"
+                style={{ borderLeft: `3px solid ${accent}` }}
+              >
+                <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: `${accent}12` }}>
+                  <span className="material-symbols-outlined text-[16px]" style={{ color: accent, fontVariationSettings: "'FILL' 1" }}>{metric.icon}</span>
+                </div>
+                <div>
+                  <div className="text-[18px] font-bold text-on-surface leading-none">{metric.value}</div>
+                  <div className="text-[11px] text-on-surface-variant mt-0.5 font-medium">{metric.label}</div>
+                  <div className="text-[10.5px] mt-0.5" style={{ color: accent }}>{metric.meta}</div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* ── Main grid ── */}
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-4">
+
+          {/* Today's activity timeline */}
+          <div className="glass-card rounded-2xl p-5 flex flex-col gap-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-[12px] font-bold text-on-surface-variant/60 tracking-[0.08em] uppercase">Today's Activity</h3>
+              <span className="text-[11px] text-secondary font-semibold">View all →</span>
+            </div>
+            <div className="relative flex flex-col gap-0">
+              <div className="absolute left-[17px] top-3 bottom-3 w-0.5" style={{ background: 'rgba(226,191,181,0.5)' }} />
+              {items.slice(0, 5).map((item, index) => {
+                const isFirst = index === 0;
+                const dotColor = isFirst ? '#aa3000' : index === 1 ? '#01677d' : '#b8a89a';
+                return (
+                  <div key={`${item.title}-${index}`} className="relative z-10 flex gap-4 pb-4 last:pb-0">
+                    <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5" style={{ background: `${dotColor}12`, border: `1.5px solid ${dotColor}30` }}>
+                      <div className="w-2 h-2 rounded-full" style={{ background: dotColor }} />
+                    </div>
+                    <div className="flex-1 min-w-0 pt-1">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="text-[13px] font-semibold text-on-surface leading-tight">{item.title}</p>
+                        {item.status && (
+                          <span className={`chip border text-[10px] flex-shrink-0 mt-0.5 ${
+                            item.status === 'Priority' ? 'bg-error/10 text-error border-error/20'
+                            : item.status === 'Ready' ? 'bg-success/10 text-success border-success/20'
+                            : 'bg-tertiary/10 text-tertiary border-tertiary/20'
+                          }`}>{item.status}</span>
+                        )}
+                      </div>
+                      <p className="text-[11.5px] text-on-surface-variant mt-0.5">{item.subtitle}</p>
+                    </div>
                   </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Right column — AI + quick actions */}
+          <div className="flex flex-col gap-4">
+            {/* AI panel */}
+            <div className="glass-card rounded-2xl p-4 flex flex-col gap-3 border-l-[3px] border-l-primary" style={{ background: 'linear-gradient(135deg, rgba(170,48,0,0.04) 0%, rgba(1,103,125,0.03) 100%)' }}>
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-primary/10">
+                  <span className="material-symbols-outlined text-[15px] text-primary" style={{ fontVariationSettings: "'FILL' 1" }}>psychology</span>
+                </div>
+                <span className="text-[12.5px] font-bold text-on-surface">Ask AI</span>
+              </div>
+              <p className="text-[11.5px] text-secondary leading-relaxed">{config.aiPrompt}</p>
+              <div className="relative">
+                <input
+                  className="w-full rounded-xl px-3 py-2 text-[12.5px] bg-card border border-card-border focus:border-primary focus:outline-none text-on-surface placeholder:text-on-surface-variant/40"
+                  placeholder="Ask about today…"
+                  value={question}
+                  onChange={e => setQuestion(e.target.value)}
+                />
+                <button className="absolute right-2.5 top-1/2 -translate-y-1/2 text-primary hover:opacity-70 transition-opacity">
+                  <span className="material-symbols-outlined text-[16px]">send</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Quick links */}
+            <div className="glass-card rounded-2xl p-4 flex flex-col gap-2">
+              <h3 className="text-[11px] font-bold text-on-surface-variant/60 tracking-[0.08em] uppercase mb-1">Quick Actions</h3>
+              {secondaryItems.map(item => (
+                <div
+                  key={item.title}
+                  className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-surface-container cursor-pointer transition-colors"
+                  style={{ border: '1px solid rgba(226,191,181,0.3)' }}
+                >
+                  <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-secondary/10 flex-shrink-0">
+                    <span className="material-symbols-outlined text-[14px] text-secondary" style={{ fontVariationSettings: "'FILL' 1" }}>bolt</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[12.5px] font-semibold text-on-surface truncate">{item.title}</p>
+                    <p className="text-[11px] text-on-surface-variant/60 truncate">{item.subtitle}</p>
+                  </div>
+                  <span className="material-symbols-outlined text-[15px] text-on-surface-variant/30 flex-shrink-0">chevron_right</span>
                 </div>
               ))}
             </div>
-          </section>
-          <aside className="lg:col-span-5 flex flex-col gap-md">
-            {metricGridCompact}
-            {aiPanelCompact}
-          </aside>
+          </div>
         </div>
       </div>
     );

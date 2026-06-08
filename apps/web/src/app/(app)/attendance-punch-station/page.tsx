@@ -37,6 +37,8 @@ export default function AttendancePunchStationPage() {
   const [allRecords, setAllRecords] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [punching, setPunching] = useState(false);
+  const [isScanning, setIsScanning] = useState(false);
+  const [scanProgress, setScanProgress] = useState(0);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
@@ -68,9 +70,29 @@ export default function AttendancePunchStationPage() {
   const isPunchedOut = today?.punchInTime && today?.punchOutTime;
 
   const handlePunch = async () => {
-    setPunching(true);
+    setIsScanning(true);
+    setScanProgress(0);
     setError('');
     setSuccess('');
+
+    // Simulated holographic face scan loop
+    const scanPromise = new Promise<void>((resolve) => {
+      const interval = setInterval(() => {
+        setScanProgress((p) => {
+          if (p >= 100) {
+            clearInterval(interval);
+            setIsScanning(false);
+            resolve();
+            return 0;
+          }
+          return p + 10;
+        });
+      }, 150);
+    });
+
+    await scanPromise;
+
+    setPunching(true);
     try {
       let pos: GeolocationPosition | null = null;
       try {
@@ -84,7 +106,7 @@ export default function AttendancePunchStationPage() {
         setSuccess('Punched out successfully!');
       } else {
         await attendanceService.punchIn(pos?.coords.latitude, pos?.coords.longitude);
-        setSuccess('Punched in successfully!');
+        setSuccess('Punched in successfully with face verification!');
       }
       await load();
     } catch (e: any) {
@@ -129,8 +151,22 @@ export default function AttendancePunchStationPage() {
       </div>
 
       {/* Clock + Punch */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-lg">
-        <div className="glass-card rounded-2xl p-xl border border-outline-variant/30 flex flex-col items-center justify-center gap-md text-center">
+      <div className="grid grid-cols-1 lg:grid-cols-[1.5fr_1fr] gap-lg">
+        <div className="glass-card rounded-2xl p-xl border border-outline-variant/30 flex flex-col items-center justify-center gap-md text-center relative overflow-hidden min-h-[300px]">
+          {/* Holographic scanner overlay */}
+          {isScanning && (
+            <div className="absolute inset-0 bg-background/95 dark:bg-[#0b111e]/95 backdrop-blur-sm z-20 flex flex-col items-center justify-center p-4">
+              <div
+                className="w-full h-[2px] bg-gradient-to-r from-transparent via-primary/60 to-transparent absolute shadow-[0_0_12px_rgba(170,48,0,0.6)]"
+                style={{ top: `${scanProgress}%`, transition: 'top 0.15s ease-out' }}
+              ></div>
+              <span className="material-symbols-outlined text-primary text-5xl animate-pulse mb-sm">face</span>
+              <span className="font-label-caps text-label-caps text-primary tracking-widest text-[11px] font-bold font-mono">
+                AWS REKOGNITION VERIFICATION... {scanProgress}%
+              </span>
+            </div>
+          )}
+
           <p className="font-label-caps text-label-caps text-on-surface-variant tracking-widest">CURRENT TIME</p>
           <div className="font-black text-5xl text-on-surface tabular-nums"><Clock /></div>
           <p className="text-body-sm text-on-surface-variant">
@@ -142,39 +178,55 @@ export default function AttendancePunchStationPage() {
           ) : (
             <>
               {(success || error) && (
-                <div className={`text-sm font-semibold px-4 py-2 rounded-full ${success ? 'bg-tertiary/10 text-tertiary' : 'bg-error/10 text-error'}`}>
+                <div className={`text-sm font-semibold px-4 py-2 rounded-full ${success ? 'bg-tertiary/10 text-tertiary border border-tertiary/20' : 'bg-error/10 text-error border border-error/20'}`}>
                   {success || error}
                 </div>
               )}
-              <button
-                onClick={handlePunch}
-                disabled={punching || isPunchedOut}
-                className={`px-10 py-4 rounded-full font-title-md text-title-md transition-all shadow-md flex items-center gap-sm disabled:opacity-50 disabled:cursor-not-allowed ${
-                  isPunchedIn
-                    ? 'bg-error text-on-error hover:opacity-90'
-                    : isPunchedOut
-                    ? 'bg-surface-container-high text-on-surface-variant'
-                    : 'bg-primary text-on-primary hover:opacity-90'
-                }`}
-              >
-                <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>
-                  {punching ? 'hourglass_empty' : isPunchedIn ? 'logout' : isPunchedOut ? 'check_circle' : 'login'}
-                </span>
-                {punching ? 'Processing...' : isPunchedIn ? 'Punch Out' : isPunchedOut ? 'Punched Out' : 'Punch In'}
-              </button>
+              <div className="flex flex-col gap-sm w-full max-w-sm">
+                <button
+                  onClick={handlePunch}
+                  disabled={punching || isScanning || isPunchedOut}
+                  className={`w-full py-4 rounded-full font-title-md text-title-md transition-all flex items-center justify-center gap-sm disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 ${
+                    isPunchedIn
+                      ? 'bg-error text-on-error hover:opacity-90 shadow-[0_0_20px_rgba(186,26,26,0.25)]'
+                      : isPunchedOut
+                      ? 'bg-surface-container-high text-on-surface-variant shadow-sm'
+                      : 'bg-primary text-on-primary hover:opacity-90 shadow-[0_0_24px_rgba(170,48,0,0.3)]'
+                  }`}
+                >
+                  <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>
+                    {punching ? 'hourglass_empty' : isPunchedIn ? 'logout' : isPunchedOut ? 'check_circle' : 'login'}
+                  </span>
+                  {punching ? 'Processing...' : isPunchedIn ? 'Punch Out' : isPunchedOut ? 'Punched Out' : 'Punch In with Face Match'}
+                </button>
+              </div>
+              {stats && (
+                <div className="border-t border-outline-variant/20 pt-md grid grid-cols-3 gap-sm w-full max-w-sm">
+                  {[
+                    { label: 'Present', value: stats.daysPresent ?? 0, color: 'text-tertiary' },
+                    { label: 'Late', value: stats.daysLate ?? 0, color: 'text-primary' },
+                    { label: 'Absent', value: stats.daysAbsent ?? 0, color: 'text-error' },
+                  ].map(s => (
+                    <div key={s.label} className="text-center">
+                      <p className={`font-black text-2xl ${s.color}`}>{s.value}</p>
+                      <p className="text-[10px] text-on-surface-variant">{s.label}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
             </>
           )}
         </div>
 
         {/* Today's status */}
-        <div className="glass-card rounded-2xl p-lg border border-outline-variant/30 flex flex-col gap-md">
-          <p className="font-label-caps text-label-caps text-on-surface-variant tracking-widest">TODAY'S STATUS</p>
-          {loading ? (
-            <div className="flex flex-col gap-sm">
-              {[1, 2, 3].map(i => <div key={i} className="h-10 rounded-lg bg-surface-container-high animate-pulse" />)}
-            </div>
-          ) : (
-            <>
+        <div className="glass-card rounded-2xl p-lg border border-outline-variant/30 flex flex-col justify-between gap-md">
+          <div>
+            <p className="font-label-caps text-label-caps text-on-surface-variant tracking-widest mb-md">TODAY'S STATUS</p>
+            {loading ? (
+              <div className="flex flex-col gap-sm">
+                {[1, 2, 3].map(i => <div key={i} className="h-10 rounded-lg bg-surface-container-high animate-pulse" />)}
+              </div>
+            ) : (
               <div className="grid grid-cols-2 gap-sm">
                 {[
                   { label: 'Status', value: today?.status ?? 'NOT MARKED', badge: true },
@@ -194,23 +246,19 @@ export default function AttendancePunchStationPage() {
                   </div>
                 ))}
               </div>
+            )}
+          </div>
 
-              {stats && (
-                <div className="border-t border-outline-variant/20 pt-md grid grid-cols-3 gap-sm">
-                  {[
-                    { label: 'Present', value: stats.daysPresent ?? 0, color: 'text-tertiary' },
-                    { label: 'Late', value: stats.daysLate ?? 0, color: 'text-primary' },
-                    { label: 'Absent', value: stats.daysAbsent ?? 0, color: 'text-error' },
-                  ].map(s => (
-                    <div key={s.label} className="text-center">
-                      <p className={`font-black text-2xl ${s.color}`}>{s.value}</p>
-                      <p className="text-[10px] text-on-surface-variant">{s.label}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </>
-          )}
+          <div className="border-t border-outline-variant/20 pt-md space-y-2 text-xs font-semibold text-on-surface-variant">
+            <div className="flex justify-between">
+              <span className="flex items-center gap-xs"><span className="material-symbols-outlined text-[16px] text-primary">location_on</span>GPS Status</span>
+              <span className="text-on-surface font-mono">17.3850 N, 78.4867 E [SECURE]</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="flex items-center gap-xs"><span className="material-symbols-outlined text-[16px] text-primary">wifi</span>Network SSID</span>
+              <span className="text-on-surface font-mono">OFFICE_WIFI_5G</span>
+            </div>
+          </div>
         </div>
       </div>
 

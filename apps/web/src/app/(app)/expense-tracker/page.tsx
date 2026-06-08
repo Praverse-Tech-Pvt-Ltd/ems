@@ -121,7 +121,7 @@ export default function ExpenseTrackerPage() {
             { label: 'Pending Amount', value: `₹${totalPending.toLocaleString('en-IN')}`, icon: 'currency_rupee', color: 'text-error' },
             { label: 'Approved', value: `₹${totalApproved.toLocaleString('en-IN')}`, icon: 'check_circle', color: 'text-tertiary' },
           ].map(s => (
-            <div key={s.label} className="glass-card rounded-2xl p-md border border-outline-variant/30 flex flex-col gap-sm">
+            <div key={s.label} className="glass-card rounded-2xl p-md border border-outline-variant/30 flex flex-col gap-sm card-hover">
               <span className={`material-symbols-outlined ${s.color}`}>{s.icon}</span>
               <p className={`font-black text-2xl ${s.color}`}>{s.value}</p>
               <p className="text-body-sm text-on-surface-variant">{s.label}</p>
@@ -195,7 +195,7 @@ export default function ExpenseTrackerPage() {
             <div className="divide-y divide-outline-variant/20">
               {myExpenses.slice(0, 20).map(exp => (
                 <div key={exp.id} className="flex items-center gap-md p-sm hover:bg-surface-container-low transition-colors">
-                  <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                  <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center shrink-0 ring-1 ring-primary/15 shadow-sm">
                     <span className="material-symbols-outlined text-[18px]">{CATEGORY_ICONS[exp.category] ?? 'receipt'}</span>
                   </div>
                   <div className="flex-1 min-w-0">
