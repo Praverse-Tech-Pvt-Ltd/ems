@@ -137,32 +137,44 @@ export default function EmployeeDirectoryPage() {
             {filtered.map(emp => (
               <div
                 key={emp.id}
-                className="grid grid-cols-1 md:grid-cols-[2fr_1fr_1fr_1fr_auto] gap-sm items-center p-sm hover:bg-surface-container-low transition-colors group cursor-pointer"
+                className="flex items-center gap-3 p-3 sm:p-4 hover:bg-surface-container-low transition-colors group cursor-pointer"
                 onClick={() => router.push(`/employee-profile/${emp.id}`)}
               >
-                <div className="flex items-center gap-sm">
-                  <div className="w-10 h-10 rounded-full bg-secondary-container text-on-secondary-container flex items-center justify-center font-bold text-sm shrink-0">
-                    {initials(emp)}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="font-semibold text-on-surface text-sm">{emp.firstName} {emp.lastName}</p>
+                {/* Avatar */}
+                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-secondary-container text-on-secondary-container flex items-center justify-center font-bold text-sm flex-shrink-0">
+                  {initials(emp)}
+                </div>
+                {/* Name + meta */}
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-on-surface text-[13px] sm:text-sm">{emp.firstName} {emp.lastName}</p>
+                  <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
                     <p className="text-[10px] text-on-surface-variant truncate">{emp.designation ?? emp.email} · {emp.employeeCode}</p>
                   </div>
+                  {/* Mobile: badges inline */}
+                  <div className="flex gap-1.5 mt-1.5 md:hidden flex-wrap">
+                    <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full border ${ROLE_COLOR[emp.role]}`}>{emp.role}</span>
+                    <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full border ${STATUS_COLOR[emp.status]}`}>{emp.status}</span>
+                    {emp.department?.name && <span className="text-[9px] font-medium px-2 py-0.5 rounded-full border border-card-border text-on-surface-variant">{emp.department.name}</span>}
+                  </div>
                 </div>
-                <p className="text-body-sm text-on-surface-variant">{emp.department?.name ?? '—'}</p>
-                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border w-fit ${ROLE_COLOR[emp.role]}`}>{emp.role}</span>
-                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border w-fit ${STATUS_COLOR[emp.status]}`}>{emp.status}</span>
-                <div className="flex gap-xs opacity-0 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
+                {/* Desktop: dept + role + status */}
+                <div className="hidden md:flex items-center gap-3 flex-shrink-0">
+                  <p className="text-[12px] text-on-surface-variant w-28 truncate">{emp.department?.name ?? '—'}</p>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${ROLE_COLOR[emp.role]}`}>{emp.role}</span>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${STATUS_COLOR[emp.status]}`}>{emp.status}</span>
+                </div>
+                {/* Actions */}
+                <div className="flex gap-1 flex-shrink-0 md:opacity-0 md:group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
                   <button
                     onClick={() => router.push(`/employee-profile/${emp.id}`)}
-                    className="text-on-surface-variant hover:text-primary transition-colors p-1"
+                    className="text-on-surface-variant hover:text-primary transition-colors p-1.5 rounded-lg hover:bg-surface-container"
                     title="View profile"
                   >
-                    <span className="material-symbols-outlined text-[18px]">visibility</span>
+                    <span className="material-symbols-outlined text-[17px]">visibility</span>
                   </button>
                   {isAdmin && (
-                    <button className="text-on-surface-variant hover:text-primary transition-colors p-1" title="Edit">
-                      <span className="material-symbols-outlined text-[18px]">edit</span>
+                    <button className="text-on-surface-variant hover:text-primary transition-colors p-1.5 rounded-lg hover:bg-surface-container hidden sm:flex" title="Edit">
+                      <span className="material-symbols-outlined text-[17px]">edit</span>
                     </button>
                   )}
                 </div>

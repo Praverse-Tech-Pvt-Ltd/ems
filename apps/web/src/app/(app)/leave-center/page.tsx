@@ -244,7 +244,7 @@ export default function LeaveCenterPage() {
       <div>
         <p className="font-label-caps text-label-caps text-on-surface-variant tracking-widest mb-sm font-bold">LEAVE BALANCES — {new Date().getFullYear()}</p>
         {loading ? (
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-sm">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-sm">
             {[1, 2, 3, 4].map(i => (
               <div key={i} className="h-24 rounded-3xl bg-surface-container-highest animate-pulse" />
             ))}
@@ -254,7 +254,7 @@ export default function LeaveCenterPage() {
             No leave balance data for this year.
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-sm">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-sm">
             {balances.map(b => (
               <LeaveLimitCard
                 key={b.leaveType}

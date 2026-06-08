@@ -239,4 +239,43 @@
     -webkit-text-fill-color: transparent;
     background-clip: text;
   }
+
+  /* ── Hide scrollbar (keeps scroll functionality) ─────────────── */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* ── line-clamp-1 ────────────────────────────────────────────── */
+  .line-clamp-1 {
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  /* ── Mobile-safe touch targets ───────────────────────────────── */
+  @media (max-width: 640px) {
+    button, a[role="button"] {
+      min-height: 40px;
+    }
+  }
+
+  /* ── Animate fade-in ─────────────────────────────────────────── */
+  .animate-fade-in {
+    animation: fadeUp 0.35s cubic-bezier(0.22,1,0.36,1) both;
+  }
+
+  /* ── xs breakpoint helper (320–480px) ───────────────────────── */
+  @media (min-width: 480px) {
+    .xs\:inline { display: inline; }
+    .xs\:hidden { display: none; }
+  }
+  @media (max-width: 479px) {
+    .xs\:inline { display: none; }
+    .xs\:hidden { display: inline; }
+  }
 }

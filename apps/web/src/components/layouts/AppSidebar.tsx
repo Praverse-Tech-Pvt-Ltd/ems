@@ -81,7 +81,7 @@ export function AppSidebar({ className = '', onNavigate }: { className?: string;
 
   return (
     <nav
-      className={`flex flex-col h-full w-[260px] flex-shrink-0 overflow-y-auto ${className}`}
+      className={`flex flex-col h-full w-[260px] max-w-[85vw] flex-shrink-0 overflow-y-auto ${className}`}
       style={{ background: 'linear-gradient(180deg, #f7f5ff 0%, #f2f3ff 100%)' }}
     >
       {/* ── Logo ─────────────────────────────────────────────────── */}

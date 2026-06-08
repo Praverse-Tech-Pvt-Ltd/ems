@@ -411,7 +411,7 @@ export function StitchPage({ config }: { config: StitchPageConfig }) {
             </div>
 
             {/* Right — action buttons */}
-            <div className="flex flex-col sm:flex-row gap-2.5 w-full md:w-auto">
+            <div className="flex flex-row sm:flex-row flex-wrap gap-2 w-full md:w-auto">
               {(config.actions ?? []).slice(0, 3).map((rawAction, index) => {
                 // Dynamically swap "Punch In" → "Punch Out" when user is already clocked in
                 const action = (index === 0 && rawAction === 'Punch In' && isPunchedIn) ? 'Punch Out' : rawAction;
@@ -421,7 +421,7 @@ export function StitchPage({ config }: { config: StitchPageConfig }) {
                   <button
                     key={rawAction}
                     onClick={() => runAction(action)}
-                    className="flex items-center justify-center gap-2 px-5 py-3 rounded-xl text-[13.5px] font-bold transition-all duration-150 active:scale-95"
+                    className="flex items-center justify-center gap-1.5 px-3 py-2.5 sm:px-5 sm:py-3 rounded-xl text-[12px] sm:text-[13.5px] font-bold transition-all duration-150 active:scale-95 flex-1 sm:flex-none"
                     style={isPrimary ? (
                       action === 'Punch Out'
                         ? { background: 'linear-gradient(135deg, #01677d 0%, #015f73 100%)', color: '#fff', boxShadow: '0 4px 16px rgba(1,103,125,0.30)' }
@@ -471,7 +471,7 @@ export function StitchPage({ config }: { config: StitchPageConfig }) {
         </div>
 
         {/* ── Main grid ── */}
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-4">
+        <div className="flex flex-col lg:grid lg:grid-cols-[1fr_300px] gap-4">
 
           {/* Today's activity timeline */}
           <div className="glass-card rounded-2xl p-5 flex flex-col gap-4">
@@ -569,7 +569,7 @@ export function StitchPage({ config }: { config: StitchPageConfig }) {
         </div>
       )}
       {punchType && <PunchModal punchType={punchType} onClose={() => setPunchType(null)} />}
-        <div className="grid grid-cols-1 xl:grid-cols-[300px_1fr] gap-lg">
+        <div className="flex flex-col xl:grid xl:grid-cols-[300px_1fr] gap-lg">
           <aside className="flex flex-col gap-md">
             {aiPanelCompact}
             <div className="glass-card rounded-xl p-sm flex flex-col gap-xs">
@@ -583,7 +583,7 @@ export function StitchPage({ config }: { config: StitchPageConfig }) {
           </aside>
           <section className="flex flex-col gap-md">
             {metricGrid}
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-sm">
               {items.slice(0, 9).map((item, index) => (
                 <article key={`${item.title}-${index}`} className="glass-card rounded-xl p-md flex flex-col gap-md border border-outline-variant/30">
                   <div className="flex items-center gap-sm">
@@ -629,7 +629,7 @@ export function StitchPage({ config }: { config: StitchPageConfig }) {
             </div>
           ))}
         </div>
-        <div className="grid grid-cols-1 xl:grid-cols-[1fr_380px] gap-lg">
+        <div className="flex flex-col xl:grid xl:grid-cols-[1fr_380px] gap-lg">
           <section className="glass-card rounded-xl overflow-hidden">
             <div className="p-md border-b border-outline-variant/30 flex justify-between">
               <h3 className="font-label-caps text-label-caps text-on-surface-variant tracking-widest">APPROVAL LEDGER</h3>
@@ -637,7 +637,7 @@ export function StitchPage({ config }: { config: StitchPageConfig }) {
             </div>
             <div className="divide-y divide-outline-variant/30">
               {items.slice(0, 6).map((item, index) => (
-                <div key={`${item.title}-${index}`} className="grid grid-cols-1 md:grid-cols-[1fr_140px_120px] gap-sm p-md items-center hover:bg-surface-container-low">
+                <div key={`${item.title}-${index}`} className="flex flex-col sm:grid sm:grid-cols-[1fr_140px_120px] gap-sm p-md items-start sm:items-center hover:bg-surface-container-low">
                   <div>
                     <p className="font-semibold text-on-surface">{item.title}</p>
                     <p className="text-body-sm text-on-surface-variant">{item.subtitle}</p>
@@ -667,7 +667,7 @@ export function StitchPage({ config }: { config: StitchPageConfig }) {
         </div>
       )}
       {punchType && <PunchModal punchType={punchType} onClose={() => setPunchType(null)} />}
-        <div className="grid grid-cols-1 xl:grid-cols-[1fr_380px] gap-lg">
+        <div className="flex flex-col xl:grid xl:grid-cols-[1fr_380px] gap-lg">
           <section className="glass-card rounded-xl p-md">
             <h3 className="font-label-caps text-label-caps text-on-surface-variant mb-md tracking-widest">TIMELINE</h3>
             <div className="relative flex flex-col gap-lg">
@@ -708,7 +708,7 @@ export function StitchPage({ config }: { config: StitchPageConfig }) {
         </div>
       )}
       {punchType && <PunchModal punchType={punchType} onClose={() => setPunchType(null)} />}
-        <div className="grid grid-cols-1 xl:grid-cols-[320px_1fr_320px] gap-md min-h-[640px]">
+        <div className="flex flex-col xl:grid xl:grid-cols-[280px_1fr_280px] gap-md min-h-[500px] xl:min-h-[640px]">
           <aside className="glass-card rounded-xl overflow-hidden">
             <div className="p-md border-b border-outline-variant/30">
               <h3 className="font-label-caps text-label-caps text-on-surface-variant tracking-widest">CHANNELS</h3>
@@ -766,7 +766,7 @@ export function StitchPage({ config }: { config: StitchPageConfig }) {
       {layout === 'command' ? aiPanel : metricGrid}
       {layout === 'command' ? metricGrid : aiPanel}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-lg">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-lg">
         <section className="flex flex-col gap-sm">
           <div className="flex justify-between items-center mb-xs">
             <h3 className="font-label-caps text-label-caps text-on-surface-variant tracking-widest">ACTIVE WORK QUEUE</h3>
