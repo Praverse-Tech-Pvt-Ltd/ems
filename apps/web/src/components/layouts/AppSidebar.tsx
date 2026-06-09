@@ -27,7 +27,7 @@ const navGroups: NavGroup[] = [
     items: [
       { href: '/employee-directory', label: 'Employees', icon: 'badge'       },
       { href: '/messaging-chat-hub', label: 'Chat',      icon: 'forum', badge: true },
-      { href: '/invoices',           label: 'Invoices',  icon: 'description' },
+      { href: '/invoices',           label: 'Invoices',  icon: 'description', roles: ['SUPER_ADMIN'] },
       { href: '/reports',            label: 'Reports',   icon: 'bar_chart'   },
     ],
   },
@@ -47,6 +47,7 @@ const navGroups: NavGroup[] = [
     label: 'Admin',
     roles: ['ADMIN', 'SUPER_ADMIN'],
     items: [
+      { href: '/admin-approvals',             label: 'Approvals',        icon: 'approval',       roles: ['SUPER_ADMIN'] },
       { href: '/audit-compliance-log',        label: 'Audit Log',        icon: 'verified_user',  roles: ['ADMIN', 'SUPER_ADMIN'] },
       { href: '/company-employee-assignment', label: 'Assign Companies', icon: 'assignment_ind', roles: ['SUPER_ADMIN'] },
     ],

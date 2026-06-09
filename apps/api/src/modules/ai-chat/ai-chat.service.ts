@@ -1,6 +1,7 @@
 import { Injectable, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { GeminiService } from '../ai-overview/gemini.service';
+import { AIProposalsService } from '../ai-proposals/ai-proposals.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { NotificationsGateway } from '../notifications/notifications.gateway';
 import { CompanyCalendarService } from '../company-calendar/company-calendar.service';
@@ -15,6 +16,7 @@ export class AIChatService {
   constructor(
     private prisma: PrismaService,
     private gemini: GeminiService,
+    private aiProposals: AIProposalsService,
     private notifications: NotificationsService,
     private notificationsGateway: NotificationsGateway,
     private companyCalendar: CompanyCalendarService,
@@ -336,6 +338,70 @@ export class AIChatService {
     const assignedEmployee = await this.resolveEmployee(question, intent.employeeName ?? null);
     const when = intent.date ? new Date(intent.date) : this.parseDueDate(question);
 
+    if (intent.action === 'ASSIGN_VISIT' || intent.action === 'SCHEDULE_EVENT') {
+      if (!assignedEmployee) return null;
+      const title = (
+        intent.title?.trim() || `Visit: ${foundCompany?.name ?? 'Client'} - ${assignedEmployee.firstName}`
+      ).substring(0, 200);
+      await this.aiProposals.create({
+        proposalType: 'CALENDAR_EVENT',
+        submittedBy: userId,
+        rawInput: question,
+        targetEntity: 'CalendarEvent',
+        targetEntityId: foundCompany?.id ?? null,
+        aiReason: intent.reason ?? null,
+        proposedData: {
+          title,
+          description: intent.reason?.toString().trim().substring(0, 500) || undefined,
+          eventType: intent.action === 'ASSIGN_VISIT' ? 'CLIENT_VISIT' : 'INTERNAL_MEETING',
+          startDate: when.toISOString(),
+          allDay: true,
+          companyId: foundCompany?.id,
+          assignedTo: assignedEmployee.id,
+        },
+      });
+      return `Queued for Pratham's approval - schedule "${title}" for ${when.toLocaleDateString('en-IN')}, assigned to ${assignedEmployee.firstName} ${assignedEmployee.lastName}. No calendar/database change has been applied yet.`;
+    }
+
+    if (intent.action === 'CREATE_FOLLOW_UP') {
+      if (!foundCompany) return null;
+      const reason = (intent.reason ?? intent.title ?? question).toString().trim().substring(0, 500);
+      await this.aiProposals.create({
+        proposalType: 'FOLLOW_UP_TASK',
+        submittedBy: userId,
+        rawInput: question,
+        targetEntity: 'FollowUpTask',
+        targetEntityId: foundCompany.id,
+        aiReason: reason,
+        proposedData: {
+          companyId: foundCompany.id,
+          assignedTo: assignedEmployee?.id ?? userId,
+          dueDate: when.toISOString(),
+          reason,
+        },
+      });
+      return `Queued for Pratham's approval - create a follow-up on ${foundCompany.name} due ${when.toLocaleDateString('en-IN')}${assignedEmployee ? `, assigned to ${assignedEmployee.firstName} ${assignedEmployee.lastName}` : ''}.`;
+    }
+
+    if (intent.action === 'UPDATE_COMPANY_NOTE') {
+      if (!foundCompany) return null;
+      const stage = (intent.title?.trim() || intent.reason?.trim() || '').toString();
+      if (!stage) return null;
+      await this.aiProposals.create({
+        proposalType: 'COMPANY_STAGE_UPDATE',
+        submittedBy: userId,
+        rawInput: question,
+        targetEntity: 'ClientCompany',
+        targetEntityId: foundCompany.id,
+        aiReason: stage,
+        proposedData: {
+          companyId: foundCompany.id,
+          currentStage: stage.substring(0, 200),
+        },
+      });
+      return `Queued for Pratham's approval - update ${foundCompany.name}'s current stage to "${stage}".`;
+    }
+
     try {
       switch (intent.action) {
         case 'ASSIGN_VISIT':
@@ -439,121 +505,71 @@ export class AIChatService {
 
     const updateDate = new Date();
     if (communicationType && foundCompany) {
-      const communication = await this.prisma.clientCommunication.create({
-        data: {
+      await this.aiProposals.create({
+        proposalType: 'CLIENT_COMMUNICATION',
+        submittedBy: userId,
+        rawInput: question,
+        targetEntity: 'ClientCommunication',
+        targetEntityId: foundCompany.id,
+        aiReason: extracted.nextAction ?? extracted.followUpAction ?? extracted.pendingTask ?? null,
+        proposedData: {
           companyId: foundCompany.id,
-          type: communicationType as any,
-          commDate: updateDate,
+          type: communicationType,
+          commDate: updateDate.toISOString(),
           summary: question,
           outcome: extracted.currentStatus ?? extracted.workStatus ?? null,
           nextAction: extracted.followUpAction ?? extracted.nextAction ?? extracted.pendingTask ?? null,
           createdBy: userId,
         },
       });
-
-      await this.prisma.companyTimelineEntry.create({
-        data: {
-          companyId: foundCompany.id,
-          entryType: communicationType === 'WHATSAPP' ? 'CLIENT_CALL' : 'CLIENT_CALL',
-          title: `AI logged ${communicationType.toLowerCase()} communication`,
-          description: question.substring(0, 200),
-          employeeId: userId,
-          referenceId: communication.id,
-          referenceType: 'ClientCommunication',
-          entryDate: updateDate,
-        },
-      });
-
-      await this.syncCompanyFromActivity(foundCompany.id, updateDate, extracted, question);
     }
 
     if (isMeetingMinutes) {
-      const note = await this.prisma.meetingNote.create({
-        data: {
+      const proposal = await this.aiProposals.create({
+        proposalType: 'MEETING_NOTE',
+        submittedBy: userId,
+        rawInput: question,
+        targetEntity: 'MeetingNote',
+        targetEntityId: foundCompany?.id ?? null,
+        aiReason: extracted.followUpAction ?? extracted.pendingGap ?? null,
+        proposedData: {
           enteredBy: userId,
           companyId: foundCompany?.id ?? null,
-          rawText: question,
-          meetingDate: updateDate,
-          extractedData: extracted as any,
+          meetingDate: updateDate.toISOString(),
+          extractedData: extracted,
           companyName: companyName ?? foundCompany?.name ?? null,
           employeeName: extracted.employeeName ?? null,
           workDiscussed: extracted.workDiscussed ?? null,
           assignedTo: extracted.assignedTo ?? assignedEmployee?.firstName ?? null,
-          deadline: extracted.deadline ? new Date(extracted.deadline) : this.parseDueDate(question),
+          deadline: extracted.deadline ? new Date(extracted.deadline).toISOString() : this.parseDueDate(question).toISOString(),
           currentStatus: extracted.currentStatus ?? null,
           pendingGap: extracted.pendingGap ?? null,
           followUpAction: extracted.followUpAction ?? extracted.pendingGap ?? null,
           priorityLevel: extracted.priorityLevel ?? (question.toLowerCase().includes('urgent') ? 'HIGH' : 'MEDIUM'),
           ownerNote: extracted.ownerNote ?? null,
-          needsAdminReview: !foundCompany || !assignedEmployee,
         },
       });
 
-      if (foundCompany) {
-        await this.prisma.companyTimelineEntry.create({
-          data: {
-            companyId: foundCompany.id,
-            entryType: 'MEETING_NOTE',
-            title: `AI MOM: ${(extracted.workDiscussed ?? question).substring(0, 60)}`,
-            description: extracted.followUpAction ?? extracted.pendingGap ?? question.substring(0, 200),
-            employeeId: userId,
-            referenceId: note.id,
-            referenceType: 'MeetingNote',
-            entryDate: updateDate,
-          },
-        });
-
-        await this.syncCompanyFromActivity(foundCompany.id, updateDate, extracted, question);
-
-        if (assignedEmployee && (extracted.followUpAction || extracted.pendingGap || /\bassign\b/i.test(question))) {
-          const assignedReason =
-            /\bassign\b/i.test(question)
-              ? [
-                  extracted.workDiscussed ? `Complete/review: ${extracted.workDiscussed}` : null,
-                  extracted.pendingGap ? `Pending gap: ${extracted.pendingGap}` : null,
-                  extracted.followUpAction ? `Next action: ${extracted.followUpAction}` : null,
-                ].filter(Boolean).join(' | ') || question.substring(0, 250)
-              : extracted.followUpAction ?? extracted.pendingGap ?? question.substring(0, 250);
-
-          const task = await this.prisma.followUpTask.create({
-            data: {
-              companyId: foundCompany.id,
-              assignedTo: assignedEmployee.id,
-              dueDate: extracted.deadline ? new Date(extracted.deadline) : this.parseDueDate(question),
-              reason: assignedReason,
-            },
-          });
-
-          await this.prisma.companyTimelineEntry.create({
-            data: {
-              companyId: foundCompany.id,
-              entryType: 'PENDING_TASK',
-              title: `AI follow-up assigned to ${assignedEmployee.firstName} ${assignedEmployee.lastName}`,
-              description: task.reason,
-              employeeId: userId,
-              referenceId: task.id,
-              referenceType: 'FollowUpTask',
-              entryDate: updateDate,
-            },
-          });
-        }
-      }
-
       return {
-        updateId: note.id,
-        updateType: 'meeting note',
+        updateId: proposal.id,
+        updateType: 'meeting note proposal',
         companyName: foundCompany?.name ?? companyName,
-        needsAdminReview: note.needsAdminReview,
+        needsAdminReview: true,
       };
     }
 
-    const update = await this.prisma.workUpdate.create({
-      data: {
+    const proposal = await this.aiProposals.create({
+      proposalType: 'WORK_UPDATE',
+      submittedBy: userId,
+      rawInput: question,
+      targetEntity: 'WorkUpdate',
+      targetEntityId: foundCompany?.id ?? null,
+      aiReason: extracted.nextAction ?? extracted.pendingTask ?? null,
+      proposedData: {
         employeeId: userId,
         companyId: foundCompany?.id ?? null,
-        rawText: question,
-        updateDate,
-        extractedData: extracted as any,
+        updateDate: updateDate.toISOString(),
+        extractedData: extracted,
         companyName: companyName ?? foundCompany?.name ?? null,
         taskCompleted: extracted.taskCompleted ?? null,
         pendingTask: extracted.pendingTask ?? null,
@@ -561,33 +577,16 @@ export class AIChatService {
         contribution: extracted.contribution ?? null,
         workStatus: extracted.workStatus ?? null,
         nextAction: extracted.nextAction ?? null,
-        needsAdminReview: !foundCompany || String(extracted.needsAdminReview) === 'true',
       },
     });
 
-    if (foundCompany) {
-      await this.prisma.companyTimelineEntry.create({
-        data: {
-          companyId: foundCompany.id,
-          entryType: 'EMPLOYEE_UPDATE',
-          title: `AI chat update: ${(extracted.taskCompleted ?? question).substring(0, 60)}`,
-          description: extracted.pendingTask ?? extracted.nextAction ?? question.substring(0, 200),
-          employeeId: userId,
-          referenceId: update.id,
-          referenceType: 'WorkUpdate',
-          entryDate: updateDate,
-        },
-      });
-
-      await this.syncCompanyFromActivity(foundCompany.id, updateDate, extracted, question);
-    }
-
     return {
-      updateId: update.id,
-      updateType: 'work update',
+      updateId: proposal.id,
+      updateType: 'work update proposal',
       companyName: foundCompany?.name ?? companyName,
-      needsAdminReview: update.needsAdminReview,
+      needsAdminReview: true,
     };
+
   }
 
   async sendMessage(sessionId: string, question: string, userId: string, userEmail: string) {
@@ -602,10 +601,10 @@ You help Pratham/Ashwani monitor clients, team updates, pending gaps, follow-ups
 Use ONLY the live EMS data shown below. Be concise, direct, and actionable.
 When a client issue is mentioned, identify the likely company, summarize what is known, highlight risks/gaps, and suggest the next operational action.
 If the data does not contain the answer, say what is missing and what should be captured in EMS.
-MOM/team-discussion messages are automatically saved as meeting notes, linked to company timelines, and can create follow-up tasks when assignee/deadline/action is present.
-Work-update messages are automatically saved as work updates and linked to company timelines.
-${recordedUpdate ? `\nThe owner's latest message was saved as a ${recordedUpdate.updateType}. Saved company: ${recordedUpdate.companyName ?? 'needs review'}. Needs admin review: ${recordedUpdate.needsAdminReview}. Mention this briefly before analysis.` : ''}
-${actionConfirmation ? `\nYou were asked to take an action and you ALREADY DID IT. Lead your reply with this exact confirmation, verbatim: "${actionConfirmation}"` : ''}
+MOM/team-discussion messages are queued as AI proposals for Pratham/SUPER_ADMIN approval before they become meeting notes, timelines, or follow-up tasks.
+Work-update messages are queued as AI proposals for approval before they become shared database updates.
+${recordedUpdate ? `\nThe owner's latest message was queued as a ${recordedUpdate.updateType}. Proposed company: ${recordedUpdate.companyName ?? 'needs review'}. Approval required: ${recordedUpdate.needsAdminReview}. Mention this briefly before analysis.` : ''}
+${actionConfirmation ? `\nYou were asked to prepare an action and you queued it for approval. Lead your reply with this exact confirmation, verbatim: "${actionConfirmation}"` : ''}
 
 ${context}
 

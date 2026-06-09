@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/commo
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { GeminiService } from '../ai-overview/gemini.service';
 import { ConfigService } from '@nestjs/config';
+import { AIProposalsService } from '../ai-proposals/ai-proposals.service';
 
 @Injectable()
 export class MeetingNotesService {
@@ -11,6 +12,7 @@ export class MeetingNotesService {
     private prisma: PrismaService,
     private gemini: GeminiService,
     private config: ConfigService,
+    private aiProposals: AIProposalsService,
   ) {
     const raw = this.config.get<string>('OWNER_EMPLOYEE_IDS', '');
     this.ownerIds = raw.split(',').map(s => s.trim()).filter(Boolean);
@@ -33,48 +35,33 @@ export class MeetingNotesService {
 
     const needsAdminReview = !resolvedCompanyId || !extracted.assignedTo;
 
-    const note = await this.prisma.meetingNote.create({
-      data: {
+    const proposal = await this.aiProposals.create({
+      proposalType: 'MEETING_NOTE',
+      submittedBy: enteredBy,
+      rawInput: dto.rawText,
+      targetEntity: 'MeetingNote',
+      targetEntityId: resolvedCompanyId,
+      aiReason: extracted.followUpAction ?? extracted.pendingGap ?? null,
+      proposedData: {
         rawText: dto.rawText,
-        meetingDate: new Date(dto.meetingDate),
+        meetingDate: new Date(dto.meetingDate).toISOString(),
         companyId: resolvedCompanyId,
         enteredBy,
-        extractedData: extracted as any,
+        extractedData: extracted,
         companyName: extracted.companyName ?? null,
         employeeName: extracted.employeeName ?? null,
         workDiscussed: extracted.workDiscussed ?? null,
         assignedTo: extracted.assignedTo ?? null,
-        deadline: extracted.deadline ? new Date(extracted.deadline) : null,
+        deadline: extracted.deadline ? new Date(extracted.deadline).toISOString() : null,
         currentStatus: extracted.currentStatus ?? null,
         pendingGap: extracted.pendingGap ?? null,
         followUpAction: extracted.followUpAction ?? null,
         priorityLevel: extracted.priorityLevel ?? null,
         ownerNote: extracted.ownerNote ?? null,
-        needsAdminReview,
       },
     });
 
-    if (resolvedCompanyId) {
-      await this.prisma.companyTimelineEntry.create({
-        data: {
-          companyId: resolvedCompanyId,
-          entryType: 'MEETING_NOTE',
-          title: `Meeting note: ${extracted.workDiscussed?.substring(0, 60) ?? dto.rawText.substring(0, 60)}`,
-          description: extracted.followUpAction ?? extracted.pendingGap ?? '',
-          employeeId: enteredBy,
-          referenceId: note.id,
-          referenceType: 'MeetingNote',
-          entryDate: new Date(dto.meetingDate),
-        },
-      });
-
-      await this.prisma.clientCompany.update({
-        where: { id: resolvedCompanyId },
-        data: { lastCommunicationDate: new Date(dto.meetingDate) },
-      });
-    }
-
-    return { note, extracted, needsAdminReview };
+    return { proposal, extracted, needsAdminReview: true, approvalRequired: true };
   }
 
   async findAll(query: { companyId?: string; needsReview?: boolean; page?: number; limit?: number }) {

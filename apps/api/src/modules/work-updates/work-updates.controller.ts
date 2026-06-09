@@ -2,11 +2,13 @@ import { Controller, Get, Post, Patch, Body, Param, Query, UseGuards } from '@ne
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { WorkUpdatesService } from './work-updates.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
 @ApiTags('work-updates')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('work-updates')
 export class WorkUpdatesController {
   constructor(private readonly service: WorkUpdatesService) {}
@@ -20,6 +22,7 @@ export class WorkUpdatesController {
   }
 
   @Get()
+  @Roles('ADMIN', 'SUPER_ADMIN', 'MANAGER')
   findAll(@Query() query: any) {
     return this.service.findAll({
       companyId: query.companyId,
@@ -40,6 +43,7 @@ export class WorkUpdatesController {
   }
 
   @Patch(':id/review')
+  @Roles('SUPER_ADMIN')
   review(
     @Param('id') id: string,
     @Body('status') status: 'APPROVED' | 'NEEDS_CORRECTION',

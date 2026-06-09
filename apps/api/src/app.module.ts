@@ -34,6 +34,7 @@ import { CompanyDocumentsModule } from './modules/company-documents/company-docu
 import { ClientCommunicationsModule } from './modules/client-communications/client-communications.module';
 import { FollowUpTasksModule } from './modules/follow-up-tasks/follow-up-tasks.module';
 import { AIChatModule } from './modules/ai-chat/ai-chat.module';
+import { AIProposalsModule } from './modules/ai-proposals/ai-proposals.module';
 import { ZohoSyncModule } from './modules/zoho-sync/zoho-sync.module';
 
 @Module({
@@ -96,6 +97,7 @@ import { ZohoSyncModule } from './modules/zoho-sync/zoho-sync.module';
     CompanyDocumentsModule,
     ClientCommunicationsModule,
     FollowUpTasksModule,
+    AIProposalsModule,
     AIChatModule,
     ZohoSyncModule,
   ],
