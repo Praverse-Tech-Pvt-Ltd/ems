@@ -199,9 +199,9 @@ export const stitchPages: Record<string, StitchPageConfig> = {
       { label: 'Follow-ups', value: 'AI', meta: 'Next action', icon: 'notification_important' },
     ],
     primaryItems: [
-      { title: 'Contract renewal: TechCorp', subtitle: 'Documents and invoice activity require review', status: 'Review' },
-      { title: 'Quiet account detected', subtitle: 'Engagement has reduced across recent communications', status: 'Risk' },
-      { title: 'Client visit due', subtitle: 'Schedule field visit and capture notes', status: 'Action' },
+      { title: 'Live client portfolio', subtitle: 'Companies come from current EMS client records only', status: 'Live' },
+      { title: 'Open follow-ups', subtitle: 'Client tasks are generated from real assignments and alerts', status: 'Review' },
+      { title: 'Visit and communication gaps', subtitle: 'Risk is based on recorded visits, calls, and updates', status: 'Action' },
     ],
     secondaryItems: [
       { title: 'Run alert check', subtitle: 'Refresh client health signals' },
@@ -225,9 +225,9 @@ export const stitchPages: Record<string, StitchPageConfig> = {
       { label: 'Visits', value: 'Logged', meta: 'Field notes', tone: 'tertiary', icon: 'location_on' },
     ],
     primaryItems: [
-      { title: 'Missing compliance document', subtitle: 'Upload or request from client owner', status: 'Gap' },
-      { title: 'Delayed invoice response', subtitle: 'Finance follow-up recommended', status: 'Risk' },
-      { title: 'No recent communication', subtitle: 'Schedule stakeholder touchpoint', status: 'Action' },
+      { title: 'Live gap signals', subtitle: 'Gaps are calculated from company activity, alerts, and follow-ups', status: 'Gap' },
+      { title: 'AI next action', subtitle: 'Generate a recommendation from the selected company record', status: 'Ready' },
+      { title: 'Assignable actions', subtitle: 'Create real follow-up tasks for current employees', status: 'Action' },
     ],
     secondaryItems: [
       { title: 'Generate AI summary', subtitle: 'Summarize client health and missing items' },
@@ -303,9 +303,9 @@ export const stitchPages: Record<string, StitchPageConfig> = {
       { label: 'Exports', value: 'PDF/XLSX', meta: 'Board ready', icon: 'download' },
     ],
     primaryItems: [
-      { title: 'Q3 reviews completion', subtitle: 'Performance review summary ready', status: '85%' },
-      { title: 'AI recommendation', subtitle: 'Prioritize delayed approvals and high-risk clients', status: 'Action' },
-      { title: 'Weekly management pack', subtitle: 'Export current company status', status: 'Ready' },
+      { title: 'Live weekly review', subtitle: 'Attendance, leaves, expenses, clients, and updates are pulled from EMS', status: 'Live' },
+      { title: 'AI recommendation', subtitle: 'Prioritize pending approvals and high-risk client work', status: 'Action' },
+      { title: 'Management pack', subtitle: 'Export current company status from live data', status: 'Ready' },
     ],
     secondaryItems: [
       { title: 'Export PDF', subtitle: 'Download management review deck' },
@@ -355,9 +355,9 @@ export const stitchPages: Record<string, StitchPageConfig> = {
       { label: 'Updates', value: 'Reviewed', meta: 'Manager flow', icon: 'task' },
     ],
     primaryItems: [
-      { title: 'Delivery pod coverage', subtitle: 'AI recommends backup owners for critical work', status: 'Insight' },
-      { title: 'Onboarding gap', subtitle: 'New hire documents and setup still pending', status: 'Action' },
-      { title: 'Performance trend', subtitle: 'Work updates show rising throughput', status: 'Positive' },
+      { title: 'Employee workload map', subtitle: 'Uses current employee records and approved work updates', status: 'Insight' },
+      { title: 'Onboarding and document gaps', subtitle: 'Shows only current employee setup/document status', status: 'Action' },
+      { title: 'Performance trend', subtitle: 'Based on reviewed work updates and follow-up completion', status: 'Live' },
     ],
     secondaryItems: [
       { title: 'Review work map', subtitle: 'Inspect employee workload and collaboration' },
