@@ -6,12 +6,14 @@ import axios from 'axios';
 import { useAuthStore } from '@/store/auth.store';
 import { AppSidebar } from '@/components/layouts/AppSidebar';
 import { AppTopNav } from '@/components/layouts/AppTopNav';
+import { NotificationsDrawer } from '@/components/layouts/NotificationsDrawer';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { accessToken, setAccessToken, clearAuth } = useAuthStore();
   const [authReady, setAuthReady] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
 
   useEffect(() => {
     if (accessToken) {
@@ -69,11 +71,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
       {/* Right column: top nav + scrollable content */}
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
-        <AppTopNav onMenuOpen={() => setNavOpen(!navOpen)} />
+        <AppTopNav onMenuOpen={() => setNavOpen(!navOpen)} onNotifOpen={() => setNotifOpen(true)} />
         <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-8 bg-background">
           {children}
         </main>
       </div>
+
+      {/* Notifications drawer — portal-level, outside the column layout */}
+      <NotificationsDrawer open={notifOpen} onClose={() => setNotifOpen(false)} />
     </div>
   );
 }

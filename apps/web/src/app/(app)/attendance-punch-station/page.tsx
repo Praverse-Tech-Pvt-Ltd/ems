@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { attendanceService } from '@/lib/api/attendance';
 import { useAuthStore } from '@/store/auth.store';
-import type { AttendanceRecord } from '@/types';
+import type { AttendanceRecord, AttendanceStatus } from '@/types';
 
 function Clock() {
   const [time, setTime] = useState('');
@@ -17,15 +17,79 @@ function Clock() {
 }
 
 const STATUS_COLOR: Record<string, string> = {
-  PRESENT: 'bg-tertiary text-on-primary',
+  PRESENT: 'bg-success text-white',
   LATE: 'bg-primary text-on-primary',
   ABSENT: 'bg-error text-on-error',
-  HALF_DAY: 'bg-secondary-container text-on-secondary-container',
-  WFH: 'bg-primary/20 text-primary',
-  LEAVE: 'bg-on-surface-variant/20 text-on-surface-variant',
-  HOLIDAY: 'bg-tertiary/20 text-tertiary',
+  HALF_DAY: 'bg-secondary text-on-secondary',
+  WFH: 'bg-[#7c3aed] text-white',
+  LEAVE: 'bg-on-surface-variant text-inverse-on-surface',
+  HOLIDAY: 'bg-tertiary-fixed-dim text-on-tertiary-fixed',
   MISSING_PUNCH_OUT: 'bg-error/20 text-error',
 };
+
+const CALENDAR_MARK: Record<AttendanceStatus, string> = {
+  PRESENT: 'bg-success text-white border-success',
+  LATE: 'bg-primary text-on-primary border-primary',
+  ABSENT: 'bg-error text-on-error border-error',
+  HALF_DAY: 'bg-secondary text-on-secondary border-secondary',
+  WFH: 'bg-[#7c3aed] text-white border-[#7c3aed]',
+  LEAVE: 'bg-on-surface-variant text-inverse-on-surface border-on-surface-variant',
+  HOLIDAY: 'bg-tertiary-fixed-dim text-on-tertiary-fixed border-tertiary-fixed-dim',
+  MISSING_PUNCH_OUT: 'bg-error/10 text-error border-error/30',
+};
+
+const WEEKEND_MARK = 'bg-surface-container-highest text-on-surface-variant border-outline-variant';
+
+const CALENDAR_LEGEND: Array<{ key: AttendanceStatus | 'WEEKEND_OFF'; label: string; dot: string }> = [
+  { key: 'PRESENT', label: 'Present', dot: 'bg-success border-success' },
+  { key: 'LATE', label: 'Late', dot: 'bg-primary border-primary' },
+  { key: 'ABSENT', label: 'Absent', dot: 'bg-error border-error' },
+  { key: 'HALF_DAY', label: 'Half day', dot: 'bg-secondary border-secondary' },
+  { key: 'WFH', label: 'WFH', dot: 'bg-[#7c3aed] border-[#7c3aed]' },
+  { key: 'LEAVE', label: 'Leave', dot: 'bg-on-surface-variant border-on-surface-variant' },
+  { key: 'HOLIDAY', label: 'Holiday', dot: 'bg-tertiary-fixed-dim border-tertiary-fixed-dim' },
+  { key: 'WEEKEND_OFF', label: 'Weekend off', dot: 'bg-surface-container-highest border-outline-variant' },
+  { key: 'MISSING_PUNCH_OUT', label: 'Missing punch', dot: 'bg-error-container border-error' },
+];
+
+function dateKey(date: Date | string) {
+  const d = typeof date === 'string' ? new Date(date) : date;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function monthBounds(month: Date) {
+  const first = new Date(month.getFullYear(), month.getMonth(), 1);
+  const last = new Date(month.getFullYear(), month.getMonth() + 1, 0);
+  return { from: dateKey(first), to: dateKey(last) };
+}
+
+function buildCalendarDays(month: Date) {
+  const first = new Date(month.getFullYear(), month.getMonth(), 1);
+  const last = new Date(month.getFullYear(), month.getMonth() + 1, 0);
+  const leading = first.getDay();
+  const totalCells = Math.ceil((leading + last.getDate()) / 7) * 7;
+
+  return Array.from({ length: totalCells }, (_, index) => {
+    const day = index - leading + 1;
+    const date = new Date(month.getFullYear(), month.getMonth(), day);
+    return {
+      date,
+      key: dateKey(date),
+      inMonth: day >= 1 && day <= last.getDate(),
+      isToday: dateKey(date) === dateKey(new Date()),
+    };
+  });
+}
+
+function hasSaturdayOff(user?: { firstName?: string } | null) {
+  const firstName = user?.firstName?.trim().toLowerCase();
+  return firstName === 'maanav' || firstName === 'dev';
+}
+
+function isWeekendOff(date: Date, saturdayOff: boolean) {
+  const day = date.getDay();
+  return day === 0 || (saturdayOff && day === 6);
+}
 
 export default function AttendancePunchStationPage() {
   const user = useAuthStore(s => s.user);
@@ -33,6 +97,9 @@ export default function AttendancePunchStationPage() {
 
   const [today, setToday] = useState<any>(null);
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
+  const [calendarRecords, setCalendarRecords] = useState<AttendanceRecord[]>([]);
+  const [calendarMonth, setCalendarMonth] = useState(() => new Date());
+  const [selectedDate, setSelectedDate] = useState(() => dateKey(new Date()));
   const [stats, setStats] = useState<any>(null);
   const [allRecords, setAllRecords] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -44,14 +111,17 @@ export default function AttendancePunchStationPage() {
 
   const load = async () => {
     try {
-      const [todayData, statsData, recordsData] = await Promise.all([
+      const { from, to } = monthBounds(calendarMonth);
+      const [todayData, statsData, recordsData, calendarData] = await Promise.all([
         attendanceService.today().catch(() => null),
         attendanceService.myStats().catch(() => null),
         attendanceService.my({ limit: 14 }).catch(() => []),
+        attendanceService.my({ from, to }).catch(() => []),
       ]);
       setToday(todayData);
       setStats(statsData);
       setRecords(Array.isArray(recordsData) ? recordsData : recordsData?.data ?? []);
+      setCalendarRecords(Array.isArray(calendarData) ? calendarData : calendarData?.data ?? []);
 
       if (isAdmin) {
         const all = await attendanceService.all().catch(() => []);
@@ -64,7 +134,7 @@ export default function AttendancePunchStationPage() {
     }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [calendarMonth]);
 
   const isPunchedIn = today?.punchInTime && !today?.punchOutTime;
   const isPunchedOut = today?.punchInTime && today?.punchOutTime;
@@ -129,6 +199,20 @@ export default function AttendancePunchStationPage() {
   };
 
   const last7 = records.slice(0, 7);
+  const calendarDays = useMemo(() => buildCalendarDays(calendarMonth), [calendarMonth]);
+  const recordsByDate = useMemo(() => {
+    return calendarRecords.reduce<Record<string, AttendanceRecord>>((acc, rec) => {
+      acc[dateKey(rec.date)] = rec;
+      return acc;
+    }, {});
+  }, [calendarRecords]);
+  const selectedRecord = recordsByDate[selectedDate];
+  const saturdayOff = hasSaturdayOff(user);
+  const selectedIsWeekendOff = isWeekendOff(new Date(selectedDate), saturdayOff) && !selectedRecord;
+  const monthLabel = calendarMonth.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+  const changeMonth = (delta: number) => {
+    setCalendarMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + delta, 1));
+  };
 
   return (
     <div className="flex flex-col gap-lg">
@@ -259,6 +343,158 @@ export default function AttendancePunchStationPage() {
               <span className="text-on-surface font-mono">OFFICE_WIFI_5G</span>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Monthly calendar */}
+      <div className="glass-card rounded-2xl p-lg border border-outline-variant/30">
+        <div className="flex flex-col gap-md lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <p className="font-label-caps text-label-caps text-on-surface-variant tracking-widest mb-xs">
+              MONTHLY ATTENDANCE
+            </p>
+            <h3 className="font-title-lg text-title-lg text-on-surface">{monthLabel}</h3>
+          </div>
+          <div className="flex items-center gap-xs">
+            <button
+              type="button"
+              onClick={() => changeMonth(-1)}
+              className="w-10 h-10 rounded-full border border-outline-variant/40 bg-surface-container-low text-on-surface hover:bg-surface-container-high transition-colors"
+              aria-label="Previous month"
+            >
+              <span className="material-symbols-outlined text-[20px]">chevron_left</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const now = new Date();
+                setCalendarMonth(new Date(now.getFullYear(), now.getMonth(), 1));
+                setSelectedDate(dateKey(now));
+              }}
+              className="h-10 px-4 rounded-full border border-outline-variant/40 bg-surface-container-low text-on-surface text-sm font-semibold hover:bg-surface-container-high transition-colors"
+            >
+              Today
+            </button>
+            <button
+              type="button"
+              onClick={() => changeMonth(1)}
+              className="w-10 h-10 rounded-full border border-outline-variant/40 bg-surface-container-low text-on-surface hover:bg-surface-container-high transition-colors"
+              aria-label="Next month"
+            >
+              <span className="material-symbols-outlined text-[20px]">chevron_right</span>
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-md grid grid-cols-1 xl:grid-cols-[1fr_280px] gap-lg">
+          <div>
+            <div className="grid grid-cols-7 gap-2 mb-2">
+              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                <div key={day} className="text-center text-[10px] font-bold tracking-widest text-on-surface-variant uppercase">
+                  {day}
+                </div>
+              ))}
+            </div>
+            <div className="grid grid-cols-7 gap-2">
+              {calendarDays.map(day => {
+                const rec = recordsByDate[day.key];
+                const weekendOff = day.inMonth && !rec && isWeekendOff(day.date, saturdayOff);
+                const isSelected = selectedDate === day.key;
+                const markClass = rec
+                  ? CALENDAR_MARK[rec.status]
+                  : weekendOff
+                    ? WEEKEND_MARK
+                    : 'bg-surface-container-low text-on-surface-variant border-outline-variant/30';
+
+                return (
+                  <button
+                    type="button"
+                    key={day.key}
+                    onClick={() => setSelectedDate(day.key)}
+                    className={[
+                      'min-h-[72px] rounded-2xl border p-2 text-left transition-all hover:-translate-y-0.5 hover:shadow-sm',
+                      day.inMonth ? markClass : 'bg-transparent text-on-surface-variant/30 border-transparent',
+                      isSelected ? 'ring-2 ring-primary ring-offset-2 ring-offset-background' : '',
+                    ].join(' ')}
+                  >
+                    <div className="flex items-start justify-between gap-1">
+                      <span className={`text-sm font-black tabular-nums ${day.isToday ? 'underline decoration-2 underline-offset-4' : ''}`}>
+                        {day.date.getDate()}
+                      </span>
+                      {rec?.isRegularized && (
+                        <span className="material-symbols-outlined text-[14px]" title="Regularized">edit_calendar</span>
+                      )}
+                    </div>
+                    {rec && (
+                      <div className="mt-2 space-y-1">
+                        <p className="text-[10px] font-black tracking-wide truncate">{rec.status.replaceAll('_', ' ')}</p>
+                        <p className="text-[10px] opacity-80 tabular-nums">{fmtHrs(rec.workingHours)}</p>
+                      </div>
+                    )}
+                    {weekendOff && (
+                      <div className="mt-2">
+                        <p className="text-[10px] font-black tracking-wide truncate">WEEKEND OFF</p>
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <aside className="rounded-2xl bg-surface-container-low border border-outline-variant/30 p-md">
+            <p className="font-label-caps text-label-caps text-on-surface-variant tracking-widest mb-sm">
+              SELECTED DAY
+            </p>
+            <h4 className="font-bold text-on-surface">
+              {new Date(selectedDate).toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}
+            </h4>
+            {selectedRecord ? (
+              <div className="mt-md space-y-sm">
+                <span className={`inline-flex px-3 py-1 rounded-full text-xs font-bold ${STATUS_COLOR[selectedRecord.status] ?? 'bg-surface-container-high text-on-surface'}`}>
+                  {selectedRecord.status.replaceAll('_', ' ')}
+                </span>
+                <div className="grid grid-cols-2 gap-sm">
+                  {[
+                    { label: 'Punch In', value: fmtTime(selectedRecord.punchInTime) },
+                    { label: 'Punch Out', value: fmtTime(selectedRecord.punchOutTime) },
+                    { label: 'Hours', value: fmtHrs(selectedRecord.workingHours) },
+                    { label: 'Regularized', value: selectedRecord.isRegularized ? 'Yes' : 'No' },
+                  ].map(item => (
+                    <div key={item.label} className="rounded-xl bg-background/70 p-sm">
+                      <p className="text-[10px] text-on-surface-variant font-label-caps tracking-widest">{item.label}</p>
+                      <p className="font-semibold text-on-surface text-sm mt-0.5">{item.value}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : selectedIsWeekendOff ? (
+              <div className="mt-md space-y-sm">
+                <span className="inline-flex px-3 py-1 rounded-full text-xs font-bold bg-surface-container-high text-on-surface-variant border border-outline-variant">
+                  WEEKEND OFF
+                </span>
+                <p className="text-sm text-on-surface-variant">
+                  This day is configured as a weekly off for {saturdayOff ? 'this employee' : 'employees on the standard schedule'}.
+                </p>
+              </div>
+            ) : (
+              <p className="mt-md text-sm text-on-surface-variant">
+                No attendance marking found for this date.
+              </p>
+            )}
+
+            <div className="mt-lg border-t border-outline-variant/30 pt-md">
+              <p className="font-label-caps text-label-caps text-on-surface-variant tracking-widest mb-sm">LEGEND</p>
+              <div className="grid grid-cols-1 gap-3">
+                {CALENDAR_LEGEND.map(item => (
+                  <div key={item.key} className="flex items-center gap-3 text-sm font-semibold text-on-surface-variant">
+                    <span className={`w-3.5 h-3.5 rounded-full border ${item.dot}`} />
+                    <span>{item.label}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </aside>
         </div>
       </div>
 

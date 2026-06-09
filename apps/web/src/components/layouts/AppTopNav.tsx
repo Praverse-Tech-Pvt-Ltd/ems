@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import Image from 'next/image';
 import { Bell, Search, ChevronRight } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { apiClient } from '@/lib/api-client';
 
 const PAGE_LABELS: Record<string, string> = {
   '/dashboard':                   'Dashboard',
@@ -74,10 +76,27 @@ function LiveClock() {
 }
 
 /* ── Top nav ─────────────────────────────────────────────────────── */
-export function AppTopNav({ onMenuOpen }: { onMenuOpen: () => void }) {
+export function AppTopNav({
+  onMenuOpen,
+  onNotifOpen,
+}: {
+  onMenuOpen: () => void;
+  onNotifOpen?: () => void;
+}) {
   const pathname  = usePathname();
   const pageLabel = PAGE_LABELS[pathname] ?? 'NexGen EMS';
   const [focused, setFocused] = useState(false);
+
+  // Fetch unread notification count for badge
+  const { data: unreadData } = useQuery({
+    queryKey: ['notifications-unread-count'],
+    queryFn: () => apiClient.get('/notifications').then(r => r.data),
+    refetchInterval: 30_000,
+    retry: false,
+  });
+  const unreadCount: number = Array.isArray(unreadData)
+    ? unreadData.filter((n: { isRead?: boolean }) => !n.isRead).length
+    : 0;
 
   return (
     <header
@@ -142,12 +161,19 @@ export function AppTopNav({ onMenuOpen }: { onMenuOpen: () => void }) {
 
       {/* Bell button */}
       <button
+        onClick={onNotifOpen}
         className="relative p-2 rounded-lg text-on-surface-variant transition-all duration-150 hover:bg-primary-container/40 hover:text-primary"
         aria-label="Notifications"
       >
         <Bell size={17} />
-        {/* Notification dot with pulse */}
-        <span className="absolute top-1.5 right-1.5 w-[8px] h-[8px] rounded-full bg-primary border-2 border-card animate-pulse-dot" />
+        {/* Notification badge — shows count if > 0, otherwise animated dot */}
+        {unreadCount > 0 ? (
+          <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-primary text-on-primary text-[9px] font-bold flex items-center justify-center border border-card">
+            {unreadCount > 99 ? '99+' : unreadCount}
+          </span>
+        ) : (
+          <span className="absolute top-1.5 right-1.5 w-[8px] h-[8px] rounded-full bg-primary border-2 border-card animate-pulse-dot" />
+        )}
       </button>
 
       {/* Live clock */}

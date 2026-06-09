@@ -62,30 +62,47 @@ export class AttendanceService {
     });
     const name = employee?.firstName.toLowerCase() || '';
 
+    // Shift 09:00–17:30 → grace window 09:15 / late 09:30 / early-out 17:15
     if (name.includes('shifa') || name.includes('chandni') || name.includes('dilip')) {
       return {
-        PRESENT_CUTOFF: 9 * 60 + 15, // 9:15 AM
-        LATE_CUTOFF: 9 * 60 + 30,    // 9:30 AM
-        EARLY_OUT_CUTOFF: 17 * 60 + 15, // 5:15 PM
+        PRESENT_CUTOFF:   9 * 60 + 15,  // 09:15 AM
+        LATE_CUTOFF:      9 * 60 + 30,  // 09:30 AM
+        EARLY_OUT_CUTOFF: 17 * 60 + 15, // 05:15 PM
         policyText: {
-          presentCutoff: '09:15',
-          lateCutoff: '09:30',
+          presentCutoff:  '09:15',
+          lateCutoff:     '09:30',
           earlyOutCutoff: '17:15',
-          regularPunchOut: '17:30',
-        }
+          regularPunchOut:'17:30',
+        },
       };
     }
 
+    // Shift 10:00–18:30 → grace window 10:15 / late 10:30 / early-out 18:15
+    if (name.includes('maanav')) {
+      return {
+        PRESENT_CUTOFF:   10 * 60 + 15, // 10:15 AM
+        LATE_CUTOFF:      10 * 60 + 30, // 10:30 AM
+        EARLY_OUT_CUTOFF: 18 * 60 + 15, // 06:15 PM
+        policyText: {
+          presentCutoff:  '10:15',
+          lateCutoff:     '10:30',
+          earlyOutCutoff: '18:15',
+          regularPunchOut:'18:30',
+        },
+      };
+    }
+
+    // Default shift 09:30–18:00 → grace window 09:45 / late 10:00 / early-out 17:45
     return {
-      PRESENT_CUTOFF: 9 * 60 + 45, // 9:45 AM
-      LATE_CUTOFF: 10 * 60,        // 10:00 AM
-      EARLY_OUT_CUTOFF: 17 * 60 + 45, // 5:45 PM
+      PRESENT_CUTOFF:   9 * 60 + 45,  // 09:45 AM
+      LATE_CUTOFF:      10 * 60,       // 10:00 AM
+      EARLY_OUT_CUTOFF: 17 * 60 + 45, // 05:45 PM
       policyText: {
-        presentCutoff: '09:45',
-        lateCutoff: '10:00',
+        presentCutoff:  '09:45',
+        lateCutoff:     '10:00',
         earlyOutCutoff: '17:45',
-        regularPunchOut: '18:00',
-      }
+        regularPunchOut:'18:00',
+      },
     };
   }
 
