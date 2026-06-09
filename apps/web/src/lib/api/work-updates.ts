@@ -30,3 +30,14 @@ export const aiService = {
   chatHistory: (sessionId: string) =>
     apiClient.get(`/ai-chat/history/${sessionId}`).then(r => r.data),
 };
+
+export const aiProposalsService = {
+  all: (params?: { status?: 'PENDING' | 'APPROVED' | 'REJECTED'; page?: number; limit?: number }) =>
+    apiClient.get('/ai-proposals', { params }).then(r => r.data),
+
+  approve: (id: string, corrections?: Record<string, any>) =>
+    apiClient.patch(`/ai-proposals/${id}/approve`, { corrections }).then(r => r.data),
+
+  reject: (id: string, reason?: string) =>
+    apiClient.patch(`/ai-proposals/${id}/reject`, { reason }).then(r => r.data),
+};

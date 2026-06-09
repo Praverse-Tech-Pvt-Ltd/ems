@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { workUpdatesService, aiService } from '@/lib/api/work-updates';
+import { workUpdatesService, aiService, aiProposalsService } from '@/lib/api/work-updates';
 import { useAuthStore } from '@/store/auth.store';
 
 function parseUpdate(text: string) {
@@ -34,9 +34,12 @@ const heatColors = ['bg-surface-container-highest', 'bg-primary/20', 'bg-primary
 export default function AiWorkIntelligencePage() {
   const user = useAuthStore(s => s.user);
   const isAdmin = ['ADMIN', 'SUPER_ADMIN', 'MANAGER'].includes(user?.role ?? '');
+  const isSuperAdmin = user?.role === 'SUPER_ADMIN';
 
   const [myUpdates, setMyUpdates] = useState<any[]>([]);
   const [allUpdates, setAllUpdates] = useState<any[]>([]);
+  const [pendingProposals, setPendingProposals] = useState<any[]>([]);
+  const [reviewingProposal, setReviewingProposal] = useState<string | null>(null);
   const [workMap, setWorkMap] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -65,6 +68,10 @@ export default function AiWorkIntelligencePage() {
       if (isAdmin) {
         const all = await workUpdatesService.all({ limit: 20 }).catch(() => []);
         setAllUpdates(Array.isArray(all) ? all : all?.data ?? []);
+      }
+      if (isSuperAdmin) {
+        const proposals = await aiProposalsService.all({ status: 'PENDING', limit: 20 }).catch(() => null);
+        setPendingProposals(Array.isArray(proposals) ? proposals : proposals?.items ?? []);
       }
     } finally {
       setLoading(false);
@@ -118,6 +125,20 @@ export default function AiWorkIntelligencePage() {
       setAiAnswer('AI service unavailable. Please ensure the backend is running with GEMINI_API_KEY configured.');
     } finally {
       setAiAsking(false);
+    }
+  };
+
+  const handleProposalReview = async (id: string, action: 'approve' | 'reject') => {
+    setReviewingProposal(id);
+    try {
+      if (action === 'approve') {
+        await aiProposalsService.approve(id);
+      } else {
+        await aiProposalsService.reject(id, 'Rejected from AI approval queue');
+      }
+      await load();
+    } finally {
+      setReviewingProposal(null);
     }
   };
 
@@ -358,6 +379,55 @@ export default function AiWorkIntelligencePage() {
               ))}
             </div>
           </div>
+
+          {/* Super admin: AI approval queue */}
+          {isSuperAdmin && (
+            <div>
+              <div className="flex items-center justify-between mb-sm">
+                <p className="font-label-caps text-label-caps text-on-surface-variant tracking-widest">AI APPROVAL QUEUE</p>
+                <span className="text-[10px] text-primary font-bold">{pendingProposals.length} pending</span>
+              </div>
+              {pendingProposals.length === 0 ? (
+                <div className="glass-card rounded-xl p-md text-center text-on-surface-variant border border-outline-variant/30 text-body-sm">
+                  No AI changes waiting for approval.
+                </div>
+              ) : (
+                <div className="flex flex-col gap-xs">
+                  {pendingProposals.slice(0, 5).map((proposal: any) => (
+                    <div key={proposal.id} className="glass-card rounded-xl p-sm border border-primary/20 bg-primary/3 flex flex-col gap-xs">
+                      <div className="flex items-start justify-between gap-xs">
+                        <div className="min-w-0">
+                          <p className="font-semibold text-on-surface text-xs">{proposal.proposalType?.replaceAll('_', ' ')}</p>
+                          <p className="text-[10px] text-on-surface-variant">
+                            {proposal.submitter?.firstName} {proposal.submitter?.lastName} · {new Date(proposal.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
+                          </p>
+                        </div>
+                        <span className="text-[9px] font-bold px-2 py-0.5 rounded-full border bg-primary/10 text-primary border-primary/20">PENDING</span>
+                      </div>
+                      <p className="text-[10px] text-on-surface-variant line-clamp-2">{proposal.rawInput}</p>
+                      {proposal.aiReason && <p className="text-[10px] text-primary line-clamp-1">AI: {proposal.aiReason}</p>}
+                      <div className="flex gap-xs pt-xs">
+                        <button
+                          onClick={() => handleProposalReview(proposal.id, 'approve')}
+                          disabled={reviewingProposal === proposal.id}
+                          className="flex-1 bg-tertiary text-on-primary font-label-caps text-[10px] py-1.5 rounded-full disabled:opacity-50"
+                        >
+                          Approve
+                        </button>
+                        <button
+                          onClick={() => handleProposalReview(proposal.id, 'reject')}
+                          disabled={reviewingProposal === proposal.id}
+                          className="flex-1 border border-error/30 text-error font-label-caps text-[10px] py-1.5 rounded-full disabled:opacity-50"
+                        >
+                          Reject
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Admin: Team updates */}
           {isAdmin && allUpdates.length > 0 && (
