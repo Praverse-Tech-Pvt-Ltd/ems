@@ -43,7 +43,7 @@ export class LeavesService {
       },
     });
 
-    if (balance && balance.totalDays - balance.usedDays < totalDays && data.leaveType !== 'UL') {
+    if (balance && balance.totalDays - balance.usedDays < totalDays && data.leaveType !== 'UL' && data.leaveType !== 'CO') {
       throw new BadRequestException(
         `Insufficient ${data.leaveType} balance. Available: ${balance.totalDays - balance.usedDays} days`,
       );

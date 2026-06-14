@@ -6,10 +6,10 @@ import { useAuthStore } from '@/store/auth.store';
 
 const STATUS_COLOR: Record<string, string> = {
   ACTIVE: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20',
-  ONBOARDING: 'bg-indigo-500/10 text-indigo-500 border-indigo-500/20',
+  DELAYED: 'bg-amber-500/10 text-amber-500 border-amber-500/20',
   AT_RISK: 'bg-rose-500/10 text-rose-500 border-rose-500/20',
-  RENEWAL: 'bg-amber-500/10 text-amber-500 border-amber-500/20',
-  INACTIVE: 'bg-slate-500/10 text-slate-500 border-slate-500/20',
+  LOST: 'bg-slate-500/10 text-slate-500 border-slate-500/20',
+  DORMANT: 'bg-slate-500/10 text-slate-500 border-slate-500/20',
 };
 
 const CRITICALITY_COLOR: Record<string, string> = {
@@ -66,6 +66,13 @@ export default function ClientCompaniesOverviewPage() {
   const [detailCompany, setDetailCompany] = useState<any | null>(null);
   const [timeline, setTimeline] = useState<any[]>([]);
   const [timelineLoading, setTimelineLoading] = useState(false);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [addMsg, setAddMsg] = useState('');
+  const [addForm, setAddForm] = useState({
+    name: '', industry: 'Pharma', businessStatus: 'ACTIVE', criticality: 'MEDIUM',
+    contactEmail: '', contactPhone: '', address: '', notes: '',
+  });
 
   const load = async () => {
     try {
@@ -79,14 +86,14 @@ export default function ClientCompaniesOverviewPage() {
   useEffect(() => { load(); }, []);
 
   const filtered = companies.filter(c => {
-    const matchSearch = !search || c.name?.toLowerCase().includes(search.toLowerCase()) || c.sector?.toLowerCase().includes(search.toLowerCase());
-    const matchStatus = !statusFilter || c.status === statusFilter;
+    const matchSearch = !search || c.name?.toLowerCase().includes(search.toLowerCase()) || c.industry?.toLowerCase().includes(search.toLowerCase());
+    const matchStatus = !statusFilter || c.businessStatus === statusFilter;
     return matchSearch && matchStatus;
   });
 
-  const pipeline = ['ONBOARDING', 'ACTIVE', 'AT_RISK', 'RENEWAL'].map(s => ({
+  const pipeline = ['ACTIVE', 'DELAYED', 'AT_RISK', 'DORMANT'].map(s => ({
     stage: s,
-    count: companies.filter(c => c.status === s).length,
+    count: companies.filter(c => c.businessStatus === s).length,
   }));
 
   const openDetails = async (company: any) => {
@@ -98,6 +105,35 @@ export default function ClientCompaniesOverviewPage() {
       setTimeline(Array.isArray(data) ? data : data?.data ?? []);
     } finally {
       setTimelineLoading(false);
+    }
+  };
+
+  const handleAddCompany = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!addForm.name.trim()) {
+      setAddMsg('Company name is required');
+      return;
+    }
+    setAdding(true);
+    setAddMsg('');
+    try {
+      await clientsService.create({
+        name: addForm.name,
+        industry: addForm.industry || undefined,
+        businessStatus: addForm.businessStatus,
+        criticality: addForm.criticality,
+        contactEmail: addForm.contactEmail || undefined,
+        contactPhone: addForm.contactPhone || undefined,
+        address: addForm.address || undefined,
+        notes: addForm.notes || undefined,
+      });
+      setShowAddForm(false);
+      setAddForm({ name: '', industry: 'Pharma', businessStatus: 'ACTIVE', criticality: 'MEDIUM', contactEmail: '', contactPhone: '', address: '', notes: '' });
+      await load();
+    } catch (e: any) {
+      setAddMsg(e?.response?.data?.message ?? 'Failed to create company');
+    } finally {
+      setAdding(false);
     }
   };
 
@@ -126,7 +162,10 @@ export default function ClientCompaniesOverviewPage() {
             <p className="text-slate-400 dark:text-slate-500 mt-xs text-sm">Portfolio overview, health scores, and critical relationships tracking.</p>
           </div>
           {isAdmin && (
-            <button className="flex items-center gap-xs text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-full shadow-lg shadow-indigo-600/15 transition-all shrink-0">
+            <button
+              onClick={() => { setShowAddForm(true); setAddMsg(''); }}
+              className="flex items-center gap-xs text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-full shadow-lg shadow-indigo-600/15 transition-all shrink-0"
+            >
               <span className="material-symbols-outlined text-[16px]">add</span>Add Client Portfolio
             </button>
           )}
@@ -197,21 +236,21 @@ export default function ClientCompaniesOverviewPage() {
                       </div>
                       <div className="min-w-0">
                         <p className="font-extrabold text-sm text-slate-800 dark:text-white leading-tight truncate">{company.name}</p>
-                        <p className="text-[10px] text-slate-400 font-semibold mt-0.5">{company.sector ?? 'Pharma'}</p>
+                        <p className="text-[10px] text-slate-400 font-semibold mt-0.5">{company.industry ?? 'Pharma'}</p>
                       </div>
                     </div>
-                    
-                    <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border shrink-0 ${STATUS_COLOR[company.status] ?? 'bg-slate-500/10 text-slate-500 border-slate-500/20'}`}>
-                      {company.status}
+
+                    <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border shrink-0 ${STATUS_COLOR[company.businessStatus] ?? 'bg-slate-500/10 text-slate-500 border-slate-500/20'}`}>
+                      {company.businessStatus}
                     </span>
                   </div>
 
                   <div className="flex items-center gap-4 mt-4 py-3 border-t border-slate-100 dark:border-slate-800/60">
-                    <HealthRing score={company.healthScore ?? 75} />
+                    <HealthRing score={100 - (company.riskScore ?? 0)} />
                     <div className="flex-grow flex flex-col gap-1 text-[11px] text-slate-500 dark:text-slate-400">
                       <div className="flex justify-between">
                         <span>Operational Health</span>
-                        <span className="font-bold text-slate-700 dark:text-slate-300 font-mono">{company.healthScore ?? 75}/100</span>
+                        <span className="font-bold text-slate-700 dark:text-slate-300 font-mono">{100 - (company.riskScore ?? 0)}/100</span>
                       </div>
                       {company.criticality && (
                         <div className="flex justify-between">
@@ -232,9 +271,9 @@ export default function ClientCompaniesOverviewPage() {
                     </div>
                   </div>
 
-                  {company.aiSummary && (
+                  {company.aiSummaries?.[0]?.content && (
                     <p className="text-[10px] text-slate-400 dark:text-slate-500 leading-relaxed line-clamp-2 bg-slate-50 dark:bg-slate-900/40 rounded-xl px-3 py-2 italic mt-2 border border-slate-100 dark:border-slate-800">
-                      "{company.aiSummary}"
+                      "{company.aiSummaries[0].content}"
                     </p>
                   )}
                 </div>
@@ -262,6 +301,125 @@ export default function ClientCompaniesOverviewPage() {
         </div>
       )}
 
+      {/* Add Client Portfolio Modal */}
+      {showAddForm && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="bg-white dark:bg-[#111c2e] border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-md p-6 relative overflow-hidden transition-all shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center pb-3 border-b border-slate-100 dark:border-slate-800 mb-4">
+              <span className="font-extrabold text-base text-slate-800 dark:text-white">Add Client Portfolio</span>
+              <button
+                onClick={() => setShowAddForm(false)}
+                className="material-symbols-outlined text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+              >
+                close
+              </button>
+            </div>
+
+            {addMsg && (
+              <div className="mb-4 text-xs font-bold px-4 py-2.5 rounded-xl border bg-rose-500/10 text-rose-500 border-rose-500/20">
+                {addMsg}
+              </div>
+            )}
+
+            <form onSubmit={handleAddCompany} className="space-y-4">
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Company Name</label>
+                <input
+                  required
+                  value={addForm.name}
+                  onChange={e => setAddForm(p => ({ ...p, name: e.target.value }))}
+                  placeholder="e.g. Anphar Labs"
+                  className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-[#0f172a] rounded-xl text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Industry</label>
+                  <input
+                    value={addForm.industry}
+                    onChange={e => setAddForm(p => ({ ...p, industry: e.target.value }))}
+                    className="w-full px-4 py-2 border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-[#0f172a] rounded-xl text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Business Status</label>
+                  <select
+                    value={addForm.businessStatus}
+                    onChange={e => setAddForm(p => ({ ...p, businessStatus: e.target.value }))}
+                    className="w-full px-4 py-2 border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-[#0f172a] rounded-xl text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  >
+                    {['ACTIVE', 'DELAYED', 'AT_RISK', 'LOST', 'DORMANT'].map(s => (
+                      <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Criticality</label>
+                <select
+                  value={addForm.criticality}
+                  onChange={e => setAddForm(p => ({ ...p, criticality: e.target.value }))}
+                  className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-[#0f172a] rounded-xl text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                >
+                  {['HIGH', 'MEDIUM', 'LOW'].map(c => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Contact Email</label>
+                  <input
+                    type="email"
+                    value={addForm.contactEmail}
+                    onChange={e => setAddForm(p => ({ ...p, contactEmail: e.target.value }))}
+                    className="w-full px-4 py-2 border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-[#0f172a] rounded-xl text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Contact Phone</label>
+                  <input
+                    value={addForm.contactPhone}
+                    onChange={e => setAddForm(p => ({ ...p, contactPhone: e.target.value }))}
+                    className="w-full px-4 py-2 border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-[#0f172a] rounded-xl text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Address</label>
+                <input
+                  value={addForm.address}
+                  onChange={e => setAddForm(p => ({ ...p, address: e.target.value }))}
+                  className="w-full px-4 py-2 border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-[#0f172a] rounded-xl text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Notes</label>
+                <textarea
+                  rows={3}
+                  value={addForm.notes}
+                  onChange={e => setAddForm(p => ({ ...p, notes: e.target.value }))}
+                  className="w-full px-4 py-2 border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-[#0f172a] rounded-xl text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={adding}
+                className="w-full py-2.5 rounded-2xl font-bold text-sm tracking-tight bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-600/15 transition-all disabled:opacity-50"
+              >
+                {adding ? 'Creating...' : 'Create Client Portfolio'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Slide-over details timeline drawer */}
       {detailCompany && (
         <div className="fixed inset-0 z-50 flex justify-end" role="dialog" aria-modal="true">
@@ -274,7 +432,7 @@ export default function ClientCompaniesOverviewPage() {
                 </div>
                 <div>
                   <h3 className="font-extrabold text-sm text-slate-800 dark:text-white leading-tight">{detailCompany.name}</h3>
-                  <p className="text-[10px] text-slate-400 font-semibold mt-0.5">{detailCompany.sector ?? 'Pharma'} · {detailCompany.criticality} criticality</p>
+                  <p className="text-[10px] text-slate-400 font-semibold mt-0.5">{detailCompany.industry ?? 'Pharma'} · {detailCompany.criticality} criticality</p>
                 </div>
               </div>
               <button 
