@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { aiProposalsService, workUpdatesService } from '@/lib/api/work-updates';
+import { clientsService } from '@/lib/api/clients';
 import { useAuthStore } from '@/store/auth.store';
 
 export default function AdminApprovalsPage() {
@@ -9,6 +10,8 @@ export default function AdminApprovalsPage() {
   const isSuperAdmin = user?.role === 'SUPER_ADMIN';
   const [items, setItems] = useState<any[]>([]);
   const [workUpdates, setWorkUpdates] = useState<any[]>([]);
+  const [companies, setCompanies] = useState<any[]>([]);
+  const [companyOverrides, setCompanyOverrides] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [reviewing, setReviewing] = useState<string | null>(null);
 
@@ -17,8 +20,10 @@ export default function AdminApprovalsPage() {
     try {
       const data = await aiProposalsService.all({ status: 'PENDING', limit: 100 }).catch(() => null);
       const updates = await workUpdatesService.all({ needsReview: true, limit: 100 }).catch(() => null);
+      const allCompanies = await clientsService.list().catch(() => []);
       setItems(Array.isArray(data) ? data : data?.items ?? []);
       setWorkUpdates(Array.isArray(updates) ? updates : updates?.items ?? []);
+      setCompanies(Array.isArray(allCompanies) ? allCompanies : allCompanies?.data ?? []);
     } finally {
       setLoading(false);
     }
@@ -31,8 +36,12 @@ export default function AdminApprovalsPage() {
   const review = async (id: string, action: 'approve' | 'reject') => {
     setReviewing(id);
     try {
-      if (action === 'approve') await aiProposalsService.approve(id);
-      else await aiProposalsService.reject(id, 'Rejected by super admin');
+      if (action === 'approve') {
+        const companyId = companyOverrides[id];
+        await aiProposalsService.approve(id, companyId ? { companyId } : undefined);
+      } else {
+        await aiProposalsService.reject(id, 'Rejected by super admin');
+      }
       await load();
     } finally {
       setReviewing(null);
@@ -172,6 +181,24 @@ export default function AdminApprovalsPage() {
 
                 {item.aiReason && (
                   <p className="text-body-sm text-primary bg-primary/5 border border-primary/20 rounded-xl px-sm py-xs">AI note: {item.aiReason}</p>
+                )}
+
+                {!data.companyId && ['WORK_UPDATE', 'MEETING_NOTE', 'CLIENT_COMMUNICATION', 'FOLLOW_UP_TASK', 'CALENDAR_EVENT', 'COMPANY_STAGE_UPDATE'].includes(item.proposalType) && (
+                  <div className="rounded-lg border border-error/30 bg-error/5 px-sm py-xs flex flex-col gap-xs">
+                    <p className="text-[10px] text-error font-bold">
+                      No matching company found{data.companyName ? ` for "${data.companyName}"` : ''}. Select one to link before approving.
+                    </p>
+                    <select
+                      value={companyOverrides[item.id] ?? ''}
+                      onChange={e => setCompanyOverrides(p => ({ ...p, [item.id]: e.target.value }))}
+                      className="w-full border border-outline-variant/50 rounded-lg px-sm py-1.5 text-body-sm bg-surface-container-lowest focus:border-primary focus:outline-none"
+                    >
+                      <option value="">— No company —</option>
+                      {companies.map(c => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
+                    </select>
+                  </div>
                 )}
 
                 <div className="flex gap-sm pt-xs">
