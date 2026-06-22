@@ -8,7 +8,7 @@ import type { AttendanceRecord, AttendanceStatus } from '@/types';
 function Clock() {
   const [time, setTime] = useState('');
   useEffect(() => {
-    const fmt = () => new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+    const fmt = () => new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' });
     setTime(fmt());
     const t = setInterval(() => setTime(fmt()), 1000);
     return () => clearInterval(t);
@@ -27,6 +27,13 @@ const STATUS_COLOR: Record<string, string> = {
   MISSING_PUNCH_OUT: 'bg-error/20 text-error',
 };
 
+// WFH #7c3aed (purple) + HALF_DAY #01677d (teal secondary)
+const SPLIT_WFH_HALFDAY_STYLE: React.CSSProperties = {
+  background: 'linear-gradient(135deg, #7c3aed 50%, #01677d 50%)',
+  color: '#fff',
+  border: '1px solid transparent',
+};
+
 const CALENDAR_MARK: Record<AttendanceStatus, string> = {
   PRESENT: 'bg-success text-white border-success',
   LATE: 'bg-primary text-on-primary border-primary',
@@ -40,12 +47,13 @@ const CALENDAR_MARK: Record<AttendanceStatus, string> = {
 
 const WEEKEND_MARK = 'bg-surface-container-highest text-on-surface-variant border-outline-variant';
 
-const CALENDAR_LEGEND: Array<{ key: AttendanceStatus | 'WEEKEND_OFF'; label: string; dot: string }> = [
+const CALENDAR_LEGEND: Array<{ key: AttendanceStatus | 'WEEKEND_OFF' | 'WFH_HALF_DAY'; label: string; dot: string; splitDot?: boolean }> = [
   { key: 'PRESENT', label: 'Present', dot: 'bg-success border-success' },
   { key: 'LATE', label: 'Late', dot: 'bg-primary border-primary' },
   { key: 'ABSENT', label: 'Absent', dot: 'bg-error border-error' },
   { key: 'HALF_DAY', label: 'Half day', dot: 'bg-secondary border-secondary' },
   { key: 'WFH', label: 'WFH', dot: 'bg-[#7c3aed] border-[#7c3aed]' },
+  { key: 'WFH_HALF_DAY', label: 'WFH Half day', dot: '', splitDot: true },
   { key: 'LEAVE', label: 'Leave', dot: 'bg-on-surface-variant border-on-surface-variant' },
   { key: 'HOLIDAY', label: 'Holiday', dot: 'bg-tertiary-fixed-dim border-tertiary-fixed-dim' },
   { key: 'WEEKEND_OFF', label: 'Weekend off', dot: 'bg-surface-container-highest border-outline-variant' },
@@ -188,7 +196,7 @@ export default function AttendancePunchStationPage() {
 
   const fmtTime = (t: string | null) => {
     if (!t) return '—';
-    return new Date(t).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+    return new Date(t).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' });
   };
 
   const fmtHrs = (h: number | null) => {
@@ -228,7 +236,7 @@ export default function AttendancePunchStationPage() {
             <h2 className="font-headline-lg-mobile text-headline-lg-mobile text-on-surface md:hidden">Punch Station</h2>
             <p className="text-on-surface-variant mt-xs">
               Welcome back, <strong>{user?.firstName}</strong> ·{' '}
-              {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}
+              {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Asia/Kolkata' })}
             </p>
           </div>
         </div>
@@ -254,7 +262,7 @@ export default function AttendancePunchStationPage() {
           <p className="font-label-caps text-label-caps text-on-surface-variant tracking-widest">CURRENT TIME</p>
           <div className="font-black text-5xl text-on-surface tabular-nums"><Clock /></div>
           <p className="text-body-sm text-on-surface-variant">
-            {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+            {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Asia/Kolkata' })}
           </p>
 
           {loading ? (
@@ -400,8 +408,9 @@ export default function AttendancePunchStationPage() {
                 const rec = recordsByDate[day.key];
                 const weekendOff = day.inMonth && !rec && isWeekendOff(day.date, saturdayOff);
                 const isSelected = selectedDate === day.key;
+                const isSplitDay = rec?.notes === 'HALF_DAY_WFH';
                 const markClass = rec
-                  ? CALENDAR_MARK[rec.status]
+                  ? (isSplitDay ? '' : CALENDAR_MARK[rec.status])
                   : weekendOff
                     ? WEEKEND_MARK
                     : 'bg-surface-container-low text-on-surface-variant border-outline-variant/30';
@@ -413,9 +422,10 @@ export default function AttendancePunchStationPage() {
                     onClick={() => setSelectedDate(day.key)}
                     className={[
                       'min-h-[72px] rounded-2xl border p-2 text-left transition-all hover:-translate-y-0.5 hover:shadow-sm',
-                      day.inMonth ? markClass : 'bg-transparent text-on-surface-variant/30 border-transparent',
+                      day.inMonth ? (isSplitDay ? 'text-white' : markClass) : 'bg-transparent text-on-surface-variant/30 border-transparent',
                       isSelected ? 'ring-2 ring-primary ring-offset-2 ring-offset-background' : '',
                     ].join(' ')}
+                    style={day.inMonth && isSplitDay ? SPLIT_WFH_HALFDAY_STYLE : undefined}
                   >
                     <div className="flex items-start justify-between gap-1">
                       <span className={`text-sm font-black tabular-nums ${day.isToday ? 'underline decoration-2 underline-offset-4' : ''}`}>
@@ -427,7 +437,9 @@ export default function AttendancePunchStationPage() {
                     </div>
                     {rec && (
                       <div className="mt-2 space-y-1">
-                        <p className="text-[10px] font-black tracking-wide truncate">{rec.status.replaceAll('_', ' ')}</p>
+                        <p className="text-[10px] font-black tracking-wide truncate">
+                          {isSplitDay ? 'WFH · HALF DAY' : rec.status.replaceAll('_', ' ')}
+                        </p>
                         <p className="text-[10px] opacity-80 tabular-nums">{fmtHrs(rec.workingHours)}</p>
                       </div>
                     )}
@@ -447,13 +459,21 @@ export default function AttendancePunchStationPage() {
               SELECTED DAY
             </p>
             <h4 className="font-bold text-on-surface">
-              {new Date(selectedDate).toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}
+              {new Date(selectedDate).toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Asia/Kolkata' })}
             </h4>
             {selectedRecord ? (
               <div className="mt-md space-y-sm">
-                <span className={`inline-flex px-3 py-1 rounded-full text-xs font-bold ${STATUS_COLOR[selectedRecord.status] ?? 'bg-surface-container-high text-on-surface'}`}>
-                  {selectedRecord.status.replaceAll('_', ' ')}
-                </span>
+                {selectedRecord.notes === 'HALF_DAY_WFH' ? (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="inline-flex px-3 py-1 rounded-full text-xs font-bold bg-[#7c3aed] text-white">WFH</span>
+                    <span className="text-xs text-on-surface-variant font-semibold">+</span>
+                    <span className="inline-flex px-3 py-1 rounded-full text-xs font-bold bg-secondary text-on-secondary">HALF DAY</span>
+                  </div>
+                ) : (
+                  <span className={`inline-flex px-3 py-1 rounded-full text-xs font-bold ${STATUS_COLOR[selectedRecord.status] ?? 'bg-surface-container-high text-on-surface'}`}>
+                    {selectedRecord.status.replaceAll('_', ' ')}
+                  </span>
+                )}
                 <div className="grid grid-cols-2 gap-sm">
                   {[
                     { label: 'Punch In', value: fmtTime(selectedRecord.punchInTime) },
@@ -488,7 +508,14 @@ export default function AttendancePunchStationPage() {
               <div className="grid grid-cols-1 gap-3">
                 {CALENDAR_LEGEND.map(item => (
                   <div key={item.key} className="flex items-center gap-3 text-sm font-semibold text-on-surface-variant">
-                    <span className={`w-3.5 h-3.5 rounded-full border ${item.dot}`} />
+                    {item.splitDot ? (
+                      <span
+                        className="w-3.5 h-3.5 rounded-full flex-shrink-0"
+                        style={{ background: 'linear-gradient(135deg, #7c3aed 50%, #01677d 50%)' }}
+                      />
+                    ) : (
+                      <span className={`w-3.5 h-3.5 rounded-full border flex-shrink-0 ${item.dot}`} />
+                    )}
                     <span>{item.label}</span>
                   </div>
                 ))}
@@ -516,10 +543,10 @@ export default function AttendancePunchStationPage() {
                 <div key={rec.id} className="flex items-center gap-md p-sm hover:bg-surface-container-low transition-colors">
                   <div className="w-16 shrink-0">
                     <p className="font-semibold text-on-surface text-sm">
-                      {new Date(rec.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
+                      {new Date(rec.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', timeZone: 'Asia/Kolkata' })}
                     </p>
                     <p className="text-[10px] text-on-surface-variant">
-                      {new Date(rec.date).toLocaleDateString('en-IN', { weekday: 'short' })}
+                      {new Date(rec.date).toLocaleDateString('en-IN', { weekday: 'short', timeZone: 'Asia/Kolkata' })}
                     </p>
                   </div>
                   <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${STATUS_COLOR[rec.status] ?? 'bg-surface-container-high text-on-surface-variant'}`}>

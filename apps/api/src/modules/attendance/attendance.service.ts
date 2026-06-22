@@ -78,7 +78,7 @@ export class AttendanceService {
     }
 
     // Shift 10:00–18:30 → grace window 10:15 / late 10:30 / early-out 18:15
-    if (name.includes('maanav')) {
+    if (name.includes('maanav') || name.includes('dev')) {
       return {
         PRESENT_CUTOFF:   10 * 60 + 15, // 10:15 AM
         LATE_CUTOFF:      10 * 60 + 30, // 10:30 AM

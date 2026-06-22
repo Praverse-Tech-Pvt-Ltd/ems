@@ -70,6 +70,7 @@ export interface AttendanceRecord {
   status: AttendanceStatus;
   workingHours: number | null;
   isRegularized: boolean;
+  notes?: string | null;
 }
 
 export interface AttendanceStats {
