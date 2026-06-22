@@ -292,6 +292,8 @@ model Employee {
   meetingNotesReviewed   MeetingNote[]           @relation("MeetingNoteReviewer")
   workUpdatesSubmitted   WorkUpdate[]            @relation("WorkUpdateEmployee")
   workUpdatesReviewed    WorkUpdate[]            @relation("WorkUpdateReviewer")
+  aiProposalsSubmitted   AIChangeProposal[]      @relation("AIProposalSubmitter")
+  aiProposalsReviewed    AIChangeProposal[]      @relation("AIProposalReviewer")
   timelineEntries        CompanyTimelineEntry[]  @relation("TimelineEmployee")
   calendarEventsAssigned CalendarEvent[]         @relation("CalendarAssignee")
   calendarEventsCreated  CalendarEvent[]         @relation("CalendarCreator")
@@ -836,6 +838,21 @@ enum WorkUpdateStatus {
   NEEDS_CORRECTION
 }
 
+enum AIChangeProposalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum AIChangeProposalType {
+  WORK_UPDATE
+  MEETING_NOTE
+  CLIENT_COMMUNICATION
+  FOLLOW_UP_TASK
+  CALENDAR_EVENT
+  COMPANY_STAGE_UPDATE
+}
+
 // ─── Client Company Models ────────────────────────────────────────────────────
 
 model ClientCompany {
@@ -1013,6 +1030,33 @@ model WorkUpdate {
   reviewer Employee?      @relation("WorkUpdateReviewer", fields: [reviewedBy], references: [id])
 
   @@map("work_updates")
+}
+
+model AIChangeProposal {
+  id              String                 @id @default(uuid())
+  proposalType    AIChangeProposalType   @map("proposal_type")
+  status          AIChangeProposalStatus @default(PENDING)
+  submittedBy     String                 @map("submitted_by")
+  rawInput        String                 @map("raw_input")
+  targetEntity    String?                @map("target_entity")
+  targetEntityId  String?                @map("target_entity_id")
+  proposedData    Json                   @map("proposed_data")
+  confidence      Int?
+  aiReason        String?                @map("ai_reason")
+  appliedEntity   String?                @map("applied_entity")
+  appliedEntityId String?                @map("applied_entity_id")
+  reviewedBy      String?                @map("reviewed_by")
+  reviewedAt      DateTime?              @map("reviewed_at") @db.Timestamptz
+  rejectionReason String?                @map("rejection_reason")
+  createdAt       DateTime               @default(now()) @map("created_at")
+  updatedAt       DateTime               @updatedAt @map("updated_at")
+
+  submitter Employee  @relation("AIProposalSubmitter", fields: [submittedBy], references: [id])
+  reviewer  Employee? @relation("AIProposalReviewer", fields: [reviewedBy], references: [id])
+
+  @@index([status, createdAt])
+  @@index([submittedBy])
+  @@map("ai_change_proposals")
 }
 
 model CompanyTimelineEntry {

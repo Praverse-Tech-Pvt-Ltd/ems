@@ -25,7 +25,7 @@ export class InvoicesController {
   constructor(private service: InvoicesService) {}
 
   @Post()
-  @Roles('ADMIN', 'SUPER_ADMIN', 'MANAGER')
+  @Roles('SUPER_ADMIN')
   create(
     @CurrentUser() user: { id: string },
     @Body() dto: CreateInvoiceDto,
@@ -34,19 +34,19 @@ export class InvoicesController {
   }
 
   @Get()
-  @Roles('ADMIN', 'SUPER_ADMIN', 'MANAGER')
+  @Roles('SUPER_ADMIN')
   findAll(@Query('status') status?: string) {
     return this.service.findAll(status);
   }
 
   @Get(':id')
-  @Roles('ADMIN', 'SUPER_ADMIN', 'MANAGER')
+  @Roles('SUPER_ADMIN')
   findOne(@Param('id', ParseUUIDPipe) id: string) {
     return this.service.findOne(id);
   }
 
   @Patch(':id/status')
-  @Roles('ADMIN', 'SUPER_ADMIN')
+  @Roles('SUPER_ADMIN')
   updateStatus(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: { id: string },

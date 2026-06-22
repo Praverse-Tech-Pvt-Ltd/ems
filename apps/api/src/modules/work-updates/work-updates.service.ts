@@ -1,12 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { GeminiService } from '../ai-overview/gemini.service';
+import { AIProposalsService } from '../ai-proposals/ai-proposals.service';
 
 @Injectable()
 export class WorkUpdatesService {
   constructor(
     private prisma: PrismaService,
     private gemini: GeminiService,
+    private aiProposals: AIProposalsService,
   ) {}
 
   async create(dto: { rawText: string; updateDate: string; companyId?: string }, employeeId: string) {
@@ -23,13 +25,18 @@ export class WorkUpdatesService {
 
     const needsAdminReview = String(extracted.needsAdminReview) === 'true' || !resolvedCompanyId;
 
-    const update = await this.prisma.workUpdate.create({
-      data: {
+    const proposal = await this.aiProposals.create({
+      proposalType: 'WORK_UPDATE',
+      submittedBy: employeeId,
+      rawInput: dto.rawText,
+      targetEntity: 'WorkUpdate',
+      targetEntityId: resolvedCompanyId,
+      aiReason: extracted.nextAction ?? extracted.pendingTask ?? null,
+      proposedData: {
         employeeId,
         companyId: resolvedCompanyId,
-        rawText: dto.rawText,
-        updateDate: new Date(dto.updateDate),
-        extractedData: extracted as any,
+        updateDate: new Date(dto.updateDate).toISOString(),
+        extractedData: extracted,
         companyName: extracted.companyName ?? null,
         taskCompleted: extracted.taskCompleted ?? null,
         pendingTask: extracted.pendingTask ?? null,
@@ -37,31 +44,10 @@ export class WorkUpdatesService {
         contribution: extracted.contribution ?? null,
         workStatus: extracted.workStatus ?? null,
         nextAction: extracted.nextAction ?? null,
-        needsAdminReview,
       },
     });
 
-    if (resolvedCompanyId) {
-      await this.prisma.companyTimelineEntry.create({
-        data: {
-          companyId: resolvedCompanyId,
-          entryType: 'EMPLOYEE_UPDATE',
-          title: `Work update: ${extracted.taskCompleted?.substring(0, 60) ?? dto.rawText.substring(0, 60)}`,
-          description: extracted.pendingTask ?? extracted.workStatus ?? '',
-          employeeId,
-          referenceId: update.id,
-          referenceType: 'WorkUpdate',
-          entryDate: new Date(dto.updateDate),
-        },
-      });
-
-      await this.prisma.clientCompany.update({
-        where: { id: resolvedCompanyId },
-        data: { lastCommunicationDate: new Date(dto.updateDate) },
-      });
-    }
-
-    return { update, extracted, needsAdminReview };
+    return { proposal, extracted, needsAdminReview: true, approvalRequired: true };
   }
 
   async findAll(query: { companyId?: string; employeeId?: string; needsReview?: boolean; page?: number; limit?: number }) {
