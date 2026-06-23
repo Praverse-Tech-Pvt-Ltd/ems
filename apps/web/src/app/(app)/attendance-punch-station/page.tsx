@@ -24,6 +24,7 @@ const STATUS_COLOR: Record<string, string> = {
   ABSENT: 'bg-error text-on-error',
   HALF_DAY: 'bg-secondary text-on-secondary',
   WFH: 'bg-[#7c3aed] text-white',
+  OD: 'bg-[#0f766e] text-white',
   LEAVE: 'bg-on-surface-variant text-inverse-on-surface',
   HOLIDAY: 'bg-tertiary-fixed-dim text-on-tertiary-fixed',
   MISSING_PUNCH_OUT: 'bg-error-container text-on-error-container border border-error/20',
@@ -48,13 +49,15 @@ const CALENDAR_MARK: Record<AttendanceStatus, string> = {
 };
 
 const WEEKEND_MARK = 'bg-surface-container-highest text-on-surface-variant border-outline-variant';
+const OD_MARK = 'bg-[#0f766e] text-white border-[#0f766e]';
 
-const CALENDAR_LEGEND: Array<{ key: AttendanceStatus | 'WEEKEND_OFF' | 'WFH_HALF_DAY'; label: string; dot: string; splitDot?: boolean }> = [
+const CALENDAR_LEGEND: Array<{ key: AttendanceStatus | 'OD' | 'WEEKEND_OFF' | 'WFH_HALF_DAY'; label: string; dot: string; splitDot?: boolean }> = [
   { key: 'PRESENT', label: 'Present', dot: 'bg-success border-success' },
   { key: 'LATE', label: 'Late', dot: 'bg-primary border-primary' },
   { key: 'ABSENT', label: 'Absent', dot: 'bg-error border-error' },
   { key: 'HALF_DAY', label: 'Half day', dot: 'bg-secondary border-secondary' },
   { key: 'WFH', label: 'WFH', dot: 'bg-[#7c3aed] border-[#7c3aed]' },
+  { key: 'OD', label: 'OD', dot: 'bg-[#0f766e] border-[#0f766e]' },
   { key: 'WFH_HALF_DAY', label: 'WFH Half day', dot: '', splitDot: true },
   { key: 'LEAVE', label: 'Leave', dot: 'bg-on-surface-variant border-on-surface-variant' },
   { key: 'HOLIDAY', label: 'Holiday', dot: 'bg-tertiary-fixed-dim border-tertiary-fixed-dim' },
@@ -424,16 +427,7 @@ export default function AttendancePunchStationPage() {
                         </div>
                       ))}
                     </div>
-                    <div className="border-t border-outline-variant/20 pt-md grid grid-cols-2 gap-sm">
-                      <div className="text-center border-r border-outline-variant/20">
-                        <p className="font-black text-xl text-tertiary">{fmtHrs(stats.totalWorkingHours ?? 0)}</p>
-                        <p className="text-[10px] text-on-surface-variant">Hours Worked</p>
-                      </div>
-                      <div className="text-center">
-                        <p className="font-black text-xl text-primary">{fmtHrs(stats.totalDesignatedHours ?? 0)}</p>
-                        <p className="text-[10px] text-on-surface-variant">Designated Hours</p>
-                      </div>
-                    </div>
+                    {/* Removed Hours Worked / Designated Hours Stats */}
                   </div>
                 )}
               </>
@@ -459,7 +453,7 @@ export default function AttendancePunchStationPage() {
                     <div key={item.label} className="bg-surface-container-low rounded-xl p-sm">
                       <p className="text-[10px] text-on-surface-variant font-label-caps tracking-widest">{item.label}</p>
                       {item.badge && today?.status ? (
-                        <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-xs font-bold ${STATUS_COLOR[today.status] ?? 'bg-surface-container-high text-on-surface'}`}>
+                        <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-xs font-bold ${today.notes === 'OD' ? STATUS_COLOR.OD : STATUS_COLOR[today.status] ?? 'bg-surface-container-high text-on-surface'}`}>
                           {statusLabel(today)}
                         </span>
                       ) : (
@@ -614,8 +608,9 @@ export default function AttendancePunchStationPage() {
                   const weekendOff = day.inMonth && !rec && !holiday && isWeekendOff(day.date, saturdayOff);
                   const isSelected = selectedDate === day.key;
                   const isSplitDay = rec?.notes === 'HALF_DAY_WFH';
+                  const isOdDay = rec?.notes === 'OD';
                   const markClass = rec
-                    ? (isSplitDay ? '' : CALENDAR_MARK[rec.status])
+                    ? (isSplitDay ? '' : isOdDay ? OD_MARK : CALENDAR_MARK[rec.status])
                     : holiday
                       ? CALENDAR_MARK['HOLIDAY']
                       : weekendOff
@@ -683,7 +678,7 @@ export default function AttendancePunchStationPage() {
                       <span className="inline-flex px-3 py-1 rounded-full text-xs font-bold bg-secondary text-on-secondary">HALF DAY</span>
                     </div>
                   ) : (
-                    <span className={`inline-flex px-3 py-1 rounded-full text-xs font-bold ${STATUS_COLOR[selectedRecord.status] ?? 'bg-surface-container-high text-on-surface'}`}>
+                    <span className={`inline-flex px-3 py-1 rounded-full text-xs font-bold ${selectedRecord.notes === 'OD' ? STATUS_COLOR.OD : STATUS_COLOR[selectedRecord.status] ?? 'bg-surface-container-high text-on-surface'}`}>
                       {statusLabel(selectedRecord)}
                     </span>
                   )}
@@ -764,7 +759,7 @@ export default function AttendancePunchStationPage() {
                     <p className="font-semibold text-on-surface text-sm">{rec.employee?.firstName} {rec.employee?.lastName}</p>
                     <p className="text-[10px] text-on-surface-variant">{rec.employee?.designation ?? rec.employee?.role}</p>
                   </div>
-                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${STATUS_COLOR[rec.status] ?? 'bg-surface-container-high text-on-surface-variant'}`}>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${rec.notes === 'OD' ? STATUS_COLOR.OD : STATUS_COLOR[rec.status] ?? 'bg-surface-container-high text-on-surface-variant'}`}>
                     {statusLabel(rec)}
                   </span>
                   <p className="text-body-sm text-on-surface-variant hidden md:block">{fmtTime(rec.punchInTime)} → {fmtTime(rec.punchOutTime)}</p>

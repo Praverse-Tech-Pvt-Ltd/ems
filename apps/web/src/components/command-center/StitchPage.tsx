@@ -156,6 +156,10 @@ function flattenData(data: unknown[]) {
   return data.flatMap(asArray).slice(0, 8);
 }
 
+function normalizeEndpoint(endpoint: string) {
+  return endpoint === '/notifications' ? '/notifications/unread-count' : endpoint;
+}
+
 function DataBadge({ children, tone = 'muted' }: { children: React.ReactNode; tone?: Metric['tone'] }) {
   const classes = {
     primary: 'bg-primary/10 text-primary border-primary/20',
@@ -179,6 +183,22 @@ export function StitchPage({ config }: { config: StitchPageConfig }) {
   const [odReason, setOdReason] = useState('');
   const [odSubmitting, setOdSubmitting] = useState(false);
   const [actionNote, setActionNote] = useState('');
+  const pageEndpoints = useMemo(() => {
+    const seen = new Set<string>();
+
+    return config.endpoints
+      .map(normalizeEndpoint)
+      .filter((endpoint) => {
+        if (config.layout === 'workday' && ['/attendance/today', '/attendance/od/open'].includes(endpoint)) {
+          return false;
+        }
+        if (seen.has(endpoint)) {
+          return false;
+        }
+        seen.add(endpoint);
+        return true;
+      });
+  }, [config.endpoints, config.layout]);
 
   // Fetch today's attendance only for workday layout to determine punch state
   const todayQuery = useQuery({
@@ -272,12 +292,15 @@ export function StitchPage({ config }: { config: StitchPageConfig }) {
   };
 
   const query = useQuery({
-    queryKey: ['stitch-page', config.title, config.endpoints],
+    queryKey: ['stitch-page', config.title, pageEndpoints.join('|')],
     queryFn: async () => {
-      const responses = await Promise.allSettled(config.endpoints.map((endpoint) => apiClient.get(endpoint)));
+      const responses = await Promise.allSettled(pageEndpoints.map((endpoint) => apiClient.get(endpoint)));
       return responses.map((response) => (response.status === 'fulfilled' ? response.value.data : null));
     },
-    retry: 1,
+    enabled: pageEndpoints.length > 0,
+    retry: false,
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
   });
 
   const liveItems = useMemo(() => {

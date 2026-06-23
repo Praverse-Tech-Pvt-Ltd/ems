@@ -1,6 +1,7 @@
 import { Controller, Post, Delete, Get, Patch, Body, Param, Query, UseGuards, Ip, Headers, ForbiddenException } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { AttendanceService } from './attendance.service';
+import { AttendanceBalanceService } from './attendance-balance.service';
 
 import { PunchInDto } from './dto/punch-in.dto';
 import { RegularizeDto } from './dto/regularize.dto';
@@ -18,6 +19,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 export class AttendanceController {
   constructor(
     private service: AttendanceService,
+    private balances: AttendanceBalanceService,
   ) {}
 
   @Post('punch-in')
@@ -115,6 +117,25 @@ export class AttendanceController {
     @Query('status') status?: string,
   ) {
     return this.service.getAll(from, to, status);
+  }
+
+  @Get('admin/monthly-balances')
+  @Roles('ADMIN', 'SUPER_ADMIN')
+  getMonthlyBalances(
+    @Query('month') month: string,
+    @Query('year') year: string,
+    @Query('employeeId') employeeId?: string,
+  ) {
+    return this.balances.list(Number(month), Number(year), employeeId);
+  }
+
+  @Post('admin/monthly-balances/recalculate')
+  @Roles('ADMIN', 'SUPER_ADMIN')
+  recalculateMonthlyBalances(
+    @CurrentUser() user: { id: string },
+    @Body() dto: { month: number; year: number; employeeId?: string },
+  ) {
+    return this.balances.recalculateMonth(user.id, dto);
   }
 
   @Patch(':id/regularize')

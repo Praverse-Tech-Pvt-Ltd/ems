@@ -88,16 +88,16 @@ export function AppTopNav({
   const pageLabel = PAGE_LABELS[pathname] ?? 'NexGen EMS';
   const [focused, setFocused] = useState(false);
 
-  // Fetch unread notification count for badge
-  const { data: unreadData } = useQuery({
-    queryKey: ['notifications-unread-count'],
-    queryFn: () => apiClient.get('/notifications').then(r => r.data),
-    refetchInterval: 30_000,
+  // Fetch only the count for the badge; the drawer fetches the full list on demand.
+  const { data: unreadData } = useQuery<{ count: number }>({
+    queryKey: ['notifications-unread'],
+    queryFn: () => apiClient.get('/notifications/unread-count').then(r => r.data),
+    refetchInterval: 60_000,
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
     retry: false,
   });
-  const unreadCount: number = Array.isArray(unreadData)
-    ? unreadData.filter((n: { isRead?: boolean }) => !n.isRead).length
-    : 0;
+  const unreadCount = unreadData?.count ?? 0;
 
   return (
     <header

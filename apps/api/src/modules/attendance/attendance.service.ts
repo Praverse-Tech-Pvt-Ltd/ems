@@ -18,7 +18,7 @@ import { ATTENDANCE_BLOCKED_MESSAGE, isAttendanceBlockedIdentity } from './atten
 const HALF_DAY_HOURS = 4;           // < 4 h worked → auto HALF_DAY at punch-out
 
 // Allowance constants per month
-const MAX_LATE_PM      = 4;             // late punch-in allowances per month
+const MAX_LATE_PM      = 2;             // late punch-in allowances per month
 const MAX_EARLY_PM     = 4;             // early punch-out allowances per month
 const MAX_HALFDAY_PM   = 4;             // > 4 half-days in a month → LEAVE
 
@@ -241,6 +241,9 @@ export class AttendanceService {
     if (existing?.punchInTime) {
       throw new ConflictException('Already punched in today');
     }
+    if (existing?.punchOutTime) {
+      throw new ConflictException('Attendance already has a punch-out for today. Please contact admin to correct this record.');
+    }
 
     if (!dto.latitude && !dto.longitude) {
       throw new BadRequestException(
@@ -277,28 +280,27 @@ export class AttendanceService {
     }
 
     // ── Persist record ───────────────────────────────────────────────────────
-    const record = await this.prisma.attendanceRecord.upsert({
-      where: { employeeId_date: { employeeId, date: today } },
-      create: {
+    const attendanceData = {
+      punchInTime: now,
+      punchInLat:  dto.latitude,
+      punchInLng:  dto.longitude,
+      isGeoValidIn: isGeoValid,
+      isManualPunch: false,
+      manualPunchReason: dto.manualPunchReason ?? null,
+      status: punchInStatus,
+    };
+
+    const record = existing
+      ? await this.prisma.attendanceRecord.update({
+        where: { id: existing.id },
+        data: attendanceData,
+      })
+      : await this.prisma.attendanceRecord.create({
+      data: {
         employeeId,
         date: today,
-        punchInTime: now,
-        punchInLat:  dto.latitude,
-        punchInLng:  dto.longitude,
-        isGeoValidIn: isGeoValid,
-        isManualPunch: false,
-        manualPunchReason: dto.manualPunchReason ?? null,
-        status: punchInStatus,
+        ...attendanceData,
         deviceInfo: (dto.deviceInfo ?? {}) as any,
-      },
-      update: {
-        punchInTime: now,
-        punchInLat:  dto.latitude,
-        punchInLng:  dto.longitude,
-        isGeoValidIn: isGeoValid,
-        isManualPunch: false,
-        manualPunchReason: dto.manualPunchReason ?? null,
-        status: punchInStatus,
       },
     });
 
@@ -561,11 +563,7 @@ export class AttendanceService {
     const record = await this.prisma.attendanceRecord.findUnique({
       where: { employeeId_date: { employeeId, date: today } },
     });
-    if (!record) return null;
-    return {
-      ...record,
-      designatedHours: 8.5
-    };
+    return record;
   }
 
   async getByEmployee(
@@ -587,10 +585,7 @@ export class AttendanceService {
       orderBy: { date: 'desc' },
       ...(limit ? { take: limit } : {}),
     });
-    return records.map(r => ({
-      ...r,
-      designatedHours: 8.5
-    }));
+    return records;
   }
 
   async getAll(from?: string, to?: string, status?: string) {
@@ -612,10 +607,7 @@ export class AttendanceService {
     });
 
     const activeRecords = records.filter((record) => !isAttendanceBlockedIdentity(record.employee));
-    return activeRecords.map(r => ({
-      ...r,
-      designatedHours: 8.5
-    }));
+    return activeRecords;
   }
 
   async regularize(id: string, adminId: string, dto: RegularizeDto) {
@@ -675,14 +667,11 @@ export class AttendanceService {
 
     const records = await this.prisma.attendanceRecord.findMany({
       where: { employeeId, date: { gte: monthStart, lte: today } },
-      select: { status: true, workingHours: true },
+      select: { status: true },
     });
 
     let daysPresent = 0, daysHalfDay = 0, daysOnLeave = 0, daysAbsent = 0, daysLate = 0;
-    let totalWorkingHours = 0;
     for (const r of records) {
-      totalWorkingHours += Number(r.workingHours || 0);
-
       if      (r.status === 'PRESENT' || r.status === 'WFH') daysPresent++;
       else if (r.status === 'LATE')     daysLate++;
       else if (r.status === 'HALF_DAY') daysHalfDay++;
@@ -706,8 +695,6 @@ export class AttendanceService {
       daysAbsent,
       attendedDays,
       attendancePercent,
-      totalWorkingHours: Math.round(totalWorkingHours * 100) / 100,
-      totalDesignatedHours: Math.round(totalWorkingDays * 8.5 * 100) / 100,
     };
   }
 
@@ -810,14 +797,29 @@ export class AttendanceService {
     const date = new Date(dto.date);
     date.setUTCHours(0, 0, 0, 0);
 
-    const punchInTime = dto.punchInTime ? new Date(dto.punchInTime) : null;
-    const punchOutTime = dto.punchOutTime ? new Date(dto.punchOutTime) : null;
+    const existing = await this.prisma.attendanceRecord.findUnique({
+      where: {
+        employeeId_date: {
+          employeeId: dto.employeeId,
+          date,
+        },
+      },
+    });
+
+    const punchInTime = dto.punchInTime
+      ? new Date(dto.punchInTime)
+      : existing?.punchInTime ?? null;
+    const punchOutTime = dto.punchOutTime
+      ? new Date(dto.punchOutTime)
+      : existing?.punchOutTime ?? null;
 
     let workingHours = null;
     if (punchInTime && punchOutTime) {
       workingHours = Math.round(
         ((punchOutTime.getTime() - punchInTime.getTime()) / (1000 * 60 * 60)) * 100
       ) / 100;
+    } else if (existing?.workingHours) {
+      workingHours = existing.workingHours as any;
     }
 
     const record = await this.prisma.attendanceRecord.upsert({
@@ -832,11 +834,11 @@ export class AttendanceService {
         date,
         punchInTime,
         punchOutTime,
-        punchInLat: 22.3097,
-        punchInLng: 73.1376,
+        punchInLat: punchInTime ? 22.3097 : null,
+        punchInLng: punchInTime ? 73.1376 : null,
         punchOutLat: punchOutTime ? 22.3097 : null,
         punchOutLng: punchOutTime ? 73.1376 : null,
-        isGeoValidIn: true,
+        isGeoValidIn: punchInTime ? true : null,
         isGeoValidOut: punchOutTime ? true : null,
         status: dto.status,
         workingHours,
@@ -850,12 +852,12 @@ export class AttendanceService {
       update: {
         punchInTime,
         punchOutTime,
-        punchInLat: 22.3097,
-        punchInLng: 73.1376,
-        punchOutLat: punchOutTime ? 22.3097 : null,
-        punchOutLng: punchOutTime ? 73.1376 : null,
-        isGeoValidIn: true,
-        isGeoValidOut: punchOutTime ? true : null,
+        punchInLat: dto.punchInTime ? 22.3097 : existing?.punchInLat,
+        punchInLng: dto.punchInTime ? 73.1376 : existing?.punchInLng,
+        punchOutLat: dto.punchOutTime ? 22.3097 : existing?.punchOutLat,
+        punchOutLng: dto.punchOutTime ? 73.1376 : existing?.punchOutLng,
+        isGeoValidIn: dto.punchInTime ? true : existing?.isGeoValidIn,
+        isGeoValidOut: dto.punchOutTime ? true : existing?.isGeoValidOut,
         status: dto.status,
         workingHours,
         isRegularized: true,
@@ -885,9 +887,6 @@ export class AttendanceService {
       }
     });
 
-    return {
-      ...record,
-      designatedHours: 8.5
-    };
+    return record;
   }
 }

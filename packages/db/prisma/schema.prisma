@@ -257,40 +257,41 @@ model Employee {
   manager      Employee?   @relation("ManagerSubordinates", fields: [managerId], references: [id])
   subordinates Employee[]  @relation("ManagerSubordinates")
 
-  attendance               AttendanceRecord[]
-  expensesClaimed          Expense[]                @relation("ExpenseClaimant")
-  expensesL1Approved       Expense[]                @relation("ExpenseL1Approver")
-  expensesFinanceApproved  Expense[]                @relation("ExpenseFinanceApprover")
-  invoicesSubmitted        Invoice[]                @relation("InvoiceSubmitter")
-  invoicesApproved         Invoice[]                @relation("InvoiceApprover")
-  leaveRequests            LeaveRequest[]           @relation("LeaveRequester")
-  leavesApproved           LeaveRequest[]           @relation("LeaveApprover")
-  leaveBalances            LeaveBalance[]
-  employeeRequests         EmployeeRequest[]        @relation("RequestSubmitter")
-  requestsReviewed         EmployeeRequest[]        @relation("RequestReviewer")
-  salarySlips              SalarySlip[]             @relation("SlipEmployee")
-  salarySlipsUploaded      SalarySlip[]             @relation("SlipUploader")
-  salaryStructures         SalaryStructure[]        @relation("StructureEmployee")
-  salaryStructuresApproved SalaryStructure[]        @relation("StructureApprover")
-  salarySlipsApproved      SalarySlip[]             @relation("SlipApprover")
-  payrollRunsGenerated     PayrollRun[]             @relation("PayrollRunGenerator")
-  payrollRunsApproved      PayrollRun[]             @relation("PayrollRunApprover")
-  payrollRunRows           PayrollRunEmployee[]
-  notifications            Notification[]
-  commentsMade             Comment[]
-  auditLogs                AuditLog[]               @relation("AuditActor")
-  attendanceRegularized    AttendanceRecord[]       @relation("AttendanceRegularizer")
-  consentRecords           ConsentRecord[]
-  refreshTokens            RefreshToken[]
-  passwordResetTokens      PasswordResetToken[]
-  documents                EmployeeDocument[]
-  tasksCreated             Task[]                   @relation("TaskCreator")
-  taskAssignments          TaskAssignment[]
-  chatMemberships          ChatChannelMember[]
-  chatMessages             ChatMessage[]
-  policyAcknowledgements   PolicyAcknowledgement[]
-  lifecycleEvents          EmployeeLifecycleEvent[] @relation("LifecycleEmployee")
-  lifecycleEventsCreated   EmployeeLifecycleEvent[] @relation("LifecycleCreator")
+  attendance                AttendanceRecord[]
+  expensesClaimed           Expense[]                  @relation("ExpenseClaimant")
+  expensesL1Approved        Expense[]                  @relation("ExpenseL1Approver")
+  expensesFinanceApproved   Expense[]                  @relation("ExpenseFinanceApprover")
+  invoicesSubmitted         Invoice[]                  @relation("InvoiceSubmitter")
+  invoicesApproved          Invoice[]                  @relation("InvoiceApprover")
+  leaveRequests             LeaveRequest[]             @relation("LeaveRequester")
+  leavesApproved            LeaveRequest[]             @relation("LeaveApprover")
+  leaveBalances             LeaveBalance[]
+  employeeRequests          EmployeeRequest[]          @relation("RequestSubmitter")
+  requestsReviewed          EmployeeRequest[]          @relation("RequestReviewer")
+  salarySlips               SalarySlip[]               @relation("SlipEmployee")
+  salarySlipsUploaded       SalarySlip[]               @relation("SlipUploader")
+  salaryStructures          SalaryStructure[]          @relation("StructureEmployee")
+  salaryStructuresApproved  SalaryStructure[]          @relation("StructureApprover")
+  salarySlipsApproved       SalarySlip[]               @relation("SlipApprover")
+  payrollRunsGenerated      PayrollRun[]               @relation("PayrollRunGenerator")
+  payrollRunsApproved       PayrollRun[]               @relation("PayrollRunApprover")
+  payrollRunRows            PayrollRunEmployee[]
+  monthlyAttendanceBalances MonthlyAttendanceBalance[]
+  notifications             Notification[]
+  commentsMade              Comment[]
+  auditLogs                 AuditLog[]                 @relation("AuditActor")
+  attendanceRegularized     AttendanceRecord[]         @relation("AttendanceRegularizer")
+  consentRecords            ConsentRecord[]
+  refreshTokens             RefreshToken[]
+  passwordResetTokens       PasswordResetToken[]
+  documents                 EmployeeDocument[]
+  tasksCreated              Task[]                     @relation("TaskCreator")
+  taskAssignments           TaskAssignment[]
+  chatMemberships           ChatChannelMember[]
+  chatMessages              ChatMessage[]
+  policyAcknowledgements    PolicyAcknowledgement[]
+  lifecycleEvents           EmployeeLifecycleEvent[]   @relation("LifecycleEmployee")
+  lifecycleEventsCreated    EmployeeLifecycleEvent[]   @relation("LifecycleCreator")
 
   // Company Intelligence relations
   companiesResponsible   ClientCompany[]         @relation("CompanyResponsible")
@@ -560,36 +561,36 @@ model PayrollRun {
 }
 
 model PayrollRunEmployee {
-  id                   String   @id @default(uuid())
-  payrollRunId         String   @map("payroll_run_id")
-  employeeId           String   @map("employee_id")
-  monthDays            Int      @map("month_days")
-  workingDays          Int      @map("working_days")
-  paidDays             Decimal  @map("paid_days") @db.Decimal(5, 2)
-  lopDays              Decimal  @map("lop_days") @db.Decimal(5, 2)
-  presentDays          Int      @default(0) @map("present_days")
-  lateDays             Int      @default(0) @map("late_days")
-  wfhDays              Int      @default(0) @map("wfh_days")
-  halfDays             Int      @default(0) @map("half_days")
-  leaveDays            Int      @default(0) @map("leave_days")
-  holidayDays          Int      @default(0) @map("holiday_days")
-  weekOffDays          Int      @default(0) @map("week_off_days")
-  absentDays           Int      @default(0) @map("absent_days")
-  missingPunchDays     Int      @default(0) @map("missing_punch_days")
-  baseSalary           Decimal  @map("base_salary") @db.Decimal(12, 2)
-  earnedBaseSalary     Decimal  @map("earned_base_salary") @db.Decimal(12, 2)
-  incentives           Decimal  @default(0) @db.Decimal(12, 2)
-  reimbursements       Decimal  @default(0) @db.Decimal(12, 2)
-  grossSalary          Decimal  @map("gross_salary") @db.Decimal(12, 2)
-  pfDeduction          Decimal  @default(0) @map("pf_deduction") @db.Decimal(12, 2)
-  esicDeduction        Decimal  @default(0) @map("esic_deduction") @db.Decimal(12, 2)
-  professionalTax      Decimal  @default(0) @map("professional_tax") @db.Decimal(12, 2)
-  tds                  Decimal  @default(0) @db.Decimal(12, 2)
-  deductions           Decimal  @db.Decimal(12, 2)
-  netPayable           Decimal  @map("net_payable") @db.Decimal(12, 2)
-  calculationSnapshot  Json     @map("calculation_snapshot")
-  createdAt            DateTime @default(now()) @map("created_at")
-  updatedAt            DateTime @updatedAt @map("updated_at")
+  id                  String   @id @default(uuid())
+  payrollRunId        String   @map("payroll_run_id")
+  employeeId          String   @map("employee_id")
+  monthDays           Int      @map("month_days")
+  workingDays         Int      @map("working_days")
+  paidDays            Decimal  @map("paid_days") @db.Decimal(5, 2)
+  lopDays             Decimal  @map("lop_days") @db.Decimal(5, 2)
+  presentDays         Int      @default(0) @map("present_days")
+  lateDays            Int      @default(0) @map("late_days")
+  wfhDays             Int      @default(0) @map("wfh_days")
+  halfDays            Int      @default(0) @map("half_days")
+  leaveDays           Int      @default(0) @map("leave_days")
+  holidayDays         Int      @default(0) @map("holiday_days")
+  weekOffDays         Int      @default(0) @map("week_off_days")
+  absentDays          Int      @default(0) @map("absent_days")
+  missingPunchDays    Int      @default(0) @map("missing_punch_days")
+  baseSalary          Decimal  @map("base_salary") @db.Decimal(12, 2)
+  earnedBaseSalary    Decimal  @map("earned_base_salary") @db.Decimal(12, 2)
+  incentives          Decimal  @default(0) @db.Decimal(12, 2)
+  reimbursements      Decimal  @default(0) @db.Decimal(12, 2)
+  grossSalary         Decimal  @map("gross_salary") @db.Decimal(12, 2)
+  pfDeduction         Decimal  @default(0) @map("pf_deduction") @db.Decimal(12, 2)
+  esicDeduction       Decimal  @default(0) @map("esic_deduction") @db.Decimal(12, 2)
+  professionalTax     Decimal  @default(0) @map("professional_tax") @db.Decimal(12, 2)
+  tds                 Decimal  @default(0) @db.Decimal(12, 2)
+  deductions          Decimal  @db.Decimal(12, 2)
+  netPayable          Decimal  @map("net_payable") @db.Decimal(12, 2)
+  calculationSnapshot Json     @map("calculation_snapshot")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
 
   payrollRun PayrollRun @relation(fields: [payrollRunId], references: [id], onDelete: Cascade)
   employee   Employee   @relation(fields: [employeeId], references: [id])
@@ -597,6 +598,49 @@ model PayrollRunEmployee {
   @@unique([payrollRunId, employeeId])
   @@index([employeeId])
   @@map("payroll_run_employees")
+}
+
+model MonthlyAttendanceBalance {
+  id                     String   @id @default(uuid())
+  employeeId             String   @map("employee_id")
+  month                  Int
+  year                   Int
+  monthDays              Int      @map("month_days")
+  workingDays            Int      @map("working_days")
+  paidDays               Decimal  @map("paid_days") @db.Decimal(5, 2)
+  lopDays                Decimal  @map("lop_days") @db.Decimal(5, 2)
+  presentDays            Int      @default(0) @map("present_days")
+  lateDays               Int      @default(0) @map("late_days")
+  wfhDays                Int      @default(0) @map("wfh_days")
+  halfDays               Int      @default(0) @map("half_days")
+  leaveDays              Int      @default(0) @map("leave_days")
+  holidayDays            Int      @default(0) @map("holiday_days")
+  weekOffDays            Int      @default(0) @map("week_off_days")
+  absentDays             Int      @default(0) @map("absent_days")
+  missingPunchDays       Int      @default(0) @map("missing_punch_days")
+  designatedHours        Decimal  @default(0) @map("designated_hours") @db.Decimal(8, 2)
+  actualHours            Decimal  @default(0) @map("actual_hours") @db.Decimal(8, 2)
+  grossOvertimeHours     Decimal  @default(0) @map("gross_overtime_hours") @db.Decimal(8, 2)
+  grossShortfallHours    Decimal  @default(0) @map("gross_shortfall_hours") @db.Decimal(8, 2)
+  overtimeCreditHours    Decimal  @default(0) @map("overtime_credit_hours") @db.Decimal(8, 2)
+  balancedHours          Decimal  @default(0) @map("balanced_hours") @db.Decimal(8, 2)
+  netOvertimeHours       Decimal  @default(0) @map("net_overtime_hours") @db.Decimal(8, 2)
+  netShortfallHours      Decimal  @default(0) @map("net_shortfall_hours") @db.Decimal(8, 2)
+  overtimeBalanceFactor  Decimal  @default(0.50) @map("overtime_balance_factor") @db.Decimal(4, 2)
+  lateAllowanceMonthly   Int      @default(2) @map("late_allowance_monthly")
+  lateAllowanceUsed      Int      @default(0) @map("late_allowance_used")
+  lateConvertedToHalfDay Int      @default(0) @map("late_converted_to_half_day")
+  calculatedAt           DateTime @default(now()) @map("calculated_at") @db.Timestamptz
+  calculatedBy           String?  @map("calculated_by")
+  createdAt              DateTime @default(now()) @map("created_at")
+  updatedAt              DateTime @updatedAt @map("updated_at")
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@unique([employeeId, month, year])
+  @@index([month, year])
+  @@index([employeeId])
+  @@map("monthly_attendance_balances")
 }
 
 model Notification {

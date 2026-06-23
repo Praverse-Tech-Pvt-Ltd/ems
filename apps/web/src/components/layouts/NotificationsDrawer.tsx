@@ -69,8 +69,10 @@ export function NotificationsDrawer({ open, onClose }: Props) {
     queryKey: ['notifications'],
     queryFn: () => apiClient.get('/notifications').then(r => r.data).catch(() => []),
     enabled: open,
-    refetchInterval: open ? 30_000 : false,
-    staleTime: 10_000,
+    refetchInterval: open ? 60_000 : false,
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
+    retry: false,
   });
 
   // Mark one read — optimistic

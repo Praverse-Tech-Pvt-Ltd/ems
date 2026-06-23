@@ -87,7 +87,7 @@ export const stitchPages: Record<string, StitchPageConfig> = {
     icon: 'work_history',
     aiPrompt: 'Ask what needs your attention today across attendance, leave, salary, and assigned tasks.',
     aiSummary: 'My Workday stitches employee, attendance, calendar, salary, notifications, and corporate task APIs into one daily cockpit.',
-    endpoints: ['/employees/me', '/attendance/today', '/leaves/balance', '/salary/slips/my', '/notifications', '/corporate/tasks/my'],
+    endpoints: ['/employees/me', '/attendance/today', '/leaves/balance', '/salary/slips/my', '/notifications/unread-count', '/corporate/tasks/my'],
     metrics: [
       { label: 'Punch', value: 'Today', meta: 'Geo verified', tone: 'tertiary', icon: 'fingerprint' },
       { label: 'Leave', value: 'Balance', meta: 'Live entitlement', icon: 'event_available' },

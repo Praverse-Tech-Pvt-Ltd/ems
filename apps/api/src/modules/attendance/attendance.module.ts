@@ -4,6 +4,7 @@ import { AttendanceController } from './attendance.controller';
 
 import { GeoFenceService } from './geo-fence.service';
 import { AttendanceCronService } from './attendance-cron.service';
+import { AttendanceBalanceService } from './attendance-balance.service';
 
 @Module({
   controllers: [AttendanceController],
@@ -12,7 +13,8 @@ import { AttendanceCronService } from './attendance-cron.service';
 
     GeoFenceService,
     AttendanceCronService,
+    AttendanceBalanceService,
   ],
-  exports: [AttendanceService],
+  exports: [AttendanceService, AttendanceBalanceService],
 })
 export class AttendanceModule {}

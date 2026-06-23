@@ -1,6 +1,5 @@
 const ATTENDANCE_BLOCKED_EMAILS = new Set([
   'ashwani@nexgenpharmasolutions.com',
-  'pratham.s@nexgenpharmasolutions.com',
 ]);
 
 export function isAttendanceBlockedUser(user?: {
@@ -15,5 +14,5 @@ export function isAttendanceBlockedUser(user?: {
 
   const firstName = user?.firstName?.trim().toLowerCase();
   const lastName = user?.lastName?.trim().toLowerCase();
-  return lastName === 'shrivastav' && (firstName === 'ashwani' || firstName === 'pratham');
+  return lastName === 'shrivastav' && firstName === 'ashwani';
 }

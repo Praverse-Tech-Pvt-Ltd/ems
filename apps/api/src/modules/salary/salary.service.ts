@@ -6,6 +6,7 @@ import { PDFParse } from 'pdf-parse';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { EmailService } from '../../common/email/email.service';
 import { GenerateSalarySlipDto, UpsertSalaryStructureDto } from './dto/create-slip.dto';
+import { AttendanceBalanceService } from '../attendance/attendance-balance.service';
 
 export interface UploadSlipData {
   employeeId: string;
@@ -33,9 +34,22 @@ interface PayrollDayCounts {
   weekOffDays: number;
   absentDays: number;
   missingPunchDays: number;
+  designatedHours: number;
+  actualHours: number;
+  grossOvertimeHours: number;
+  grossShortfallHours: number;
+  overtimeCreditHours: number;
+  balancedHours: number;
+  netOvertimeHours: number;
+  netShortfallHours: number;
+  lateAllowanceUsed: number;
+  lateConvertedToHalfDay: number;
 }
 
 type ReconciliationDocumentType = 'WAGE_SHEET' | 'EPF_ECR' | 'ESIC_ECR';
+const MONTHLY_LATE_ALLOWANCE = 2;
+const OVERTIME_BALANCE_FACTOR = 0.5;
+const DESIGNATED_HOURS_PER_WORKING_DAY = 8.5;
 
 export interface ExtractedPayrollRow {
   source: ReconciliationDocumentType;
@@ -56,6 +70,7 @@ export class SalaryService {
   constructor(
     private prisma: PrismaService,
     private email: EmailService,
+    private attendanceBalances: AttendanceBalanceService,
   ) {}
 
   async upload(uploadedBy: string, data: UploadSlipData) {
@@ -192,7 +207,8 @@ export class SalaryService {
         const baseSalary = structure
           ? this.money(structure.basic) + this.money(structure.hra) + this.money(structure.allowances)
           : this.money(employee.grossSalary);
-        const counts = await this.calculatePayrollDays(employee.id, employee.joiningDate, employee.department?.name, dto.month, dto.year);
+        const counts = await this.attendanceBalances.calculateEmployeeMonth(employee.id, dto.month, dto.year);
+        await this.attendanceBalances.upsertCounts(counts, adminId);
         const paidFactor = counts.monthDays > 0 ? counts.paidDays / counts.monthDays : 0;
         const earnedBaseSalary = this.roundMoney(baseSalary * paidFactor);
         const reimbursements = await this.approvedReimbursements(employee.id, dto.month, dto.year);
@@ -240,6 +256,22 @@ export class SalaryService {
             month: dto.month,
             year: dto.year,
             paidFactor,
+            hours: {
+              designatedHours: counts.designatedHours,
+              actualHours: counts.actualHours,
+              grossOvertimeHours: counts.grossOvertimeHours,
+              grossShortfallHours: counts.grossShortfallHours,
+              overtimeCreditHours: counts.overtimeCreditHours,
+              balancedHours: counts.balancedHours,
+              netOvertimeHours: counts.netOvertimeHours,
+              netShortfallHours: counts.netShortfallHours,
+              overtimeBalanceFactor: counts.overtimeBalanceFactor,
+            },
+            latePolicy: {
+              monthlyAllowance: counts.lateAllowanceMonthly,
+              allowanceUsed: counts.lateAllowanceUsed,
+              convertedToHalfDay: counts.lateConvertedToHalfDay,
+            },
             salarySource: structure ? 'salary_structure' : 'employee_gross_salary',
             statutoryBasis: {
               employeePf: '12% of Basic, capped to INR 15,000 PF wage base',
@@ -761,7 +793,13 @@ export class SalaryService {
     const [records, holidays] = await Promise.all([
       this.prisma.attendanceRecord.findMany({
         where: { employeeId, date: { gte: from, lte: to } },
-        select: { date: true, status: true },
+        select: {
+          date: true,
+          status: true,
+          punchInTime: true,
+          punchOutTime: true,
+          workingHours: true,
+        },
       }),
       this.prisma.holiday.findMany({
         where: { date: { gte: from, lte: to }, isPaid: true },
@@ -769,7 +807,7 @@ export class SalaryService {
       }),
     ]);
 
-    const recordByDate = new Map(records.map((record) => [this.dateKey(record.date), record.status]));
+    const recordByDate = new Map(records.map((record) => [this.dateKey(record.date), record]));
     const paidHolidayKeys = new Set(holidays.map((holiday) => this.dateKey(holiday.date)));
     const counts: PayrollDayCounts = {
       monthDays: to.getDate(),
@@ -785,6 +823,16 @@ export class SalaryService {
       weekOffDays: 0,
       absentDays: 0,
       missingPunchDays: 0,
+      designatedHours: 0,
+      actualHours: 0,
+      grossOvertimeHours: 0,
+      grossShortfallHours: 0,
+      overtimeCreditHours: 0,
+      balancedHours: 0,
+      netOvertimeHours: 0,
+      netShortfallHours: 0,
+      lateAllowanceUsed: 0,
+      lateConvertedToHalfDay: 0,
     };
 
     const softwareWeekOff = departmentName?.toLowerCase().includes('software') ?? false;
@@ -804,16 +852,29 @@ export class SalaryService {
       const isSaturday = current.getDay() === 6;
       const isWeekOff = isSunday || (softwareWeekOff && isSaturday);
       const isPaidHoliday = paidHolidayKeys.has(key);
-      const status = recordByDate.get(key);
+      const record = recordByDate.get(key);
+      const status = record?.status;
 
-      if (!isWeekOff && !isPaidHoliday) counts.workingDays += 1;
+      const isScheduledWorkingDay = !isWeekOff && !isPaidHoliday;
+      if (isScheduledWorkingDay) {
+        counts.workingDays += 1;
+        counts.designatedHours += DESIGNATED_HOURS_PER_WORKING_DAY;
+        this.applyMonthlyHoursBalance(counts, status, this.attendanceHours(record));
+      }
 
       if (status === 'PRESENT') {
         counts.presentDays += 1;
         counts.paidDays += 1;
       } else if (status === 'LATE') {
-        counts.lateDays += 1;
-        counts.paidDays += 1;
+        if (counts.lateAllowanceUsed < MONTHLY_LATE_ALLOWANCE) {
+          counts.lateDays += 1;
+          counts.lateAllowanceUsed += 1;
+          counts.paidDays += 1;
+        } else {
+          counts.halfDays += 1;
+          counts.lateConvertedToHalfDay += 1;
+          counts.paidDays += 0.5;
+        }
       } else if (status === 'WFH') {
         counts.wfhDays += 1;
         counts.paidDays += 1;
@@ -838,7 +899,39 @@ export class SalaryService {
 
     counts.paidDays = this.roundDay(counts.paidDays);
     counts.lopDays = this.roundDay(Math.max(counts.monthDays - counts.paidDays, 0));
+    counts.designatedHours = this.roundHours(counts.designatedHours);
+    counts.actualHours = this.roundHours(counts.actualHours);
+    counts.grossOvertimeHours = this.roundHours(counts.grossOvertimeHours);
+    counts.grossShortfallHours = this.roundHours(counts.grossShortfallHours);
+    counts.overtimeCreditHours = this.roundHours(counts.grossOvertimeHours * OVERTIME_BALANCE_FACTOR);
+    counts.balancedHours = this.roundHours(Math.min(counts.overtimeCreditHours, counts.grossShortfallHours));
+    counts.netOvertimeHours = this.roundHours(Math.max(counts.overtimeCreditHours - counts.balancedHours, 0));
+    counts.netShortfallHours = this.roundHours(Math.max(counts.grossShortfallHours - counts.balancedHours, 0));
     return counts;
+  }
+
+  private attendanceHours(record?: { workingHours: unknown; punchInTime: Date | null; punchOutTime: Date | null }) {
+    const recordedHours = this.money(record?.workingHours);
+    if (recordedHours > 0) return recordedHours;
+    if (!record?.punchInTime || !record.punchOutTime) return 0;
+    const hours = (record.punchOutTime.getTime() - record.punchInTime.getTime()) / (1000 * 60 * 60);
+    return Math.max(this.roundHours(hours), 0);
+  }
+
+  private applyMonthlyHoursBalance(
+    counts: PayrollDayCounts,
+    status: string | undefined,
+    actualHours: number,
+  ) {
+    if (status === 'LEAVE' || status === 'HOLIDAY') return;
+
+    counts.actualHours += actualHours;
+    const delta = actualHours - DESIGNATED_HOURS_PER_WORKING_DAY;
+    if (delta > 0) {
+      counts.grossOvertimeHours += delta;
+    } else {
+      counts.grossShortfallHours += Math.abs(delta);
+    }
   }
 
   private extractPayrollRows(text: string, documentType: ReconciliationDocumentType): ExtractedPayrollRow[] {
@@ -1042,6 +1135,10 @@ export class SalaryService {
   }
 
   private roundDay(value: number) {
+    return Math.round(value * 100) / 100;
+  }
+
+  private roundHours(value: number) {
     return Math.round(value * 100) / 100;
   }
 
