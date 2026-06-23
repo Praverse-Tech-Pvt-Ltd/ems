@@ -1,5 +1,5 @@
 # ── Stage 1: build ──────────────────────────────────────────────────────────
-FROM node:20-alpine AS builder
+FROM node:22-alpine AS builder
 WORKDIR /app
 
 # Prisma generate validates datasource env vars while building, but it does
@@ -25,7 +25,7 @@ RUN npx prisma generate --schema=packages/db/prisma/schema.prisma
 RUN npm run build --workspace=apps/api
 
 # ── Stage 2: production ──────────────────────────────────────────────────────
-FROM node:20-alpine AS runner
+FROM node:22-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
