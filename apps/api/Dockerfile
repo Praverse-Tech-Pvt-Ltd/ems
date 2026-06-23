@@ -1,5 +1,6 @@
 # ── Stage 1: build ──────────────────────────────────────────────────────────
 FROM node:22-alpine AS builder
+RUN apk add --no-cache openssl
 WORKDIR /app
 
 # Prisma generate validates datasource env vars while building, but it does
@@ -26,6 +27,7 @@ RUN npm run build --workspace=apps/api
 
 # ── Stage 2: production ──────────────────────────────────────────────────────
 FROM node:22-alpine AS runner
+RUN apk add --no-cache openssl
 WORKDIR /app
 
 ENV NODE_ENV=production
