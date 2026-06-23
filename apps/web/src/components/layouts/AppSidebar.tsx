@@ -74,7 +74,14 @@ export function AppSidebar({ className = '', onNavigate }: { className?: string;
   const attendanceBlocked = isAttendanceBlockedUser(user);
 
   const canSee = (roles?: string[]) => !roles || roles.includes(role);
-  const canSeeItem = (item: NavItem) => canSee(item.roles) && !(attendanceBlocked && item.href === '/attendance-punch-station');
+  const canSeeItem = (item: NavItem) => {
+    if (!canSee(item.roles)) return false;
+    if (item.href === '/attendance-punch-station') {
+      const isPowerUser = ['ADMIN', 'SUPER_ADMIN'].includes(role);
+      return isPowerUser || !attendanceBlocked;
+    }
+    return true;
+  };
 
   const handleLogout = () => {
     queryClient.clear();

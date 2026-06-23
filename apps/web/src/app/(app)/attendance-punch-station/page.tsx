@@ -132,21 +132,25 @@ export default function AttendancePunchStationPage() {
   const [adminModalOpen, setAdminModalOpen] = useState(false);
 
   const load = async () => {
-    if (attendanceBlocked) {
+    const isPowerUser = ['ADMIN', 'SUPER_ADMIN'].includes(user?.role ?? '');
+    if (attendanceBlocked && !isPowerUser) {
       setLoading(false);
       return;
     }
 
     try {
       const { from, to } = monthBounds(calendarMonth);
-      const [todayData, statsData, recordsData, calendarData, holidaysData, openOdData] = await Promise.all([
-        attendanceService.today().catch(() => null),
-        attendanceService.myStats().catch(() => null),
-        attendanceService.my({ limit: 14 }).catch(() => []),
-        attendanceService.my({ from, to }).catch(() => []),
-        attendanceService.holidays().catch(() => []),
-        attendanceService.openOd().catch(() => null),
-      ]);
+      const [todayData, statsData, recordsData, calendarData, holidaysData, openOdData] = !attendanceBlocked
+        ? await Promise.all([
+            attendanceService.today().catch(() => null),
+            attendanceService.myStats().catch(() => null),
+            attendanceService.my({ limit: 14 }).catch(() => []),
+            attendanceService.my({ from, to }).catch(() => []),
+            attendanceService.holidays().catch(() => []),
+            attendanceService.openOd().catch(() => null),
+          ])
+        : [null, null, [], [], [], null];
+
       setToday(todayData);
       setStats(statsData);
       setRecords(Array.isArray(recordsData) ? recordsData : recordsData?.data ?? []);
@@ -293,7 +297,8 @@ export default function AttendancePunchStationPage() {
     setCalendarMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + delta, 1));
   };
 
-  if (attendanceBlocked) {
+  const isPowerUser = ['ADMIN', 'SUPER_ADMIN'].includes(user?.role ?? '');
+  if (attendanceBlocked && !isPowerUser) {
     return (
       <div className="flex flex-col gap-lg">
         <div className="border-b border-outline-variant/30 pb-sm">
@@ -341,134 +346,144 @@ export default function AttendancePunchStationPage() {
       </div>
 
       {/* Clock + Punch */}
-      <div className="grid grid-cols-1 lg:grid-cols-[1.5fr_1fr] gap-lg">
-        <div className="glass-card rounded-2xl p-xl border border-outline-variant/30 flex flex-col items-center justify-center gap-md text-center relative overflow-hidden min-h-[300px]">
-          {odRecord?.id && (
-            <div className="w-full max-w-sm rounded-2xl bg-primary/10 border border-primary/20 px-md py-sm text-left">
-              <p className="text-xs font-black text-primary tracking-widest">OD PUNCH-OUT PENDING</p>
-              <p className="text-sm text-on-surface-variant mt-1">
-                Add your OD punch-out time to complete the entry from {fmtTime(odRecord.punchInTime)}.
-              </p>
-            </div>
-          )}
-
-          <p className="font-label-caps text-label-caps text-on-surface-variant tracking-widest">CURRENT TIME</p>
-          <div className="font-black text-5xl text-on-surface tabular-nums"><Clock /></div>
-          <p className="text-body-sm text-on-surface-variant">
-            {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Asia/Kolkata' })}
+      {attendanceBlocked ? (
+        <div className="glass-card rounded-2xl p-xl border border-outline-variant/30 flex flex-col items-center justify-center gap-sm text-center min-h-[220px]">
+          <span className="material-symbols-outlined text-[40px] text-primary" style={{ fontVariationSettings: "'FILL' 1" }}>info</span>
+          <h3 className="font-bold text-on-surface text-lg">Personal Attendance Disabled</h3>
+          <p className="text-on-surface-variant text-sm max-w-md mt-1">
+            Your personal attendance punching is disabled. However, as an administrator, you can still manage the team's records using the <strong>Admin Adjustment</strong> tool.
           </p>
-
-          {loading ? (
-            <div className="w-40 h-12 rounded-full bg-surface-container-high animate-pulse" />
-          ) : (
-            <>
-              {(success || error) && (
-                <div className={`text-sm font-semibold px-4 py-2 rounded-full ${success ? 'bg-tertiary/10 text-tertiary border border-tertiary/20' : 'bg-error/10 text-error border border-error/20'}`}>
-                  {success || error}
-                </div>
-              )}
-              <div className="flex flex-col gap-sm w-full max-w-sm">
-                <button
-                  onClick={handlePunch}
-                  disabled={punching || isPunchedOut || !!odRecord}
-                  className={`w-full py-4 rounded-full font-title-md text-title-md transition-all flex items-center justify-center gap-sm disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 ${
-                    isPunchedIn
-                      ? 'bg-error text-on-error hover:opacity-90 shadow-[0_0_20px_rgba(186,26,26,0.25)]'
-                      : isPunchedOut
-                      ? 'bg-surface-container-high text-on-surface-variant shadow-sm'
-                      : 'bg-primary text-on-primary hover:opacity-90 shadow-[0_0_24px_rgba(170,48,0,0.3)]'
-                  }`}
-                >
-                  <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>
-                    {punching ? 'hourglass_empty' : isPunchedIn ? 'logout' : isPunchedOut ? 'check_circle' : 'login'}
-                  </span>
-                  {punching ? 'Processing...' : isPunchedIn ? 'Punch Out' : isPunchedOut ? 'Punched Out' : 'Punch In'}
-                </button>
-                <button
-                  type="button"
-                  onClick={odRecord?.id ? () => setOdMode('out') : openOdPunchIn}
-                  disabled={punching || (!odRecord?.id && (isPunchedIn || isPunchedOut))}
-                  className="w-full py-3 rounded-full font-title-md text-title-md transition-all flex items-center justify-center gap-sm border border-outline-variant/50 bg-surface-container-low text-on-surface hover:bg-surface-container disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>
-                    {odRecord?.id ? 'edit_note' : 'work_history'}
-                  </span>
-                  {odRecord?.id ? 'Add OD Punch Out' : 'OD'}
-                </button>
-              </div>
-              {stats && (
-                <div className="w-full max-w-sm space-y-md">
-                  <div className="border-t border-outline-variant/20 pt-md grid grid-cols-3 gap-sm">
-                    {[
-                      { label: 'Present', value: stats.daysPresent ?? 0, color: 'text-tertiary' },
-                      { label: 'Late', value: stats.daysLate ?? 0, color: 'text-primary' },
-                      { label: 'Absent', value: stats.daysAbsent ?? 0, color: 'text-error' },
-                    ].map(s => (
-                      <div key={s.label} className="text-center">
-                        <p className={`font-black text-2xl ${s.color}`}>{s.value}</p>
-                        <p className="text-[10px] text-on-surface-variant">{s.label}</p>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="border-t border-outline-variant/20 pt-md grid grid-cols-2 gap-sm">
-                    <div className="text-center border-r border-outline-variant/20">
-                      <p className="font-black text-xl text-tertiary">{fmtHrs(stats.totalWorkingHours ?? 0)}</p>
-                      <p className="text-[10px] text-on-surface-variant">Hours Worked</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="font-black text-xl text-primary">{fmtHrs(stats.totalDesignatedHours ?? 0)}</p>
-                      <p className="text-[10px] text-on-surface-variant">Designated Hours</p>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </>
-          )}
         </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-[1.5fr_1fr] gap-lg">
+          <div className="glass-card rounded-2xl p-xl border border-outline-variant/30 flex flex-col items-center justify-center gap-md text-center relative overflow-hidden min-h-[300px]">
+            {odRecord?.id && (
+              <div className="w-full max-w-sm rounded-2xl bg-primary/10 border border-primary/20 px-md py-sm text-left">
+                <p className="text-xs font-black text-primary tracking-widest">OD PUNCH-OUT PENDING</p>
+                <p className="text-sm text-on-surface-variant mt-1">
+                  Add your OD punch-out time to complete the entry from {fmtTime(odRecord.punchInTime)}.
+                </p>
+              </div>
+            )}
 
-        {/* Today's status */}
-        <div className="glass-card rounded-2xl p-lg border border-outline-variant/30 flex flex-col justify-between gap-md">
-          <div>
-            <p className="font-label-caps text-label-caps text-on-surface-variant tracking-widest mb-md">TODAY'S STATUS</p>
+            <p className="font-label-caps text-label-caps text-on-surface-variant tracking-widest">CURRENT TIME</p>
+            <div className="font-black text-5xl text-on-surface tabular-nums"><Clock /></div>
+            <p className="text-body-sm text-on-surface-variant">
+              {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Asia/Kolkata' })}
+            </p>
+
             {loading ? (
-              <div className="flex flex-col gap-sm">
-                {[1, 2, 3].map(i => <div key={i} className="h-10 rounded-lg bg-surface-container-high animate-pulse" />)}
-              </div>
+              <div className="w-40 h-12 rounded-full bg-surface-container-high animate-pulse" />
             ) : (
-              <div className="grid grid-cols-2 gap-sm">
-                {[
-                  { label: 'Status', value: today?.status ?? 'NOT MARKED', badge: true },
-                  { label: 'Punch In', value: fmtTime(today?.punchInTime ?? null) },
-                  { label: 'Punch Out', value: fmtTime(today?.punchOutTime ?? null) },
-                  { label: 'Hours', value: fmtHrs(today?.workingHours ?? null) },
-                ].map(item => (
-                  <div key={item.label} className="bg-surface-container-low rounded-xl p-sm">
-                    <p className="text-[10px] text-on-surface-variant font-label-caps tracking-widest">{item.label}</p>
-                    {item.badge && today?.status ? (
-                      <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-xs font-bold ${STATUS_COLOR[today.status] ?? 'bg-surface-container-high text-on-surface'}`}>
-                        {statusLabel(today)}
-                      </span>
-                    ) : (
-                      <p className="font-bold text-on-surface mt-0.5">{item.value as string}</p>
-                    )}
+              <>
+                {(success || error) && (
+                  <div className={`text-sm font-semibold px-4 py-2 rounded-full ${success ? 'bg-tertiary/10 text-tertiary border border-tertiary/20' : 'bg-error/10 text-error border border-error/20'}`}>
+                    {success || error}
                   </div>
-                ))}
-              </div>
+                )}
+                <div className="flex flex-col gap-sm w-full max-w-sm">
+                  <button
+                    onClick={handlePunch}
+                    disabled={punching || isPunchedOut || !!odRecord}
+                    className={`w-full py-4 rounded-full font-title-md text-title-md transition-all flex items-center justify-center gap-sm disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 ${
+                      isPunchedIn
+                        ? 'bg-error text-on-error hover:opacity-90 shadow-[0_0_20px_rgba(186,26,26,0.25)]'
+                        : isPunchedOut
+                        ? 'bg-surface-container-high text-on-surface-variant shadow-sm'
+                        : 'bg-primary text-on-primary hover:opacity-90 shadow-[0_0_24px_rgba(170,48,0,0.3)]'
+                    }`}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>
+                      {punching ? 'hourglass_empty' : isPunchedIn ? 'logout' : isPunchedOut ? 'check_circle' : 'login'}
+                    </span>
+                    {punching ? 'Processing...' : isPunchedIn ? 'Punch Out' : isPunchedOut ? 'Punched Out' : 'Punch In'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={odRecord?.id ? () => setOdMode('out') : openOdPunchIn}
+                    disabled={punching || (!odRecord?.id && (isPunchedIn || isPunchedOut))}
+                    className="w-full py-3 rounded-full font-title-md text-title-md transition-all flex items-center justify-center gap-sm border border-outline-variant/50 bg-surface-container-low text-on-surface hover:bg-surface-container disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>
+                      {odRecord?.id ? 'edit_note' : 'work_history'}
+                    </span>
+                    {odRecord?.id ? 'Add OD Punch Out' : 'OD'}
+                  </button>
+                </div>
+                {stats && (
+                  <div className="w-full max-w-sm space-y-md">
+                    <div className="border-t border-outline-variant/20 pt-md grid grid-cols-3 gap-sm">
+                      {[
+                        { label: 'Present', value: stats.daysPresent ?? 0, color: 'text-tertiary' },
+                        { label: 'Late', value: stats.daysLate ?? 0, color: 'text-primary' },
+                        { label: 'Absent', value: stats.daysAbsent ?? 0, color: 'text-error' },
+                      ].map(s => (
+                        <div key={s.label} className="text-center">
+                          <p className={`font-black text-2xl ${s.color}`}>{s.value}</p>
+                          <p className="text-[10px] text-on-surface-variant">{s.label}</p>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="border-t border-outline-variant/20 pt-md grid grid-cols-2 gap-sm">
+                      <div className="text-center border-r border-outline-variant/20">
+                        <p className="font-black text-xl text-tertiary">{fmtHrs(stats.totalWorkingHours ?? 0)}</p>
+                        <p className="text-[10px] text-on-surface-variant">Hours Worked</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="font-black text-xl text-primary">{fmtHrs(stats.totalDesignatedHours ?? 0)}</p>
+                        <p className="text-[10px] text-on-surface-variant">Designated Hours</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
 
-          <div className="border-t border-outline-variant/20 pt-md space-y-2 text-xs font-semibold text-on-surface-variant">
-            <div className="flex justify-between">
-              <span className="flex items-center gap-xs"><span className="material-symbols-outlined text-[16px] text-primary">location_on</span>GPS Status</span>
-              <span className="text-on-surface font-mono">17.3850 N, 78.4867 E [SECURE]</span>
+          {/* Today's status */}
+          <div className="glass-card rounded-2xl p-lg border border-outline-variant/30 flex flex-col justify-between gap-md">
+            <div>
+              <p className="font-label-caps text-label-caps text-on-surface-variant tracking-widest mb-md">TODAY'S STATUS</p>
+              {loading ? (
+                <div className="flex flex-col gap-sm">
+                  {[1, 2, 3].map(i => <div key={i} className="h-10 rounded-lg bg-surface-container-high animate-pulse" />)}
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-sm">
+                  {[
+                    { label: 'Status', value: today?.status ?? 'NOT MARKED', badge: true },
+                    { label: 'Punch In', value: fmtTime(today?.punchInTime ?? null) },
+                    { label: 'Punch Out', value: fmtTime(today?.punchOutTime ?? null) },
+                    { label: 'Hours', value: fmtHrs(today?.workingHours ?? null) },
+                  ].map(item => (
+                    <div key={item.label} className="bg-surface-container-low rounded-xl p-sm">
+                      <p className="text-[10px] text-on-surface-variant font-label-caps tracking-widest">{item.label}</p>
+                      {item.badge && today?.status ? (
+                        <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-xs font-bold ${STATUS_COLOR[today.status] ?? 'bg-surface-container-high text-on-surface'}`}>
+                          {statusLabel(today)}
+                        </span>
+                      ) : (
+                        <p className="font-bold text-on-surface mt-0.5">{item.value as string}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-            <div className="flex justify-between">
-              <span className="flex items-center gap-xs"><span className="material-symbols-outlined text-[16px] text-primary">wifi</span>Network SSID</span>
-              <span className="text-on-surface font-mono">OFFICE_WIFI_5G</span>
+
+            <div className="border-t border-outline-variant/20 pt-md space-y-2 text-xs font-semibold text-on-surface-variant">
+              <div className="flex justify-between">
+                <span className="flex items-center gap-xs"><span className="material-symbols-outlined text-[16px] text-primary">location_on</span>GPS Status</span>
+                <span className="text-on-surface font-mono">17.3850 N, 78.4867 E [SECURE]</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="flex items-center gap-xs"><span className="material-symbols-outlined text-[16px] text-primary">wifi</span>Network SSID</span>
+                <span className="text-on-surface font-mono">OFFICE_WIFI_5G</span>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
 
       {odMode && (
         <div className="fixed inset-0 z-50 bg-scrim/40 backdrop-blur-sm flex items-center justify-center p-md">
@@ -543,194 +558,196 @@ export default function AttendancePunchStationPage() {
       )}
 
       {/* Monthly calendar */}
-      <div className="glass-card rounded-2xl p-lg border border-outline-variant/30">
-        <div className="flex flex-col gap-md lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <p className="font-label-caps text-label-caps text-on-surface-variant tracking-widest mb-xs">
-              MONTHLY ATTENDANCE
-            </p>
-            <h3 className="font-title-lg text-title-lg text-on-surface">{monthLabel}</h3>
-          </div>
-          <div className="flex items-center gap-xs">
-            <button
-              type="button"
-              onClick={() => changeMonth(-1)}
-              className="w-10 h-10 rounded-full border border-outline-variant/40 bg-surface-container-low text-on-surface hover:bg-surface-container-high transition-colors"
-              aria-label="Previous month"
-            >
-              <span className="material-symbols-outlined text-[20px]">chevron_left</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                const now = new Date();
-                setCalendarMonth(new Date(now.getFullYear(), now.getMonth(), 1));
-                setSelectedDate(dateKey(now));
-              }}
-              className="h-10 px-4 rounded-full border border-outline-variant/40 bg-surface-container-low text-on-surface text-sm font-semibold hover:bg-surface-container-high transition-colors"
-            >
-              Today
-            </button>
-            <button
-              type="button"
-              onClick={() => changeMonth(1)}
-              className="w-10 h-10 rounded-full border border-outline-variant/40 bg-surface-container-low text-on-surface hover:bg-surface-container-high transition-colors"
-              aria-label="Next month"
-            >
-              <span className="material-symbols-outlined text-[20px]">chevron_right</span>
-            </button>
-          </div>
-        </div>
-
-        <div className="mt-md grid grid-cols-1 xl:grid-cols-[1fr_280px] gap-lg">
-          <div>
-            <div className="grid grid-cols-7 gap-2 mb-2">
-              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                <div key={day} className="text-center text-[10px] font-bold tracking-widest text-on-surface-variant uppercase">
-                  {day}
-                </div>
-              ))}
+      {!attendanceBlocked && (
+        <div className="glass-card rounded-2xl p-lg border border-outline-variant/30">
+          <div className="flex flex-col gap-md lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <p className="font-label-caps text-label-caps text-on-surface-variant tracking-widest mb-xs">
+                MONTHLY ATTENDANCE
+              </p>
+              <h3 className="font-title-lg text-title-lg text-on-surface">{monthLabel}</h3>
             </div>
-            <div className="grid grid-cols-7 gap-2">
-              {calendarDays.map(day => {
-                const rec = recordsByDate[day.key];
-                const holiday = holidaysByDate[day.key];
-                const weekendOff = day.inMonth && !rec && !holiday && isWeekendOff(day.date, saturdayOff);
-                const isSelected = selectedDate === day.key;
-                const isSplitDay = rec?.notes === 'HALF_DAY_WFH';
-                const markClass = rec
-                  ? (isSplitDay ? '' : CALENDAR_MARK[rec.status])
-                  : holiday
-                    ? CALENDAR_MARK['HOLIDAY']
-                    : weekendOff
-                      ? WEEKEND_MARK
-                      : 'bg-surface-container-low text-on-surface-variant border-outline-variant/30';
-
-                return (
-                  <button
-                    type="button"
-                    key={day.key}
-                    onClick={() => setSelectedDate(day.key)}
-                    className={[
-                      'min-h-[72px] rounded-2xl border p-2 text-left transition-all hover:-translate-y-0.5 hover:shadow-sm',
-                      day.inMonth ? (isSplitDay ? 'text-white border-transparent' : markClass) : 'bg-transparent text-on-surface-variant/30 border-transparent',
-                      isSelected ? 'ring-2 ring-primary ring-offset-2 ring-offset-background' : '',
-                    ].join(' ')}
-                    style={day.inMonth && isSplitDay ? SPLIT_WFH_HALFDAY_STYLE : undefined}
-                  >
-                    <div className="flex items-start justify-between gap-1">
-                      <span className={`text-sm font-black tabular-nums ${day.isToday ? 'underline decoration-2 underline-offset-4' : ''}`}>
-                        {day.date.getDate()}
-                      </span>
-                      {rec?.isRegularized && (
-                        <span className="material-symbols-outlined text-[14px]" title="Regularized">edit_calendar</span>
-                      )}
-                    </div>
-                    {rec && (
-                      <div className="mt-2 space-y-1">
-                        <p className="text-[10px] font-black tracking-wide truncate">
-                          {isSplitDay ? 'WFH · HALF DAY' : statusLabel(rec).toUpperCase()}
-                        </p>
-                        <p className="text-[10px] opacity-80 tabular-nums">{fmtHrs(rec.workingHours)}</p>
-                      </div>
-                    )}
-                    {holiday && !rec && (
-                      <div className="mt-2">
-                        <p className="text-[10px] font-black tracking-wide truncate text-on-tertiary-fixed">{holiday.title.toUpperCase()}</p>
-                        <p className="text-[9px] opacity-85 text-on-tertiary-fixed font-semibold">HOLIDAY</p>
-                      </div>
-                    )}
-                    {weekendOff && (
-                      <div className="mt-2">
-                        <p className="text-[10px] font-black tracking-wide truncate text-on-surface-variant">WEEKEND OFF</p>
-                      </div>
-                    )}
-                  </button>
-                );
-              })}
+            <div className="flex items-center gap-xs">
+              <button
+                type="button"
+                onClick={() => changeMonth(-1)}
+                className="w-10 h-10 rounded-full border border-outline-variant/40 bg-surface-container-low text-on-surface hover:bg-surface-container-high transition-colors"
+                aria-label="Previous month"
+              >
+                <span className="material-symbols-outlined text-[20px]">chevron_left</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const now = new Date();
+                  setCalendarMonth(new Date(now.getFullYear(), now.getMonth(), 1));
+                  setSelectedDate(dateKey(now));
+                }}
+                className="h-10 px-4 rounded-full border border-outline-variant/40 bg-surface-container-low text-on-surface text-sm font-semibold hover:bg-surface-container-high transition-colors"
+              >
+                Today
+              </button>
+              <button
+                type="button"
+                onClick={() => changeMonth(1)}
+                className="w-10 h-10 rounded-full border border-outline-variant/40 bg-surface-container-low text-on-surface hover:bg-surface-container-high transition-colors"
+                aria-label="Next month"
+              >
+                <span className="material-symbols-outlined text-[20px]">chevron_right</span>
+              </button>
             </div>
           </div>
 
-          <aside className="rounded-2xl bg-surface-container-low border border-outline-variant/30 p-md">
-            <p className="font-label-caps text-label-caps text-on-surface-variant tracking-widest mb-sm">
-              SELECTED DAY
-            </p>
-            <h4 className="font-bold text-on-surface">
-              {new Date(selectedDate).toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Asia/Kolkata' })}
-            </h4>
-            {selectedRecord ? (
-              <div className="mt-md space-y-sm">
-                {selectedRecord.notes === 'HALF_DAY_WFH' ? (
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="inline-flex px-3 py-1 rounded-full text-xs font-bold bg-[#7c3aed] text-white">WFH</span>
-                    <span className="text-xs text-on-surface-variant font-semibold">+</span>
-                    <span className="inline-flex px-3 py-1 rounded-full text-xs font-bold bg-secondary text-on-secondary">HALF DAY</span>
+          <div className="mt-md grid grid-cols-1 xl:grid-cols-[1fr_280px] gap-lg">
+            <div>
+              <div className="grid grid-cols-7 gap-2 mb-2">
+                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                  <div key={day} className="text-center text-[10px] font-bold tracking-widest text-on-surface-variant uppercase">
+                    {day}
                   </div>
-                ) : (
-                  <span className={`inline-flex px-3 py-1 rounded-full text-xs font-bold ${STATUS_COLOR[selectedRecord.status] ?? 'bg-surface-container-high text-on-surface'}`}>
-                    {statusLabel(selectedRecord)}
+                ))}
+              </div>
+              <div className="grid grid-cols-7 gap-2">
+                {calendarDays.map(day => {
+                  const rec = recordsByDate[day.key];
+                  const holiday = holidaysByDate[day.key];
+                  const weekendOff = day.inMonth && !rec && !holiday && isWeekendOff(day.date, saturdayOff);
+                  const isSelected = selectedDate === day.key;
+                  const isSplitDay = rec?.notes === 'HALF_DAY_WFH';
+                  const markClass = rec
+                    ? (isSplitDay ? '' : CALENDAR_MARK[rec.status])
+                    : holiday
+                      ? CALENDAR_MARK['HOLIDAY']
+                      : weekendOff
+                        ? WEEKEND_MARK
+                        : 'bg-surface-container-low text-on-surface-variant border-outline-variant/30';
+
+                  return (
+                    <button
+                      type="button"
+                      key={day.key}
+                      onClick={() => setSelectedDate(day.key)}
+                      className={[
+                        'min-h-[72px] rounded-2xl border p-2 text-left transition-all hover:-translate-y-0.5 hover:shadow-sm',
+                        day.inMonth ? (isSplitDay ? 'text-white border-transparent' : markClass) : 'bg-transparent text-on-surface-variant/30 border-transparent',
+                        isSelected ? 'ring-2 ring-primary ring-offset-2 ring-offset-background' : '',
+                      ].join(' ')}
+                      style={day.inMonth && isSplitDay ? SPLIT_WFH_HALFDAY_STYLE : undefined}
+                    >
+                      <div className="flex items-start justify-between gap-1">
+                        <span className={`text-sm font-black tabular-nums ${day.isToday ? 'underline decoration-2 underline-offset-4' : ''}`}>
+                          {day.date.getDate()}
+                        </span>
+                        {rec?.isRegularized && (
+                          <span className="material-symbols-outlined text-[14px]" title="Regularized">edit_calendar</span>
+                        )}
+                      </div>
+                      {rec && (
+                        <div className="mt-2 space-y-1">
+                          <p className="text-[10px] font-black tracking-wide truncate">
+                            {isSplitDay ? 'WFH · HALF DAY' : statusLabel(rec).toUpperCase()}
+                          </p>
+                          <p className="text-[10px] opacity-80 tabular-nums">{fmtHrs(rec.workingHours)}</p>
+                        </div>
+                      )}
+                      {holiday && !rec && (
+                        <div className="mt-2">
+                          <p className="text-[10px] font-black tracking-wide truncate text-on-tertiary-fixed">{holiday.title.toUpperCase()}</p>
+                          <p className="text-[9px] opacity-85 text-on-tertiary-fixed font-semibold">HOLIDAY</p>
+                        </div>
+                      )}
+                      {weekendOff && (
+                        <div className="mt-2">
+                          <p className="text-[10px] font-black tracking-wide truncate text-on-surface-variant">WEEKEND OFF</p>
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <aside className="rounded-2xl bg-surface-container-low border border-outline-variant/30 p-md">
+              <p className="font-label-caps text-label-caps text-on-surface-variant tracking-widest mb-sm">
+                SELECTED DAY
+              </p>
+              <h4 className="font-bold text-on-surface">
+                {new Date(selectedDate).toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Asia/Kolkata' })}
+              </h4>
+              {selectedRecord ? (
+                <div className="mt-md space-y-sm">
+                  {selectedRecord.notes === 'HALF_DAY_WFH' ? (
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="inline-flex px-3 py-1 rounded-full text-xs font-bold bg-[#7c3aed] text-white">WFH</span>
+                      <span className="text-xs text-on-surface-variant font-semibold">+</span>
+                      <span className="inline-flex px-3 py-1 rounded-full text-xs font-bold bg-secondary text-on-secondary">HALF DAY</span>
+                    </div>
+                  ) : (
+                    <span className={`inline-flex px-3 py-1 rounded-full text-xs font-bold ${STATUS_COLOR[selectedRecord.status] ?? 'bg-surface-container-high text-on-surface'}`}>
+                      {statusLabel(selectedRecord)}
+                    </span>
+                  )}
+                  <div className="grid grid-cols-2 gap-sm">
+                    {[
+                      { label: 'Punch In', value: fmtTime(selectedRecord.punchInTime) },
+                      { label: 'Punch Out', value: fmtTime(selectedRecord.punchOutTime) },
+                      { label: 'Hours', value: fmtHrs(selectedRecord.workingHours) },
+                      { label: 'Regularized', value: selectedRecord.isRegularized ? 'Yes' : 'No' },
+                    ].map(item => (
+                      <div key={item.label} className="rounded-xl bg-background/70 p-sm">
+                        <p className="text-[10px] text-on-surface-variant font-label-caps tracking-widest">{item.label}</p>
+                        <p className="font-semibold text-on-surface text-sm mt-0.5">{item.value}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : selectedIsHoliday ? (
+                <div className="mt-md space-y-sm">
+                  <span className="inline-flex px-3 py-1 rounded-full text-xs font-bold bg-tertiary-fixed-dim text-on-tertiary-fixed border border-tertiary-fixed-dim">
+                    HOLIDAY
                   </span>
-                )}
-                <div className="grid grid-cols-2 gap-sm">
-                  {[
-                    { label: 'Punch In', value: fmtTime(selectedRecord.punchInTime) },
-                    { label: 'Punch Out', value: fmtTime(selectedRecord.punchOutTime) },
-                    { label: 'Hours', value: fmtHrs(selectedRecord.workingHours) },
-                    { label: 'Regularized', value: selectedRecord.isRegularized ? 'Yes' : 'No' },
-                  ].map(item => (
-                    <div key={item.label} className="rounded-xl bg-background/70 p-sm">
-                      <p className="text-[10px] text-on-surface-variant font-label-caps tracking-widest">{item.label}</p>
-                      <p className="font-semibold text-on-surface text-sm mt-0.5">{item.value}</p>
+                  <h5 className="font-bold text-on-surface text-sm mt-xs">{selectedHoliday?.title}</h5>
+                  <p className="text-sm text-on-surface-variant">
+                    This day is marked as an official company holiday.
+                  </p>
+                </div>
+              ) : selectedIsWeekendOff ? (
+                <div className="mt-md space-y-sm">
+                  <span className="inline-flex px-3 py-1 rounded-full text-xs font-bold bg-surface-container-high text-on-surface-variant border border-outline-variant">
+                    WEEKEND OFF
+                  </span>
+                  <p className="text-sm text-on-surface-variant">
+                    This day is configured as a weekly off for {saturdayOff ? 'this employee' : 'employees on the standard schedule'}.
+                  </p>
+                </div>
+              ) : (
+                <p className="mt-md text-sm text-on-surface-variant">
+                  No attendance marking found for this date.
+                </p>
+              )}
+
+              <div className="mt-lg border-t border-outline-variant/30 pt-md">
+                <p className="font-label-caps text-label-caps text-on-surface-variant tracking-widest mb-sm">LEGEND</p>
+                <div className="grid grid-cols-1 gap-3">
+                  {CALENDAR_LEGEND.map(item => (
+                    <div key={item.key} className="flex items-center gap-3 text-sm font-semibold text-on-surface-variant">
+                      {item.splitDot ? (
+                        <span
+                          className="w-3.5 h-3.5 rounded-full flex-shrink-0"
+                          style={{ background: 'linear-gradient(135deg, #7c3aed 50%, #01677d 50%)' }}
+                        />
+                      ) : (
+                        <span className={`w-3.5 h-3.5 rounded-full border flex-shrink-0 ${item.dot}`} />
+                      )}
+                      <span>{item.label}</span>
                     </div>
                   ))}
                 </div>
               </div>
-            ) : selectedIsHoliday ? (
-              <div className="mt-md space-y-sm">
-                <span className="inline-flex px-3 py-1 rounded-full text-xs font-bold bg-tertiary-fixed-dim text-on-tertiary-fixed border border-tertiary-fixed-dim">
-                  HOLIDAY
-                </span>
-                <h5 className="font-bold text-on-surface text-sm mt-xs">{selectedHoliday?.title}</h5>
-                <p className="text-sm text-on-surface-variant">
-                  This day is marked as an official company holiday.
-                </p>
-              </div>
-            ) : selectedIsWeekendOff ? (
-              <div className="mt-md space-y-sm">
-                <span className="inline-flex px-3 py-1 rounded-full text-xs font-bold bg-surface-container-high text-on-surface-variant border border-outline-variant">
-                  WEEKEND OFF
-                </span>
-                <p className="text-sm text-on-surface-variant">
-                  This day is configured as a weekly off for {saturdayOff ? 'this employee' : 'employees on the standard schedule'}.
-                </p>
-              </div>
-            ) : (
-              <p className="mt-md text-sm text-on-surface-variant">
-                No attendance marking found for this date.
-              </p>
-            )}
-
-            <div className="mt-lg border-t border-outline-variant/30 pt-md">
-              <p className="font-label-caps text-label-caps text-on-surface-variant tracking-widest mb-sm">LEGEND</p>
-              <div className="grid grid-cols-1 gap-3">
-                {CALENDAR_LEGEND.map(item => (
-                  <div key={item.key} className="flex items-center gap-3 text-sm font-semibold text-on-surface-variant">
-                    {item.splitDot ? (
-                      <span
-                        className="w-3.5 h-3.5 rounded-full flex-shrink-0"
-                        style={{ background: 'linear-gradient(135deg, #7c3aed 50%, #01677d 50%)' }}
-                      />
-                    ) : (
-                      <span className={`w-3.5 h-3.5 rounded-full border flex-shrink-0 ${item.dot}`} />
-                    )}
-                    <span>{item.label}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </aside>
+            </aside>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Admin view: all team records */}
       {isAdmin && allRecords.length > 0 && (
