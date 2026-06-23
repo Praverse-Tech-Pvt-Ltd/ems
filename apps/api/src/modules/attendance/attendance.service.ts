@@ -100,47 +100,51 @@ export class AttendanceService {
     });
     const name = employee?.firstName.toLowerCase() || '';
 
-    // Shift 09:00-17:30 -> grace window 09:30 / late until 12:00 / early-out 17:15
+    let designatedStart = 9 * 60; // 09:00 AM
+    let designatedEnd = 17 * 60 + 30; // 05:30 PM
+    let text = {
+      presentCutoff:  '09:00',
+      lateCutoff:     '09:30',
+      earlyOutCutoff: '17:00',
+      regularPunchOut:'17:30',
+    };
+
     if (name.includes('shifa') || name.includes('chandni') || name.includes('dilip')) {
-      return {
-        PRESENT_CUTOFF:   9 * 60 + 30,  // 09:30 AM
-        LATE_CUTOFF:      12 * 60,      // 12:00 PM
-        EARLY_OUT_CUTOFF: 17 * 60 + 15, // 05:15 PM
-        policyText: {
-          presentCutoff:  '09:30',
-          lateCutoff:     '12:00',
-          earlyOutCutoff: '17:15',
-          regularPunchOut:'17:30',
-        },
+      designatedStart = 9 * 60;
+      designatedEnd = 17 * 60 + 30;
+      text = {
+        presentCutoff:  '09:00',
+        lateCutoff:     '09:30',
+        earlyOutCutoff: '17:00',
+        regularPunchOut:'17:30',
       };
-    }
-
-    // Shift 10:00-18:30 -> grace window 10:30 / late until 12:00 / early-out 18:15
-    if (name.includes('maanav') || name.includes('dev')) {
-      return {
-        PRESENT_CUTOFF:   10 * 60 + 30, // 10:30 AM
-        LATE_CUTOFF:      12 * 60,      // 12:00 PM
-        EARLY_OUT_CUTOFF: 18 * 60 + 15, // 06:15 PM
-        policyText: {
-          presentCutoff:  '10:30',
-          lateCutoff:     '12:00',
-          earlyOutCutoff: '18:15',
-          regularPunchOut:'18:30',
-        },
-      };
-    }
-
-    // Default shift 09:30-18:00 -> grace window 10:00 / late until 12:00 / early-out 17:45
-    return {
-      PRESENT_CUTOFF:   10 * 60,      // 10:00 AM
-      LATE_CUTOFF:      12 * 60,      // 12:00 PM
-      EARLY_OUT_CUTOFF: 17 * 60 + 45, // 05:45 PM
-      policyText: {
+    } else if (name.includes('maanav') || name.includes('dev')) {
+      designatedStart = 10 * 60;
+      designatedEnd = 18 * 60 + 30;
+      text = {
         presentCutoff:  '10:00',
-        lateCutoff:     '12:00',
-        earlyOutCutoff: '17:45',
+        lateCutoff:     '10:30',
+        earlyOutCutoff: '18:00',
+        regularPunchOut:'18:30',
+      };
+    } else {
+      // Default shift 09:30-18:00
+      designatedStart = 9 * 60 + 30;
+      designatedEnd = 18 * 60;
+      text = {
+        presentCutoff:  '09:30',
+        lateCutoff:     '10:00',
+        earlyOutCutoff: '17:30',
         regularPunchOut:'18:00',
-      },
+      };
+    }
+
+    return {
+      DESIGNATED_START: designatedStart,
+      DESIGNATED_END: designatedEnd,
+      LATE_CUTOFF: designatedStart + 30,
+      EARLY_OUT_CUTOFF: designatedEnd - 30,
+      policyText: text,
     };
   }
 
@@ -246,7 +250,7 @@ export class AttendanceService {
     const isGeoValid = await this.geoFence.isWithinAnyOffice(dto.latitude, dto.longitude);
     const now        = new Date();
     const punchMins  = this.minutesSinceMidnight(now);
-    const { PRESENT_CUTOFF, LATE_CUTOFF } = await this.getEmployeeTimeConstraints(employeeId);
+    const { DESIGNATED_START, LATE_CUTOFF } = await this.getEmployeeTimeConstraints(employeeId);
 
     // ── Determine punch-in status ────────────────────────────────────────────
     let punchInStatus: 'PRESENT' | 'LATE' | 'HALF_DAY' | 'WFH' | 'LEAVE';
@@ -254,15 +258,15 @@ export class AttendanceService {
     if (!isGeoValid) {
       // Outside geo-fence: WFH, no time penalty
       punchInStatus = 'WFH';
-    } else if (punchMins <= PRESENT_CUTOFF) {
-      // Within allowance
+    } else if (punchMins <= DESIGNATED_START) {
+      // Punched in before or at designated start
       punchInStatus = 'PRESENT';
     } else if (punchMins <= LATE_CUTOFF) {
-      // Late punch-in window: check monthly late allowance
+      // Late punch-in window (Grace window: up to 30 mins after designated start)
       const lateCount = await this.countLateThisMonth(employeeId);
       punchInStatus   = lateCount < MAX_LATE_PM ? 'LATE' : 'HALF_DAY';
     } else {
-      // After late window: straight HALF_DAY
+      // Punched in after 30 mins after designated start: HALF_DAY
       punchInStatus = 'HALF_DAY';
     }
 
@@ -353,7 +357,7 @@ export class AttendanceService {
     const punchOutMins  = this.minutesSinceMidnight(now);
     const workingHours  = (now.getTime() - record.punchInTime.getTime()) / (1000 * 60 * 60);
     const timeStr       = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
-    const { EARLY_OUT_CUTOFF } = await this.getEmployeeTimeConstraints(employeeId);
+    const { DESIGNATED_END, EARLY_OUT_CUTOFF } = await this.getEmployeeTimeConstraints(employeeId);
 
     // ── Determine final status ───────────────────────────────────────────────
     let finalStatus: string = record.status;     // inherit punch-in status
@@ -367,7 +371,10 @@ export class AttendanceService {
       // Worked less than 4 h regardless of clock time → HALF_DAY
       finalStatus = 'HALF_DAY';
     } else if (punchOutMins < EARLY_OUT_CUTOFF) {
-      // Worked ≥ 4 h but punching out before 5:45 PM
+      // Punched out earlier than 30 mins before designated punch out → HALF_DAY
+      finalStatus = 'HALF_DAY';
+    } else if (punchOutMins < DESIGNATED_END) {
+      // Early punch out within 30-min window before designated end
       const earlyCount = await this.countEarlyPunchOutsThisMonth(employeeId);
       if (earlyCount >= MAX_EARLY_PM) {
         // Allowances exhausted → HALF_DAY
@@ -550,9 +557,14 @@ export class AttendanceService {
   async getToday(employeeId: string) {
     await this.assertAttendanceAllowed(employeeId);
     const today = this.getISTToday();
-    return this.prisma.attendanceRecord.findUnique({
+    const record = await this.prisma.attendanceRecord.findUnique({
       where: { employeeId_date: { employeeId, date: today } },
     });
+    if (!record) return null;
+    return {
+      ...record,
+      designatedHours: 8.5
+    };
   }
 
   async getByEmployee(
@@ -569,11 +581,15 @@ export class AttendanceService {
         ...(to   ? { lte: new Date(to)   } : {}),
       };
     }
-    return this.prisma.attendanceRecord.findMany({
+    const records = await this.prisma.attendanceRecord.findMany({
       where,
       orderBy: { date: 'desc' },
       ...(limit ? { take: limit } : {}),
     });
+    return records.map(r => ({
+      ...r,
+      designatedHours: 8.5
+    }));
   }
 
   async getAll(from?: string, to?: string, status?: string) {
@@ -594,7 +610,11 @@ export class AttendanceService {
       orderBy: [{ date: 'desc' }, { punchInTime: 'asc' }],
     });
 
-    return records.filter((record) => !isAttendanceBlockedIdentity(record.employee));
+    const activeRecords = records.filter((record) => !isAttendanceBlockedIdentity(record.employee));
+    return activeRecords.map(r => ({
+      ...r,
+      designatedHours: 8.5
+    }));
   }
 
   async regularize(id: string, adminId: string, dto: RegularizeDto) {
@@ -654,18 +674,22 @@ export class AttendanceService {
 
     const records = await this.prisma.attendanceRecord.findMany({
       where: { employeeId, date: { gte: monthStart, lte: today } },
-      select: { status: true },
+      select: { status: true, workingHours: true },
     });
 
-    let daysPresent = 0, daysHalfDay = 0, daysOnLeave = 0, daysAbsent = 0;
+    let daysPresent = 0, daysHalfDay = 0, daysOnLeave = 0, daysAbsent = 0, daysLate = 0;
+    let totalWorkingHours = 0;
     for (const r of records) {
-      if      (r.status === 'PRESENT' || r.status === 'LATE' || r.status === 'WFH') daysPresent++;
+      totalWorkingHours += Number(r.workingHours || 0);
+
+      if      (r.status === 'PRESENT' || r.status === 'WFH') daysPresent++;
+      else if (r.status === 'LATE')     daysLate++;
       else if (r.status === 'HALF_DAY') daysHalfDay++;
       else if (r.status === 'LEAVE')    daysOnLeave++;
       else if (r.status === 'ABSENT')   daysAbsent++;
     }
 
-    const attendedDays      = daysPresent + daysHalfDay * 0.5 + daysOnLeave;
+    const attendedDays      = daysPresent + daysLate + daysHalfDay * 0.5 + daysOnLeave;
     const attendancePercent = totalWorkingDays > 0
       ? Math.round((attendedDays / totalWorkingDays) * 100)
       : 0;
@@ -675,11 +699,14 @@ export class AttendanceService {
       month: monthName,
       totalWorkingDays,
       daysPresent,
+      daysLate,
       daysHalfDay,
       daysOnLeave,
       daysAbsent,
       attendedDays,
       attendancePercent,
+      totalWorkingHours: Math.round(totalWorkingHours * 100) / 100,
+      totalDesignatedHours: Math.round(totalWorkingDays * 8.5 * 100) / 100,
     };
   }
 

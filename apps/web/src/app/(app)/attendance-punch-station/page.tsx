@@ -386,17 +386,29 @@ export default function AttendancePunchStationPage() {
                 </button>
               </div>
               {stats && (
-                <div className="border-t border-outline-variant/20 pt-md grid grid-cols-3 gap-sm w-full max-w-sm">
-                  {[
-                    { label: 'Present', value: stats.daysPresent ?? 0, color: 'text-tertiary' },
-                    { label: 'Late', value: stats.daysLate ?? 0, color: 'text-primary' },
-                    { label: 'Absent', value: stats.daysAbsent ?? 0, color: 'text-error' },
-                  ].map(s => (
-                    <div key={s.label} className="text-center">
-                      <p className={`font-black text-2xl ${s.color}`}>{s.value}</p>
-                      <p className="text-[10px] text-on-surface-variant">{s.label}</p>
+                <div className="w-full max-w-sm space-y-md">
+                  <div className="border-t border-outline-variant/20 pt-md grid grid-cols-3 gap-sm">
+                    {[
+                      { label: 'Present', value: stats.daysPresent ?? 0, color: 'text-tertiary' },
+                      { label: 'Late', value: stats.daysLate ?? 0, color: 'text-primary' },
+                      { label: 'Absent', value: stats.daysAbsent ?? 0, color: 'text-error' },
+                    ].map(s => (
+                      <div key={s.label} className="text-center">
+                        <p className={`font-black text-2xl ${s.color}`}>{s.value}</p>
+                        <p className="text-[10px] text-on-surface-variant">{s.label}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="border-t border-outline-variant/20 pt-md grid grid-cols-2 gap-sm">
+                    <div className="text-center border-r border-outline-variant/20">
+                      <p className="font-black text-xl text-tertiary">{fmtHrs(stats.totalWorkingHours ?? 0)}</p>
+                      <p className="text-[10px] text-on-surface-variant">Hours Worked</p>
                     </div>
-                  ))}
+                    <div className="text-center">
+                      <p className="font-black text-xl text-primary">{fmtHrs(stats.totalDesignatedHours ?? 0)}</p>
+                      <p className="text-[10px] text-on-surface-variant">Designated Hours</p>
+                    </div>
+                  </div>
                 </div>
               )}
             </>
