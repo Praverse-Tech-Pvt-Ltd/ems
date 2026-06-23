@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { AttendanceService } from './attendance.service';
+import { ATTENDANCE_BLOCKED_EMAILS, isAttendanceBlockedIdentity } from './attendance-blocklist';
 
 @Injectable()
 export class AttendanceCronService {
@@ -27,15 +28,16 @@ export class AttendanceCronService {
       include: { employee: { select: { id: true, firstName: true, email: true } } },
     });
 
-    if (missing.length === 0) return;
+    const eligibleMissing = missing.filter((record) => !isAttendanceBlockedIdentity(record.employee));
+    if (eligibleMissing.length === 0) return;
 
     await this.prisma.attendanceRecord.updateMany({
-      where: { id: { in: missing.map((r) => r.id) } },
+      where: { id: { in: eligibleMissing.map((r) => r.id) } },
       data: { status: 'MISSING_PUNCH_OUT' },
     });
 
     await Promise.all(
-      missing.map((record) =>
+      eligibleMissing.map((record) =>
         this.prisma.auditLog.create({
           data: {
             actorId: record.employeeId,
@@ -52,7 +54,7 @@ export class AttendanceCronService {
       )
     );
 
-    this.logger.log(`Flagged ${missing.length} missing punch-outs`);
+    this.logger.log(`Flagged ${eligibleMissing.length} missing punch-outs`);
   }
 
   @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT, { timeZone: 'Asia/Kolkata' })
@@ -72,8 +74,11 @@ export class AttendanceCronService {
 
     // 2. Fetch all active employees
     const employees = await this.prisma.employee.findMany({
-      where: { status: 'ACTIVE' },
-      select: { id: true },
+      where: {
+        status: 'ACTIVE',
+        email: { notIn: [...ATTENDANCE_BLOCKED_EMAILS] },
+      },
+      select: { id: true, email: true, firstName: true, lastName: true },
     });
 
     // 3. Find leave requests covering yesterday (APPROVED or PENDING)
@@ -98,6 +103,10 @@ export class AttendanceCronService {
     const recordIdsToUpdateToAbsent: string[] = [];
 
     for (const employee of employees) {
+      if (isAttendanceBlockedIdentity(employee)) {
+        continue;
+      }
+
       // Skip if the employee has a leave request (sent/approved)
       if (leaveEmployeeIds.has(employee.id)) {
         continue;

@@ -7,6 +7,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '@/store/auth.store';
 import { Avatar } from '@/components/ui/Avatar';
 import { LogOut } from 'lucide-react';
+import { isAttendanceBlockedUser } from '@/lib/attendance-access';
 
 type NavItem = { href: string; label: string; icon: string; roles?: string[]; badge?: boolean };
 type NavGroup = { label: string; roles?: string[]; items: NavItem[] };
@@ -70,10 +71,10 @@ export function AppSidebar({ className = '', onNavigate }: { className?: string;
   const clearAuth = useAuthStore((s) => s.clearAuth);
   const user      = useAuthStore((s) => s.user);
   const role      = user?.role ?? 'EMPLOYEE';
-  const isAshwani = user?.email?.toLowerCase() === 'ashwani@nexgenpharmasolutions.com';
+  const attendanceBlocked = isAttendanceBlockedUser(user);
 
   const canSee = (roles?: string[]) => !roles || roles.includes(role);
-  const canSeeItem = (item: NavItem) => canSee(item.roles) && !(isAshwani && item.href === '/attendance-punch-station');
+  const canSeeItem = (item: NavItem) => canSee(item.roles) && !(attendanceBlocked && item.href === '/attendance-punch-station');
 
   const handleLogout = () => {
     queryClient.clear();

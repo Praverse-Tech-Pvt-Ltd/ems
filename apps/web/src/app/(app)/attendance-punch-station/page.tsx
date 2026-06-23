@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { attendanceService } from '@/lib/api/attendance';
 import { useAuthStore } from '@/store/auth.store';
 import type { AttendanceRecord, AttendanceStatus } from '@/types';
+import { isAttendanceBlockedUser } from '@/lib/attendance-access';
 
 function Clock() {
   const [time, setTime] = useState('');
@@ -107,6 +108,7 @@ function isWeekendOff(date: Date, saturdayOff: boolean) {
 export default function AttendancePunchStationPage() {
   const user = useAuthStore(s => s.user);
   const isAdmin = ['ADMIN', 'SUPER_ADMIN', 'MANAGER'].includes(user?.role ?? '');
+  const attendanceBlocked = isAttendanceBlockedUser(user);
 
   const [today, setToday] = useState<any>(null);
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
@@ -128,6 +130,11 @@ export default function AttendancePunchStationPage() {
   const [success, setSuccess] = useState('');
 
   const load = async () => {
+    if (attendanceBlocked) {
+      setLoading(false);
+      return;
+    }
+
     try {
       const { from, to } = monthBounds(calendarMonth);
       const [todayData, statsData, recordsData, calendarData, holidaysData, openOdData] = await Promise.all([
@@ -161,12 +168,13 @@ export default function AttendancePunchStationPage() {
     }
   };
 
-  useEffect(() => { load(); }, [calendarMonth]);
+  useEffect(() => { load(); }, [calendarMonth, attendanceBlocked]);
 
   const isPunchedIn = today?.punchInTime && !today?.punchOutTime;
   const isPunchedOut = today?.punchInTime && today?.punchOutTime;
 
   const handlePunch = async () => {
+    if (attendanceBlocked) return;
     setError('');
     setSuccess('');
     setPunching(true);
@@ -194,6 +202,7 @@ export default function AttendancePunchStationPage() {
   };
 
   const openOdPunchIn = () => {
+    if (attendanceBlocked) return;
     setError('');
     setSuccess('');
     setOdMode('in');
@@ -202,6 +211,7 @@ export default function AttendancePunchStationPage() {
   };
 
   const submitOdPunchIn = async () => {
+    if (attendanceBlocked) return;
     setError('');
     setSuccess('');
     setOdSubmitting(true);
@@ -221,6 +231,7 @@ export default function AttendancePunchStationPage() {
   };
 
   const submitOdPunchOut = async () => {
+    if (attendanceBlocked) return;
     setError('');
     setSuccess('');
     setOdSubmitting(true);
@@ -279,6 +290,24 @@ export default function AttendancePunchStationPage() {
   const changeMonth = (delta: number) => {
     setCalendarMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + delta, 1));
   };
+
+  if (attendanceBlocked) {
+    return (
+      <div className="flex flex-col gap-lg">
+        <div className="border-b border-outline-variant/30 pb-sm">
+          <div className="font-label-caps text-label-caps text-primary tracking-widest flex items-center gap-xs mb-xs">
+            <span className="material-symbols-outlined text-[18px]">block</span>
+            ATTENDANCE
+          </div>
+          <h2 className="font-display-lg text-display-lg text-on-surface hidden md:block">Attendance Disabled</h2>
+          <h2 className="font-headline-lg-mobile text-headline-lg-mobile text-on-surface md:hidden">Attendance Disabled</h2>
+          <p className="text-on-surface-variant mt-xs">
+            Attendance punching and attendance records are disabled for this account.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-lg">

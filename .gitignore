@@ -8,6 +8,7 @@ node_modules
 dist
 build
 out
+*.tsbuildinfo
 
 # Turbo
 .turbo
@@ -21,6 +22,9 @@ out
 *.log
 npm-debug.log*
 .codex-runlogs/
+
+# Local Codex generated catalog
+codex-skills-catalog.*
 
 # OS
 .DS_Store

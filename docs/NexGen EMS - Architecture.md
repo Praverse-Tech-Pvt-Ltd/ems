@@ -13,14 +13,14 @@ date: 2026-05-18
 
 ```text
 nexgen-ems/
-├── apps/
-│   ├── api/        NestJS REST API
-│   └── web/        Next.js frontend
-├── packages/
-│   ├── db/         Prisma schema + client
-│   └── types/      Shared TypeScript types
-├── docker-compose.yml
-└── railway.json
+|-- apps/
+|   |-- api/        NestJS REST API
+|   `-- web/        Next.js frontend
+|-- packages/
+|   |-- db/         Prisma schema + client
+|   `-- types/      Shared TypeScript types
+|-- docker-compose.yml
+`-- render.yaml
 ```
 
 ## Service Map
@@ -28,26 +28,26 @@ nexgen-ems/
 ```mermaid
 graph TD
     Browser["Browser"] -->|HTTP| Web["Next.js web"]
-    Web -->|REST /api/v1| API["NestJS API"]
+    Web -->|REST /api/v1| API["NestJS API on Render"]
     Web -->|Socket.IO| API
     API -->|Prisma| DB[("Neon PostgreSQL")]
     API -->|BullMQ / ioredis| Redis["Upstash Redis"]
     API -->|Resend API| Email["Resend"]
-    API -->|S3 API| Storage["S3-compatible storage"]
+    API -->|local disk or S3 API| Storage["File storage"]
 ```
 
 ## Service Details
 
 ### Next.js Web (`apps/web`)
 
-- Vercel frontend project
+- Frontend project, hosted separately from the API
 - Public API env var: `NEXT_PUBLIC_API_URL`
 - `NEXT_PUBLIC_API_URL` must be the API origin only, without `/api/v1`
 - Key pages include login, dashboard, attendance, leaves, expenses, salary, reports, and management views
 
 ### NestJS API (`apps/api`)
 
-- Vercel backend project
+- Render Docker web service
 - API prefix: `/api/v1`
 - Health check: `GET /health`
 - Swagger docs: `/api/docs`
@@ -85,10 +85,12 @@ sequenceDiagram
 > pgBouncer pooled URLs do not support Prisma migration behavior reliably. Use
 > `DIRECT_URL` for migrations and `DATABASE_URL` for runtime.
 
-## Production Ports
+## Production Hosting
 
-Vercel provides public HTTPS origins for both apps. Local development commonly
-uses:
+Render provides the public HTTPS origin for the API. The frontend must set
+`NEXT_PUBLIC_API_URL` to that Render origin without `/api/v1`.
+
+## Local Ports
 
 | Service | Local Port |
 |---------|------------|

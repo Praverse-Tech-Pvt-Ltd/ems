@@ -1,16 +1,9 @@
-# NexGen EMS — Render Blueprint
-# Docs: https://render.com/docs/blueprint-spec
-#
-# Deploy:
-#   1. Push this repo to GitHub
-#   2. render.com → New → Blueprint → connect repo
-#   3. After first deploy, set the "sync: false" vars manually in the Render dashboard
-#
-# Frontend is hosted on Vercel — set NEXT_PUBLIC_API_URL there to the nexgen-api hostURL.
+# NexGen EMS - Render Blueprint
+# Create this from Render Dashboard: New -> Blueprint -> connect this repo.
+# Frontend remains separate. After Render gives you the API URL, set the web
+# app's NEXT_PUBLIC_API_URL to that URL without /api/v1.
 
 services:
-
-  # ── NestJS API ────────────────────────────────────────────────────────────────
   - type: web
     name: nexgen-api
     runtime: docker
@@ -24,52 +17,52 @@ services:
       - key: PORT
         value: 3001
 
-      # Set manually in Render dashboard after first deploy
       - key: DATABASE_URL
         sync: false
       - key: DIRECT_URL
         sync: false
       - key: REDIS_URL
         sync: false
-      - key: RESEND_API_KEY
-        sync: false
-      - key: FRONTEND_URL
-        sync: false
-      # Set to this service's own URL to keep the free-tier instance alive
-      - key: RENDER_SELF_URL
-        sync: false
 
-      # Auto-generated secrets
       - key: JWT_SECRET
         generateValue: true
       - key: JWT_REFRESH_SECRET
         generateValue: true
       - key: ENCRYPTION_KEY
-        generateValue: true
-
-      # Static values
+        sync: false
       - key: JWT_EXPIRES_IN
         value: 15m
       - key: JWT_REFRESH_EXPIRES_IN
         value: 7d
+
+      - key: FRONTEND_URL
+        value: https://ems.nexgenpharmasolutions.com
+      - key: CORS_ALLOWED_ORIGINS
+        value: https://ems.nexgenpharmasolutions.com
+      - key: RENDER_SELF_URL
+        sync: false
+
+      - key: RESEND_API_KEY
+        sync: false
+      - key: RESEND_FROM_EMAIL
+        value: noreply@nexgenpharmasolutions.com
+      - key: RESEND_FROM_NAME
+        value: NexGen Pharma EMS
+
       - key: STORAGE_DRIVER
         value: local
       - key: LOCAL_STORAGE_DIR
         value: uploads
-      - key: RESEND_FROM_EMAIL
-        value: nexgenpharmasolution@gmail.com
-      - key: RESEND_FROM_NAME
-        value: NexGen Pharma EMS
-      - key: BCRYPT_OTP_ROUNDS
-        value: 8
+
       - key: BCRYPT_ROUNDS
-        value: 12
+        value: "12"
+      - key: BCRYPT_OTP_ROUNDS
+        value: "8"
       - key: RATE_LIMIT_OTP_MAX
-        value: 3
+        value: "3"
       - key: RATE_LIMIT_OTP_WINDOW
-        value: 1800
-      - key: CRON_TOKEN_CLEANUP
-        value: "0 2 * * *"
+        value: "1800"
+
       - key: OFFICE_LAT
         value: "28.6139"
       - key: OFFICE_LNG
@@ -77,3 +70,11 @@ services:
       - key: OFFICE_RADIUS_METERS
         value: "200"
 
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-2.5-flash
+      - key: OWNER_EMPLOYEE_IDS
+        value: f2112547-5be0-4819-9d66-13996dc56581,b300bd45-0e53-41e6-a9bc-448f4c4dcd40
+      - key: AI_CHAT_ENABLED
+        value: "true"

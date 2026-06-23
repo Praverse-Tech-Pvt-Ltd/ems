@@ -16,5 +16,5 @@ The face recognition service has been removed from the active deployment, so
 Vercel does not need Rekognition, face-service, or recognition-threshold
 environment variables.
 
-See `docs/Vercel Environment Variables.md` for the current production
+See `docs/Render Environment Variables.md` for the current production
 environment variable list.

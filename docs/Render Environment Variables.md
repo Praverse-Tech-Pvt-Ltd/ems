@@ -1,7 +1,12 @@
-# NexGen EMS API environment example for Render.
-#
-# Face recognition, Zoho, and WhatsApp variables are not required.
+# Render Environment Variables
 
+Use these for the Render backend service. After Render creates the service URL,
+set `RENDER_SELF_URL` to that URL and update the frontend `NEXT_PUBLIC_API_URL`
+to the same URL without `/api/v1`.
+
+## Backend API - Render
+
+```env
 NODE_ENV=production
 PORT=3001
 
@@ -39,3 +44,32 @@ GEMINI_API_KEY=
 GEMINI_MODEL=gemini-2.5-flash
 OWNER_EMPLOYEE_IDS=f2112547-5be0-4819-9d66-13996dc56581,b300bd45-0e53-41e6-a9bc-448f4c4dcd40
 AI_CHAT_ENABLED=true
+```
+
+## Frontend Web App
+
+Set this only after the Render backend URL is available:
+
+```env
+NEXT_PUBLIC_API_URL=https://<your-render-api-service>.onrender.com
+NEXT_PUBLIC_DEV_BYPASS=false
+```
+
+`NEXT_PUBLIC_API_URL` must not include `/api/v1`; the frontend client appends it.
+
+## Not Required
+
+Do not set these anymore:
+
+```env
+FACE_SERVICE_URL
+FR_SERVICE_URL
+FACE_SERVICE_API_KEY
+RECOGNITION_THRESHOLD
+REKOGNITION_COLLECTION_ID
+ZOHO_CLIENT_ID
+ZOHO_CLIENT_SECRET
+ZOHO_REDIRECT_URI
+ZOHO_REFRESH_TOKEN
+WHATSAPP_API_KEY
+```

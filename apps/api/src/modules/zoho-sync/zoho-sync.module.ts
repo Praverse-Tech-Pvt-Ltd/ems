@@ -9,12 +9,6 @@ import { Module } from '@nestjs/common';
  * 3. Zoho WorkDrive → store CompanyDocument files in WorkDrive instead of R2
  * 4. Zoho CRM → push ClientCompany updates to Zoho CRM pipeline
  *
- * Required env vars (add when ready):
- *   ZOHO_CLIENT_ID=
- *   ZOHO_CLIENT_SECRET=
- *   ZOHO_REDIRECT_URI=
- *   ZOHO_REFRESH_TOKEN=
- *
  * DB table to add (migration tier3_zoho):
  *   model ZohoOAuthToken {
  *     id           String   @id @default(uuid())
@@ -27,8 +21,7 @@ import { Module } from '@nestjs/common';
  *
  * WhatsApp integration entry point:
  *   ClientCommType.WHATSAPP is already in the enum.
- *   Implement ClientCommunicationsService.sendWhatsapp() when WATI/Twilio key is ready.
- *   Env: WHATSAPP_API_KEY=
+ *   Implement ClientCommunicationsService.sendWhatsapp() only if that integration is enabled later.
  */
 @Module({})
 export class ZohoSyncModule {}

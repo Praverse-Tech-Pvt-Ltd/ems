@@ -11,6 +11,7 @@ import { GeoFenceService } from './geo-fence.service';
 import { PunchInDto } from './dto/punch-in.dto';
 import { RegularizeDto } from './dto/regularize.dto';
 import { OdPunchInDto, OdPunchOutDto } from './dto/od-punch.dto';
+import { ATTENDANCE_BLOCKED_MESSAGE, isAttendanceBlockedIdentity } from './attendance-blocklist';
 
 // ── Attendance Policy Constants ────────────────────────────────────────────────
 const HALF_DAY_HOURS = 4;           // < 4 h worked → auto HALF_DAY at punch-out
@@ -52,14 +53,27 @@ export class AttendanceService {
     ) / 100;
   }
 
-  private async assertPunchAllowed(employeeId: string) {
+  private async assertAttendanceAllowed(employeeId: string) {
     const employee = await this.prisma.employee.findUnique({
       where: { id: employeeId },
-      select: { email: true },
+      select: { email: true, firstName: true, lastName: true },
     });
-    if (employee?.email?.toLowerCase() === 'ashwani@nexgenpharmasolutions.com') {
-      throw new ForbiddenException('Attendance punch is disabled for this user.');
+    if (isAttendanceBlockedIdentity(employee)) {
+      throw new ForbiddenException(ATTENDANCE_BLOCKED_MESSAGE);
     }
+  }
+
+  private async assertAttendanceRecordAllowed(attendanceId: string) {
+    const record = await this.prisma.attendanceRecord.findUniqueOrThrow({
+      where: { id: attendanceId },
+      include: {
+        employee: { select: { email: true, firstName: true, lastName: true } },
+      },
+    });
+    if (isAttendanceBlockedIdentity(record.employee)) {
+      throw new ForbiddenException(ATTENDANCE_BLOCKED_MESSAGE);
+    }
+    return record;
   }
 
   /** Returns true if today is a non-working day for this employee.
@@ -202,7 +216,7 @@ export class AttendanceService {
   // ── Punch-in ───────────────────────────────────────────────────────────────
 
   async punchIn(employeeId: string, dto: PunchInDto, ip?: string, userAgent?: string) {
-    await this.assertPunchAllowed(employeeId);
+    await this.assertAttendanceAllowed(employeeId);
     const today = this.getISTToday();
 
     const holiday = await this.prisma.holiday.findFirst({ where: { date: today } });
@@ -315,7 +329,7 @@ export class AttendanceService {
   // ── Punch-out ──────────────────────────────────────────────────────────────
 
   async punchOut(employeeId: string, dto: PunchInDto, ip?: string, userAgent?: string) {
-    await this.assertPunchAllowed(employeeId);
+    await this.assertAttendanceAllowed(employeeId);
     const today = this.getISTToday();
 
     const record = await this.prisma.attendanceRecord.findUnique({
@@ -417,6 +431,7 @@ export class AttendanceService {
   // ── Other methods (unchanged) ─────────────────────────────────────────────
 
   async getOpenOd(employeeId: string) {
+    await this.assertAttendanceAllowed(employeeId);
     return this.prisma.attendanceRecord.findFirst({
       where: {
         employeeId,
@@ -429,7 +444,7 @@ export class AttendanceService {
   }
 
   async odPunchIn(employeeId: string, dto: OdPunchInDto, ip?: string, userAgent?: string) {
-    await this.assertPunchAllowed(employeeId);
+    await this.assertAttendanceAllowed(employeeId);
 
     const openOd = await this.getOpenOd(employeeId);
     if (openOd) {
@@ -487,7 +502,7 @@ export class AttendanceService {
   }
 
   async odPunchOut(employeeId: string, dto: OdPunchOutDto, ip?: string, userAgent?: string) {
-    await this.assertPunchAllowed(employeeId);
+    await this.assertAttendanceAllowed(employeeId);
 
     const record = await this.getOpenOd(employeeId);
     if (!record?.punchInTime) {
@@ -533,6 +548,7 @@ export class AttendanceService {
   }
 
   async getToday(employeeId: string) {
+    await this.assertAttendanceAllowed(employeeId);
     const today = this.getISTToday();
     return this.prisma.attendanceRecord.findUnique({
       where: { employeeId_date: { employeeId, date: today } },
@@ -545,6 +561,7 @@ export class AttendanceService {
     to?: string,
     limit?: number,
   ) {
+    await this.assertAttendanceAllowed(employeeId);
     const where: Record<string, unknown> = { employeeId };
     if (from || to) {
       where['date'] = {
@@ -569,17 +586,19 @@ export class AttendanceService {
     }
     if (status) where['status'] = status;
 
-    return this.prisma.attendanceRecord.findMany({
+    const records = await this.prisma.attendanceRecord.findMany({
       where,
       include: {
-        employee: { select: { id: true, firstName: true, lastName: true, employeeCode: true } },
+        employee: { select: { id: true, firstName: true, lastName: true, email: true, employeeCode: true } },
       },
       orderBy: [{ date: 'desc' }, { punchInTime: 'asc' }],
     });
+
+    return records.filter((record) => !isAttendanceBlockedIdentity(record.employee));
   }
 
   async regularize(id: string, adminId: string, dto: RegularizeDto) {
-    const record = await this.prisma.attendanceRecord.findUniqueOrThrow({ where: { id } });
+    const record = await this.assertAttendanceRecordAllowed(id);
 
     const updated = await this.prisma.attendanceRecord.update({
       where: { id },
@@ -614,6 +633,7 @@ export class AttendanceService {
   }
 
   async getMyStats(employeeId: string) {
+    await this.assertAttendanceAllowed(employeeId);
     const today = this.getISTToday();
     const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
 
@@ -665,6 +685,7 @@ export class AttendanceService {
 
   /** Returns a summary of the employee's monthly policy usage. */
   async getPolicyUsage(employeeId: string) {
+    await this.assertAttendanceAllowed(employeeId);
     const [lateCount, earlyCount, halfDayCount, constraints] = await Promise.all([
       this.countLateThisMonth(employeeId),
       this.countEarlyPunchOutsThisMonth(employeeId),
@@ -690,7 +711,7 @@ export class AttendanceService {
     adminId: string,
     dto: { punchInTime?: string; punchOutTime?: string; reason: string },
   ) {
-    const record = await this.prisma.attendanceRecord.findUniqueOrThrow({ where: { id } });
+    const record = await this.assertAttendanceRecordAllowed(id);
 
     const edits: Array<{ field: string; original: string | null; newVal: string | null }> = [];
     const updateData: Record<string, any> = {
@@ -740,6 +761,8 @@ export class AttendanceService {
   }
 
   async getEditHistory(attendanceId: string) {
+    await this.assertAttendanceRecordAllowed(attendanceId);
+
     return this.prisma.attendanceEditHistory.findMany({
       where: { attendanceId },
       include: { editor: { select: { id: true, firstName: true, lastName: true } } },

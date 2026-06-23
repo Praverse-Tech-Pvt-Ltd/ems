@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api-client';
 import { PunchModal } from '@/components/PunchModal';
 import { useAuthStore } from '@/store/auth.store';
+import { isAttendanceBlockedUser } from '@/lib/attendance-access';
 
 /* Maps generic dashboard action labels to the dedicated page that implements them. */
 const ACTION_ROUTES: Record<string, string> = {
@@ -169,7 +170,7 @@ function DataBadge({ children, tone = 'muted' }: { children: React.ReactNode; to
 export function StitchPage({ config }: { config: StitchPageConfig }) {
   const router = useRouter();
   const user = useAuthStore(s => s.user);
-  const isAshwani = user?.email?.toLowerCase() === 'ashwani@nexgenpharmasolutions.com';
+  const attendanceBlocked = isAttendanceBlockedUser(user);
   const [question, setQuestion] = useState('');
   const [punchType, setPunchType] = useState<'in' | 'out' | null>(null);
   const [odMode, setOdMode] = useState<'in' | 'out' | null>(null);
@@ -183,7 +184,7 @@ export function StitchPage({ config }: { config: StitchPageConfig }) {
   const todayQuery = useQuery({
     queryKey: ['attendance-today', user?.id],
     queryFn: () => apiClient.get('/attendance/today').then(r => r.data),
-    enabled: config.layout === 'workday' && !!user?.id,
+    enabled: config.layout === 'workday' && !attendanceBlocked && !!user?.id,
     retry: false,
   });
   const todayData = todayQuery.data as { punchInTime?: string | null; punchOutTime?: string | null } | undefined;
@@ -192,21 +193,21 @@ export function StitchPage({ config }: { config: StitchPageConfig }) {
   const openOdQuery = useQuery({
     queryKey: ['attendance-od-open', user?.id],
     queryFn: () => apiClient.get('/attendance/od/open').then(r => r.data),
-    enabled: config.layout === 'workday' && !isAshwani && !!user?.id,
+    enabled: config.layout === 'workday' && !attendanceBlocked && !!user?.id,
     retry: false,
   });
   const openOd = openOdQuery.data as { id?: string; punchInTime?: string | null; manualPunchReason?: string | null } | null | undefined;
   const visibleActions = (config.actions ?? []).filter(action => {
-    if (!isAshwani) return true;
+    if (!attendanceBlocked) return true;
     return !['Punch In', 'Punch Out', 'OD', 'Regularize'].includes(action);
   });
   const visibleMetrics = config.metrics.filter(metric => {
-    if (!isAshwani) return true;
+    if (!attendanceBlocked) return true;
     return !['Punch', 'Today Status', 'Regularize', 'Policy Use', 'Face Proxy'].includes(metric.label);
   });
 
   const runAction = (label: string) => {
-    if (isAshwani && ['Punch In', 'Punch Out', 'OD', 'Regularize'].includes(label)) return;
+    if (attendanceBlocked && ['Punch In', 'Punch Out', 'OD', 'Regularize'].includes(label)) return;
     if (label === 'Punch In') { setPunchType('in'); return; }
     if (label === 'Punch Out') { setPunchType('out'); return; }
     if (label === 'OD') {
@@ -424,8 +425,8 @@ export function StitchPage({ config }: { config: StitchPageConfig }) {
     };
     return (
       <div className="max-w-[1040px] mx-auto w-full flex flex-col gap-5 pb-6">
-        {!isAshwani && punchType && <PunchModal punchType={punchType} onClose={() => setPunchType(null)} />}
-        {!isAshwani && odMode && (
+        {!attendanceBlocked && punchType && <PunchModal punchType={punchType} onClose={() => setPunchType(null)} />}
+        {!attendanceBlocked && odMode && (
           <div className="fixed inset-0 z-50 bg-scrim/40 backdrop-blur-sm flex items-center justify-center p-md">
             <div className="w-full max-w-md rounded-2xl bg-surface-container-lowest border border-outline-variant/40 shadow-xl p-lg">
               <div className="flex items-start justify-between gap-md">
@@ -506,7 +507,7 @@ export function StitchPage({ config }: { config: StitchPageConfig }) {
             </h1>
             <p className="text-[13px] text-on-surface-variant mt-0.5">{config.description}</p>
           </div>
-          {!isAshwani && <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold ${
+          {!attendanceBlocked && <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold ${
             isPunchedIn  ? 'bg-success/10 text-success border border-success/20' :
             isPunchedOut ? 'bg-secondary/10 text-secondary border border-secondary/20' :
             todayQuery.isLoading ? 'bg-on-surface-variant/8 text-on-surface-variant border border-card-border' :
@@ -527,7 +528,7 @@ export function StitchPage({ config }: { config: StitchPageConfig }) {
         )}
 
         {/* ── Hero punch card ── */}
-        {!isAshwani && <div
+        {!attendanceBlocked && <div
           className="rounded-2xl p-5 relative overflow-hidden"
           style={{
             background: 'linear-gradient(135deg, rgba(170,48,0,0.08) 0%, rgba(1,103,125,0.06) 60%, rgba(250,248,255,0) 100%)',
@@ -722,7 +723,7 @@ export function StitchPage({ config }: { config: StitchPageConfig }) {
           {actionNote}
         </div>
       )}
-      {!isAshwani && punchType && <PunchModal punchType={punchType} onClose={() => setPunchType(null)} />}
+      {!attendanceBlocked && punchType && <PunchModal punchType={punchType} onClose={() => setPunchType(null)} />}
         <div className="flex flex-col xl:grid xl:grid-cols-[300px_1fr] gap-lg">
           <aside className="flex flex-col gap-md">
             {aiPanelCompact}
@@ -770,7 +771,7 @@ export function StitchPage({ config }: { config: StitchPageConfig }) {
           {actionNote}
         </div>
       )}
-      {!isAshwani && punchType && <PunchModal punchType={punchType} onClose={() => setPunchType(null)} />}
+      {!attendanceBlocked && punchType && <PunchModal punchType={punchType} onClose={() => setPunchType(null)} />}
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-sm">
           {visibleMetrics.map((metric) => (
             <div key={metric.label} className="glass-card rounded-xl p-md min-h-[150px] flex flex-col justify-between">
@@ -820,7 +821,7 @@ export function StitchPage({ config }: { config: StitchPageConfig }) {
           {actionNote}
         </div>
       )}
-      {!isAshwani && punchType && <PunchModal punchType={punchType} onClose={() => setPunchType(null)} />}
+      {!attendanceBlocked && punchType && <PunchModal punchType={punchType} onClose={() => setPunchType(null)} />}
         <div className="flex flex-col xl:grid xl:grid-cols-[1fr_380px] gap-lg">
           <section className="glass-card rounded-xl p-md">
             <h3 className="font-label-caps text-label-caps text-on-surface-variant mb-md tracking-widest">TIMELINE</h3>
@@ -861,7 +862,7 @@ export function StitchPage({ config }: { config: StitchPageConfig }) {
           {actionNote}
         </div>
       )}
-      {!isAshwani && punchType && <PunchModal punchType={punchType} onClose={() => setPunchType(null)} />}
+      {!attendanceBlocked && punchType && <PunchModal punchType={punchType} onClose={() => setPunchType(null)} />}
         <div className="flex flex-col xl:grid xl:grid-cols-[280px_1fr_280px] gap-md min-h-[500px] xl:min-h-[640px]">
           <aside className="glass-card rounded-xl overflow-hidden">
             <div className="p-md border-b border-outline-variant/30">
@@ -916,7 +917,7 @@ export function StitchPage({ config }: { config: StitchPageConfig }) {
           {actionNote}
         </div>
       )}
-      {!isAshwani && punchType && <PunchModal punchType={punchType} onClose={() => setPunchType(null)} />}
+      {!attendanceBlocked && punchType && <PunchModal punchType={punchType} onClose={() => setPunchType(null)} />}
       {layout === 'command' ? aiPanel : metricGrid}
       {layout === 'command' ? metricGrid : aiPanel}
 
