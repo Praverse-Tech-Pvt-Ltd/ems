@@ -135,6 +135,13 @@ enum PayrollStatus {
   TRANSFERRED
 }
 
+enum PayrollRunStatus {
+  DRAFT
+  REVIEWED
+  APPROVED
+  CANCELLED
+}
+
 enum PolicyStatus {
   DRAFT
   PUBLISHED
@@ -266,6 +273,9 @@ model Employee {
   salaryStructures         SalaryStructure[]        @relation("StructureEmployee")
   salaryStructuresApproved SalaryStructure[]        @relation("StructureApprover")
   salarySlipsApproved      SalarySlip[]             @relation("SlipApprover")
+  payrollRunsGenerated     PayrollRun[]             @relation("PayrollRunGenerator")
+  payrollRunsApproved      PayrollRun[]             @relation("PayrollRunApprover")
+  payrollRunRows           PayrollRunEmployee[]
   notifications            Notification[]
   commentsMade             Comment[]
   auditLogs                AuditLog[]               @relation("AuditActor")
@@ -528,6 +538,67 @@ model SalaryStructure {
   @@unique([employeeId, effectiveFrom])
   @@index([employeeId])
   @@map("salary_structures")
+}
+
+model PayrollRun {
+  id          String           @id @default(uuid())
+  month       Int
+  year        Int
+  status      PayrollRunStatus @default(DRAFT)
+  generatedBy String           @map("generated_by")
+  approvedBy  String?          @map("approved_by")
+  approvedAt  DateTime?        @map("approved_at") @db.Timestamptz
+  notes       String?
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
+
+  generator Employee             @relation("PayrollRunGenerator", fields: [generatedBy], references: [id])
+  approver  Employee?            @relation("PayrollRunApprover", fields: [approvedBy], references: [id])
+  rows      PayrollRunEmployee[]
+
+  @@unique([month, year])
+  @@index([status])
+  @@map("payroll_runs")
+}
+
+model PayrollRunEmployee {
+  id                   String   @id @default(uuid())
+  payrollRunId         String   @map("payroll_run_id")
+  employeeId           String   @map("employee_id")
+  monthDays            Int      @map("month_days")
+  workingDays          Int      @map("working_days")
+  paidDays             Decimal  @map("paid_days") @db.Decimal(5, 2)
+  lopDays              Decimal  @map("lop_days") @db.Decimal(5, 2)
+  presentDays          Int      @default(0) @map("present_days")
+  lateDays             Int      @default(0) @map("late_days")
+  wfhDays              Int      @default(0) @map("wfh_days")
+  halfDays             Int      @default(0) @map("half_days")
+  leaveDays            Int      @default(0) @map("leave_days")
+  holidayDays          Int      @default(0) @map("holiday_days")
+  weekOffDays          Int      @default(0) @map("week_off_days")
+  absentDays           Int      @default(0) @map("absent_days")
+  missingPunchDays     Int      @default(0) @map("missing_punch_days")
+  baseSalary           Decimal  @map("base_salary") @db.Decimal(12, 2)
+  earnedBaseSalary     Decimal  @map("earned_base_salary") @db.Decimal(12, 2)
+  incentives           Decimal  @default(0) @db.Decimal(12, 2)
+  reimbursements       Decimal  @default(0) @db.Decimal(12, 2)
+  grossSalary          Decimal  @map("gross_salary") @db.Decimal(12, 2)
+  pfDeduction          Decimal  @default(0) @map("pf_deduction") @db.Decimal(12, 2)
+  esicDeduction        Decimal  @default(0) @map("esic_deduction") @db.Decimal(12, 2)
+  professionalTax      Decimal  @default(0) @map("professional_tax") @db.Decimal(12, 2)
+  tds                  Decimal  @default(0) @db.Decimal(12, 2)
+  deductions           Decimal  @db.Decimal(12, 2)
+  netPayable           Decimal  @map("net_payable") @db.Decimal(12, 2)
+  calculationSnapshot  Json     @map("calculation_snapshot")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  payrollRun PayrollRun @relation(fields: [payrollRunId], references: [id], onDelete: Cascade)
+  employee   Employee   @relation(fields: [employeeId], references: [id])
+
+  @@unique([payrollRunId, employeeId])
+  @@index([employeeId])
+  @@map("payroll_run_employees")
 }
 
 model Notification {

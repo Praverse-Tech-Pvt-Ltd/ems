@@ -8,8 +8,11 @@ import {
   Post,
   Query,
   Res,
+  UploadedFile,
+  UseInterceptors,
   UseGuards,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { SalaryService } from './salary.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -18,7 +21,9 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import {
   CreateSalarySlipDto,
+  GeneratePayrollRunDto,
   GenerateSalarySlipDto,
+  ReconcilePayrollRunDto,
   RejectSalarySlipDto,
   TransferSalarySlipDto,
   UpsertSalaryStructureDto,
@@ -63,6 +68,51 @@ export class SalaryController {
     @Body() body: GenerateSalarySlipDto,
   ) {
     return this.service.generate(user.id, body);
+  }
+
+  @Post('payroll-runs/generate')
+  @Roles('ADMIN', 'SUPER_ADMIN')
+  generatePayrollRun(
+    @CurrentUser() user: { id: string },
+    @Body() body: GeneratePayrollRunDto,
+  ) {
+    return this.service.generatePayrollRun(user.id, body);
+  }
+
+  @Get('payroll-runs')
+  @Roles('ADMIN', 'SUPER_ADMIN')
+  payrollRuns(
+    @Query('month') month?: number,
+    @Query('year') year?: number,
+  ) {
+    return this.service.listPayrollRuns(month ? Number(month) : undefined, year ? Number(year) : undefined);
+  }
+
+  @Get('payroll-runs/:id')
+  @Roles('ADMIN', 'SUPER_ADMIN')
+  payrollRun(@Param('id', ParseUUIDPipe) id: string) {
+    return this.service.findPayrollRun(id);
+  }
+
+  @Patch('payroll-runs/:id/review')
+  @Roles('ADMIN', 'SUPER_ADMIN')
+  reviewPayrollRun(
+    @CurrentUser() user: { id: string },
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.service.markPayrollRunReviewed(user.id, id);
+  }
+
+  @Post('payroll-runs/:id/reconcile')
+  @Roles('ADMIN', 'SUPER_ADMIN')
+  @UseInterceptors(FileInterceptor('file'))
+  reconcilePayrollRun(
+    @CurrentUser() user: { id: string },
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: ReconcilePayrollRunDto,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    return this.service.reconcilePayrollRun(user.id, id, body.documentType, file);
   }
 
   @Patch('slips/:id/approve')

@@ -1,5 +1,5 @@
 import { Global, Module } from '@nestjs/common';
-import { BullModule } from '@nestjs/bull';
+import { BullModule } from '@nestjs/bullmq';
 import { EmailService } from './email.service';
 import { EmailProcessor } from './email.processor';
 import { QUEUE_EMAIL_NAME } from './email.constants';

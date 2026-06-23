@@ -1,4 +1,4 @@
-import { IsString, IsInt, IsNumber, IsUUID, Min, Max, IsOptional } from 'class-validator';
+import { IsString, IsInt, IsNumber, IsUUID, Min, Max, IsOptional, IsEnum } from 'class-validator';
 
 export class CreateSalarySlipDto {
   @IsUUID()
@@ -130,6 +130,23 @@ export class GenerateSalarySlipDto {
   @IsOptional()
   @IsString()
   notes?: string;
+}
+
+export class GeneratePayrollRunDto {
+  @IsInt() @Min(1) @Max(12)
+  month: number;
+
+  @IsInt() @Min(2020)
+  year: number;
+
+  @IsOptional()
+  @IsString()
+  notes?: string;
+}
+
+export class ReconcilePayrollRunDto {
+  @IsEnum(['WAGE_SHEET', 'EPF_ECR', 'ESIC_ECR'])
+  documentType: 'WAGE_SHEET' | 'EPF_ECR' | 'ESIC_ECR';
 }
 
 export class TransferSalarySlipDto {

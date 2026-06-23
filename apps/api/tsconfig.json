@@ -23,7 +23,9 @@
     "jsx": "react",
     "paths": {
       "@nexgen/db": ["../../packages/db/node_modules/.prisma/client"],
-      "@nexgen/types": ["../../packages/types/src/index.ts"]
+      "@nexgen/types": ["../../packages/types/src/index.ts"],
+      "rxjs": ["../../node_modules/rxjs"],
+      "rxjs/*": ["../../node_modules/rxjs/*"]
     }
   },
   "include": ["src/**/*"],

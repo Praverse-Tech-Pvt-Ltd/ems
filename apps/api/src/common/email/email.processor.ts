@@ -1,21 +1,22 @@
-import { Process, Processor } from '@nestjs/bull';
-import { Job } from 'bull';
+import { Processor, WorkerHost } from '@nestjs/bullmq';
+import { Job } from 'bullmq';
 import { EmailService } from './email.service';
 import { QUEUE_EMAIL_NAME } from './email.constants';
 import { Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Processor('email')
-export class EmailProcessor {
+export class EmailProcessor extends WorkerHost {
   private readonly logger = new Logger(EmailProcessor.name);
 
   constructor(
     private readonly emailService: EmailService,
     private readonly prisma: PrismaService,
-  ) {}
+  ) {
+    super();
+  }
 
-  @Process()
-  async handleEmailJob(job: Job<any>) {
+  async process(job: Job<any>) {
     this.logger.log(`Processing email job ${job.id} for action: ${job.data.action}`);
     try {
       await this.emailService.executeSendJob(job.data);

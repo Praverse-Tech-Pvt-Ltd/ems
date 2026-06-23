@@ -2,8 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { GeminiService } from '../ai-overview/gemini.service';
 import { differenceInDays, startOfWeek, endOfWeek, format, subDays } from 'date-fns';
+import ExcelJS from 'exceljs';
 import PDFDocument from 'pdfkit';
-import * as XLSX from 'xlsx';
 
 @Injectable()
 export class ManagementReviewService {
@@ -333,11 +333,23 @@ export class ManagementReviewService {
       'Notes': c.notes ?? '',
     }));
 
-    const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.json_to_sheet(rows);
-    ws['!cols'] = [20, 12, 10, 8, 20, 20, 15, 18, 15, 30].map(w => ({ wch: w }));
-    XLSX.utils.book_append_sheet(wb, ws, 'Companies');
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('Companies');
+    sheet.columns = [
+      { header: 'Company', key: 'Company', width: 20 },
+      { header: 'Status', key: 'Status', width: 12 },
+      { header: 'Priority', key: 'Priority', width: 10 },
+      { header: 'Risk Score', key: 'Risk Score', width: 8 },
+      { header: 'Current Stage', key: 'Current Stage', width: 20 },
+      { header: 'Responsible', key: 'Responsible', width: 20 },
+      { header: 'Last Visit', key: 'Last Visit', width: 15 },
+      { header: 'Last Communication', key: 'Last Communication', width: 18 },
+      { header: 'Next Audit', key: 'Next Audit', width: 15 },
+      { header: 'Notes', key: 'Notes', width: 30 },
+    ];
+    sheet.addRows(rows);
 
-    return Buffer.from(XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }));
+    const buffer = await workbook.xlsx.writeBuffer();
+    return Buffer.from(buffer);
   }
 }

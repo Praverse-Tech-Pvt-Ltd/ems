@@ -3,7 +3,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { ScheduleModule } from '@nestjs/schedule';
-import { BullModule } from '@nestjs/bull';
+import { BullModule } from '@nestjs/bullmq';
 import { PrismaModule } from './common/prisma/prisma.module';
 import { StorageModule } from './common/storage/storage.module';
 import { EmailModule } from './common/email/email.module';
@@ -57,7 +57,7 @@ import { ZohoSyncModule } from './modules/zoho-sync/zoho-sync.module';
         const parsed = new URL(redisUrl);
         const isTls = parsed.protocol === 'rediss:';
         return {
-          redis: {
+          connection: {
             host: parsed.hostname,
             port: parseInt(parsed.port || (isTls ? '6380' : '6379'), 10),
             password: parsed.password || undefined,

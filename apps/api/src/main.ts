@@ -39,7 +39,7 @@ async function bootstrap() {
   ].filter(Boolean) as string[];
 
   app.enableCors({
-    origin: (origin, callback) => {
+    origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
       // Allow requests with no origin (mobile apps, curl, Swagger)
       if (!origin) return callback(null, true);
       // Allow any Vercel deployment preview or the explicit FRONTEND_URL
