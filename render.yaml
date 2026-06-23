@@ -7,6 +7,7 @@ services:
   - type: web
     name: nexgen-api
     runtime: docker
+    rootDir: .
     dockerfilePath: apps/api/Dockerfile
     dockerContext: .
     plan: free
@@ -41,6 +42,10 @@ services:
         value: https://ems.nexgenpharmasolutions.com
       - key: RENDER_SELF_URL
         sync: false
+      - key: KEEP_ALIVE_TIMEZONE
+        value: Asia/Kolkata
+      - key: KEEP_ALIVE_WINDOWS
+        value: 08:45-10:30,17:20-18:30
 
       - key: RESEND_API_KEY
         sync: false

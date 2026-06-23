@@ -39,7 +39,7 @@ RUN npm ci --workspace=apps/api --workspace=packages/db --workspace=packages/typ
 
 COPY --from=builder /app/apps/api/dist        ./apps/api/dist
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
-COPY packages/db/prisma ./packages/db/prisma
+COPY --from=builder /app/packages/db/prisma   ./packages/db/prisma
 
 EXPOSE 3001
 

@@ -23,6 +23,8 @@ ENCRYPTION_KEY=<32-char-random-hex>
 FRONTEND_URL=https://ems.nexgenpharmasolutions.com
 CORS_ALLOWED_ORIGINS=https://ems.nexgenpharmasolutions.com
 RENDER_SELF_URL=https://<your-render-api-service>.onrender.com
+KEEP_ALIVE_TIMEZONE=Asia/Kolkata
+KEEP_ALIVE_WINDOWS=08:45-10:30,17:20-18:30
 
 RESEND_API_KEY=re_xxxxxxxxxxxxxxxxxxxx
 RESEND_FROM_EMAIL=noreply@nexgenpharmasolutions.com
@@ -56,6 +58,23 @@ NEXT_PUBLIC_DEV_BYPASS=false
 ```
 
 `NEXT_PUBLIC_API_URL` must not include `/api/v1`; the frontend client appends it.
+
+## Keep-Alive Schedule
+
+The API pings its own `/health` route every 5 minutes only during:
+
+```text
+08:45-10:30
+17:20-18:30
+```
+
+Times use `KEEP_ALIVE_TIMEZONE`, defaulting to `Asia/Kolkata`.
+
+An in-process cron can keep an already-running Render instance warm, but it
+cannot wake an instance that is fully asleep. For guaranteed wake-up 15 minutes
+before punch time, configure an external uptime monitor or scheduled job to hit
+`https://<your-render-api-service>.onrender.com/health` every 5 minutes during
+the same windows.
 
 ## Not Required
 
