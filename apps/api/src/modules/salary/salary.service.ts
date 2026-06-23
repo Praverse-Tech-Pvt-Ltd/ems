@@ -347,6 +347,52 @@ export class SalaryService {
     return this.findPayrollRun(id);
   }
 
+  async autoRefreshWeeklyPayrollRun() {
+    const { month, year } = this.currentPayrollPeriodInIst();
+    const existingRun = await this.prisma.payrollRun.findUnique({
+      where: { month_year: { month, year } },
+      select: { id: true, status: true },
+    });
+
+    if (existingRun?.status === 'APPROVED') {
+      return {
+        skipped: true,
+        reason: 'Payroll run is approved',
+        month,
+        year,
+        id: existingRun.id,
+      };
+    }
+
+    const systemUser = await this.prisma.employee.findFirst({
+      where: {
+        status: 'ACTIVE',
+        role: { in: ['SUPER_ADMIN', 'ADMIN'] },
+      },
+      orderBy: [{ role: 'desc' }, { createdAt: 'asc' }],
+      select: { id: true },
+    });
+
+    if (!systemUser) {
+      throw new BadRequestException('No active admin user found for weekly payroll refresh');
+    }
+
+    const run = await this.generatePayrollRun(systemUser.id, {
+      month,
+      year,
+      notes: `Auto-refreshed by weekly wage sheet scheduler on ${new Date().toISOString()}`,
+    });
+
+    return {
+      skipped: false,
+      month,
+      year,
+      id: run.id,
+      status: run.status,
+      totals: run.totals,
+    };
+  }
+
   async reconcilePayrollRun(
     adminId: string,
     id: string,
@@ -947,6 +993,21 @@ export class SalaryService {
 
   private period(month: number, year: number) {
     return new Date(year, month - 1, 1).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+  }
+
+  private currentPayrollPeriodInIst(reference = new Date()) {
+    const parts = new Intl.DateTimeFormat('en-IN', {
+      timeZone: 'Asia/Kolkata',
+      month: 'numeric',
+      year: 'numeric',
+    }).formatToParts(reference);
+
+    const month = Number(parts.find((part) => part.type === 'month')?.value);
+    const year = Number(parts.find((part) => part.type === 'year')?.value);
+    if (!month || !year) {
+      throw new BadRequestException('Could not resolve current payroll period');
+    }
+    return { month, year };
   }
 
   private employeeName(employee: { firstName: string; lastName: string }) {

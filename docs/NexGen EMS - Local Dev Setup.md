@@ -38,40 +38,24 @@ npm install
 ### API — `apps/api/.env`
 
 ```env
-DATABASE_URL=postgresql://neondb_owner:npg_5c8uRmbMzxNj@ep-mute-meadow-ao8beta1-pooler.c-2.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require&pgbouncer=true
-DIRECT_URL=postgresql://neondb_owner:npg_5c8uRmbMzxNj@ep-mute-meadow-ao8beta1.c-2.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require
-REDIS_URL=rediss://default:gQAAAAAAAecbAAIgcDFmMmYxNWJlYmI4ZWQ0NDJiOTQ0NGZiOTQzNjRhYjZmNQ@proud-porpoise-124699.upstash.io:6379
+DATABASE_URL=postgresql://<user>:<password>@<host>-pooler.<region>.neon.tech/<dbname>?sslmode=require&pgbouncer=true
+DIRECT_URL=postgresql://<user>:<password>@<host>.<region>.neon.tech/<dbname>?sslmode=require
+REDIS_URL=rediss://default:<token>@<host>.upstash.io:6379
 JWT_SECRET=<generated>
 JWT_REFRESH_SECRET=<generated>
 JWT_EXPIRES_IN=15m
 JWT_REFRESH_EXPIRES_IN=7d
 ENCRYPTION_KEY=<32-char key>
-FR_SERVICE_URL=http://localhost:8000
 STORAGE_DRIVER=local
 LOCAL_STORAGE_DIR=uploads
-SES_FROM_EMAIL=noreply@nexgen.in
-SMTP_HOST=smtp-relay.brevo.com
-SMTP_PORT=587
-SMTP_USER=
-SMTP_PASS=
+RESEND_API_KEY=<resend-api-key>
+RESEND_FROM_EMAIL=noreply@nexgenpharmasolutions.com
+RESEND_FROM_NAME=NexGen Pharma EMS
 PORT=3001
 NODE_ENV=development
 FRONTEND_URL=http://localhost:3000
-NEXT_PUBLIC_API_URL=http://localhost:3001
+CORS_ALLOWED_ORIGINS=http://localhost:3000
 ```
-
-### Face Service — `apps/face-service/.env`
-
-```env
-DATABASE_URL=postgresql://neondb_owner:npg_5c8uRmbMzxNj@ep-mute-meadow-ao8beta1.c-2.ap-southeast-1.aws.neon.tech/neondb?sslmode=require
-AWS_ACCESS_KEY_ID=YOUR_KEY_HERE
-AWS_SECRET_ACCESS_KEY=YOUR_SECRET_HERE
-AWS_REGION=ap-south-1
-REKOGNITION_COLLECTION_ID=nexgen-employees
-```
-
-> [!warning] AWS Keys Required
-> Face enrollment and punch-in won't work without real AWS credentials. See [[NexGen EMS - AWS Rekognition Setup]] to create them.
 
 ### Web — `apps/web/.env.local`
 

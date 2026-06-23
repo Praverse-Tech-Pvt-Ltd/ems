@@ -28,8 +28,14 @@ services:
         sync: false
       - key: FRONTEND_URL
         sync: false
-      - key: FR_SERVICE_URL
+      - key: CORS_ALLOWED_ORIGINS
         sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: RESEND_FROM_EMAIL
+        sync: false
+      - key: RESEND_FROM_NAME
+        value: NexGen Pharma EMS
       - key: AWS_REGION
         value: auto
       - key: AWS_ACCESS_KEY_ID

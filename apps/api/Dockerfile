@@ -2,6 +2,11 @@
 FROM node:20-alpine AS builder
 WORKDIR /app
 
+# Prisma generate validates datasource env vars while building, but it does
+# not connect to the database. Runtime secrets still come from the host.
+ENV DATABASE_URL="postgresql://nexgen:nexgen@localhost:5432/nexgen_ems?schema=public"
+ENV DIRECT_URL="postgresql://nexgen:nexgen@localhost:5432/nexgen_ems?schema=public"
+
 # Copy workspace manifests for dependency resolution
 COPY package*.json turbo.json ./
 COPY packages/db/package*.json    ./packages/db/

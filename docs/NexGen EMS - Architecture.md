@@ -9,111 +9,90 @@ date: 2026-05-18
 
 # Architecture & Services
 
-← [[NexGen EMS - Overview|Overview]]
-
----
-
 ## Monorepo Structure
 
-```
+```text
 nexgen-ems/
 ├── apps/
-│   ├── api/              NestJS REST API          → :3001
-│   ├── web/              Next.js frontend          → :3000
-│   └── face-service/     FastAPI face recognition  → :8000
+│   ├── api/        NestJS REST API
+│   └── web/        Next.js frontend
 ├── packages/
-│   ├── db/               Prisma schema + client
-│   └── types/            Shared TypeScript types
+│   ├── db/         Prisma schema + client
+│   └── types/      Shared TypeScript types
 ├── docker-compose.yml
-└── render.yaml           Cloud deploy blueprint
+└── railway.json
 ```
-
----
 
 ## Service Map
 
 ```mermaid
 graph TD
-    Browser["Browser :3000"] -->|HTTP| Web["Next.js\napp/web :3000"]
-    Web -->|REST /api/v1| API["NestJS API\n:3001"]
-    API -->|Prisma| DB[("Neon\nPostgreSQL")]
-    API -->|ioredis| Redis["Upstash\nRedis"]
-    API -->|HTTP| FR["FastAPI\nFace Service :8000"]
-    FR -->|psycopg2| DB
-    FR -->|boto3| Rekognition["AWS\nRekognition"]
+    Browser["Browser"] -->|HTTP| Web["Next.js web"]
+    Web -->|REST /api/v1| API["NestJS API"]
+    Web -->|Socket.IO| API
+    API -->|Prisma| DB[("Neon PostgreSQL")]
+    API -->|BullMQ / ioredis| Redis["Upstash Redis"]
+    API -->|Resend API| Email["Resend"]
+    API -->|S3 API| Storage["S3-compatible storage"]
 ```
-
----
 
 ## Service Details
 
 ### Next.js Web (`apps/web`)
-- **Port:** 3000
-- **Output:** `standalone` (Docker-ready)
-- **API env var:** `NEXT_PUBLIC_API_URL` — baked at build time
-- **Key pages:**
-  - `/` → Login
-  - `/(app)/dashboard` → Dashboard
-  - `/(app)/attendance` → Punch in/out with face scan
-  - `/(app)/attendance/biometric` → Face enrollment
-  - `/(app)/leaves` → Leave requests
-  - `/(app)/expenses` → Expense claims
+
+- Vercel frontend project
+- Public API env var: `NEXT_PUBLIC_API_URL`
+- `NEXT_PUBLIC_API_URL` must be the API origin only, without `/api/v1`
+- Key pages include login, dashboard, attendance, leaves, expenses, salary, reports, and management views
 
 ### NestJS API (`apps/api`)
-- **Port:** 3001
-- **Prefix:** `/api/v1`
-- **Health check:** `GET /health`
-- **Swagger docs:** `/api/docs`
-- **Body limit:** 20 MB (base64 face images)
-- **Key modules:** `auth`, `employees`, `attendance`, `leaves`, `expenses`, `salary`, `reports`
 
-### FastAPI Face Service (`apps/face-service`)
-- **Port:** 8000
-- **Provider:** AWS Rekognition (replaced DeepFace)
-- **Endpoints:**
-  - `POST /enroll` — index face into Rekognition collection
-  - `POST /verify` — search face against collection
-  - `GET /health` — liveness probe
-- **Collection:** `nexgen-employees` (auto-created on first enroll)
+- Vercel backend project
+- API prefix: `/api/v1`
+- Health check: `GET /health`
+- Swagger docs: `/api/docs`
+- Key modules: `auth`, `employees`, `attendance`, `leaves`, `expenses`, `salary`, `reports`, `notifications`
 
----
+The old face recognition service has been removed from the active deployment.
 
-## Data Flow — Punch In
+## Data Flow - Login
 
 ```mermaid
 sequenceDiagram
-    Browser->>Web: Capture 1 JPEG frame (quality 0.6)
-    Web->>API: POST /api/v1/attendance/punch-in\n{ faceImageBase64, latitude, longitude }
-    API->>FaceService: POST /verify\n{ employee_id, face_image }
-    FaceService->>Rekognition: search_faces_by_image()
-    Rekognition-->>FaceService: similarity score
-    FaceService-->>API: { verified, confidence }
-    Note over API: Soft verify — proceeds even if FR down
-    API->>DB: INSERT attendance record
-    API-->>Web: { success, punchTime }
-    Web-->>Browser: Show punch-out button + time
+    Browser->>Web: Submit login form
+    Web->>API: POST /api/v1/auth/login
+    API->>DB: Validate employee credentials
+    API-->>Web: Access token + httpOnly refresh cookie
+    Web-->>Browser: Navigate to dashboard
 ```
 
----
+## Data Flow - Punch In
 
-## Database (Neon PostgreSQL)
+```mermaid
+sequenceDiagram
+    Browser->>Web: Submit punch request with location
+    Web->>API: POST /api/v1/attendance/punch-in
+    API->>DB: Insert attendance record
+    API-->>Web: { success, punchTime }
+    Web-->>Browser: Show punch-out state
+```
 
-- **Pooled URL** (API): `ep-mute-meadow-ao8beta1-pooler...` — pgBouncer pooling
-- **Direct URL** (face-service / migrations): `ep-mute-meadow-ao8beta1...` — no pooling
-- **Face data storage:** `employees.face_embedding` (JSONB) stores `{"rekognition_face_id": "uuid"}`
-- **Face enrolled flag:** `employees.face_enrolled` (BOOLEAN)
+## Database
 
-> [!note] Why two URLs?
-> pgBouncer (pooled) doesn't support Prisma's prepared statements for migrations, and psycopg2 doesn't support `channel_binding=require`. The direct URL is used for both.
+- Runtime API connection: Neon pooled connection string in `DATABASE_URL`
+- Prisma migration/generate connection: Neon direct connection string in `DIRECT_URL`
 
----
+> pgBouncer pooled URLs do not support Prisma migration behavior reliably. Use
+> `DIRECT_URL` for migrations and `DATABASE_URL` for runtime.
 
-## Ports at a Glance
+## Production Ports
 
-| Service | Local Port | Notes |
-|---------|-----------|-------|
-| Next.js web | 3000 | |
-| NestJS API | 3001 | |
-| FastAPI face | 8000 | |
-| PostgreSQL (Docker only) | 5433 | maps to container :5432 |
-| Redis (Docker only) | 6380 | maps to container :6379 |
+Vercel provides public HTTPS origins for both apps. Local development commonly
+uses:
+
+| Service | Local Port |
+|---------|------------|
+| Next.js web | 3000 |
+| NestJS API | 3001 |
+| PostgreSQL (Docker only) | 5433 |
+| Redis (Docker only) | 6380 |

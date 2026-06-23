@@ -10,15 +10,20 @@ jobs:
   typecheck:
     name: Type Check & Schema Validate
     runs-on: ubuntu-latest
+    env:
+      # Prisma validate/generate only need parseable datasource URLs here; the
+      # CI job does not connect to a real database.
+      DATABASE_URL: postgresql://nexgen:nexgen@localhost:5432/nexgen_ems?schema=public
+      DIRECT_URL: postgresql://nexgen:nexgen@localhost:5432/nexgen_ems?schema=public
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node 20
+      - name: Setup Node 24
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
 
       - name: Install dependencies

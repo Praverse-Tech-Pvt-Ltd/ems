@@ -1,21 +1,24 @@
-# NexGen EMS API environment example
-#
-# Face recognition service variables have been removed.
+# Vercel Environment Variables
 
+Set these in the correct Vercel project, then redeploy that project. Do not put
+backend secrets in the frontend project.
+
+## Backend API project
+
+Project: `ems-api-neon.vercel.app`
+
+```env
+NODE_ENV=production
 DATABASE_URL=postgresql://<user>:<password>@<host>-pooler.<region>.neon.tech/<dbname>?sslmode=require&pgbouncer=true
 DIRECT_URL=postgresql://<user>:<password>@<host>.<region>.neon.tech/<dbname>?sslmode=require
-
-# Required at API startup. For Vercel, use an external Redis such as Upstash.
 REDIS_URL=rediss://default:<token>@<host>.upstash.io:6379
 
-JWT_SECRET=replace_with_64_byte_random_hex
-JWT_REFRESH_SECRET=replace_with_a_different_64_byte_random_hex
+JWT_SECRET=<64-byte-random-hex>
+JWT_REFRESH_SECRET=<different-64-byte-random-hex>
 JWT_EXPIRES_IN=15m
 JWT_REFRESH_EXPIRES_IN=7d
-ENCRYPTION_KEY=replace_with_32_char_random_hex
+ENCRYPTION_KEY=<32-char-random-hex>
 
-NODE_ENV=production
-PORT=3001
 FRONTEND_URL=https://ems.nexgenpharmasolutions.com
 CORS_ALLOWED_ORIGINS=https://ems.nexgenpharmasolutions.com,https://<your-web-project>.vercel.app
 
@@ -23,11 +26,10 @@ RESEND_API_KEY=re_xxxxxxxxxxxxxxxxxxxx
 RESEND_FROM_EMAIL=noreply@nexgenpharmasolutions.com
 RESEND_FROM_NAME=NexGen Pharma EMS
 
-# Recommended for Vercel production. Local filesystem storage is ephemeral.
 STORAGE_DRIVER=s3
 AWS_REGION=auto
-AWS_ACCESS_KEY_ID=
-AWS_SECRET_ACCESS_KEY=
+AWS_ACCESS_KEY_ID=<storage-access-key>
+AWS_SECRET_ACCESS_KEY=<storage-secret-key>
 S3_BUCKET_NAME=nexgen-ems-prod
 AWS_ENDPOINT_URL=https://<account_id>.r2.cloudflarestorage.com
 
@@ -58,3 +60,35 @@ ZOHO_CLIENT_SECRET=
 ZOHO_REDIRECT_URI=
 ZOHO_REFRESH_TOKEN=
 WHATSAPP_API_KEY=
+```
+
+## Frontend web project
+
+Project: `ems.nexgenpharmasolutions.com`
+
+```env
+NEXT_PUBLIC_API_URL=https://ems-api-neon.vercel.app
+NEXT_PUBLIC_DEV_BYPASS=false
+```
+
+`NEXT_PUBLIC_API_URL` must not include `/api/v1`; the frontend client appends it.
+
+## Removed face-service variables
+
+Do not set these in Vercel anymore:
+
+```env
+FACE_SERVICE_URL
+FR_SERVICE_URL
+FACE_SERVICE_API_KEY
+RECOGNITION_THRESHOLD
+REKOGNITION_COLLECTION_ID
+```
+
+## Why the browser shows a CORS error
+
+The frontend sends a preflight `OPTIONS` request before login. If the API
+function crashes during startup because a required environment variable is
+missing, Vercel returns a 500 response without CORS headers. The browser then
+reports it as a CORS failure even though the root cause is usually API startup
+failure or an incomplete CORS allowlist.

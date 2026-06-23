@@ -9,10 +9,22 @@ import { Server, Socket } from 'socket.io';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 
+const socketOrigins = [
+  process.env['FRONTEND_URL'],
+  process.env['CORS_ALLOWED_ORIGINS'],
+]
+  .filter(Boolean)
+  .flatMap((value) => value!.split(',').map((origin) => origin.trim()))
+  .filter(Boolean);
+
 @WebSocketGateway({
   cors: {
     // Restrict to known frontend origins — never allow '*'.
-    origin: (process.env['FRONTEND_URL'] ?? 'http://localhost:3000').split(','),
+    origin: [
+      ...socketOrigins,
+      'https://ems.nexgenpharmasolutions.com',
+      'http://localhost:3000',
+    ],
     credentials: true,
   },
   namespace: '/notifications',
