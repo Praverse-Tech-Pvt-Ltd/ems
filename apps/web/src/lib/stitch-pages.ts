@@ -40,10 +40,10 @@ export const stitchPages: Record<string, StitchPageConfig> = {
       { label: 'Today Status', value: 'Live', meta: 'Punch API ready', tone: 'tertiary', icon: 'schedule' },
       { label: 'Regularize', value: 'Open', meta: 'Manager review', tone: 'primary', icon: 'edit_calendar' },
       { label: 'Policy Use', value: 'Tracked', meta: 'Backend synced', icon: 'policy' },
-      { label: 'Face Proxy', value: 'Ready', meta: 'Secure route', icon: 'face' },
+      { label: 'Geo Punch', value: 'Ready', meta: 'Location route', icon: 'location_on' },
     ],
     primaryItems: [
-      { title: 'Punch in from verified zone', subtitle: 'Location and optional face flow available', status: 'Ready' },
+      { title: 'Punch in from verified zone', subtitle: 'Location verification available', status: 'Ready' },
       { title: 'Review missing punch', subtitle: 'Submit regularization with notes', status: 'Pending' },
       { title: 'Manager time edit', subtitle: 'Admin edits preserve history', status: 'Audited' },
     ],
@@ -51,7 +51,7 @@ export const stitchPages: Record<string, StitchPageConfig> = {
       { title: 'Late arrival cluster', subtitle: 'Review employees with repeated variance' },
       { title: 'Policy usage trend', subtitle: 'Compare grace and work-from-home usage' },
     ],
-    actions: ['Punch In', 'Punch Out', 'Regularize'],
+    actions: ['Punch In', 'Punch Out', 'OD', 'Regularize'],
   },
   'employee-directory': {
     layout: 'directory',
@@ -103,7 +103,7 @@ export const stitchPages: Record<string, StitchPageConfig> = {
       { title: 'Quick leave apply', subtitle: 'Start a leave request from current balance' },
       { title: 'Submit work update', subtitle: 'Send daily or weekly work summary' },
     ],
-    actions: ['Punch In', 'Apply Leave', 'View Payslip'],
+    actions: ['Punch In', 'OD', 'Apply Leave', 'View Payslip'],
   },
   'leave-center': {
     layout: 'board',

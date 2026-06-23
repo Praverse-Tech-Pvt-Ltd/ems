@@ -347,8 +347,6 @@ model AttendanceRecord {
   workingHours         Decimal?         @map("working_hours") @db.Decimal(4, 2)
   isGeoValidIn         Boolean?         @map("is_geo_valid_in")
   isGeoValidOut        Boolean?         @map("is_geo_valid_out")
-  frConfidenceIn       Decimal?         @map("fr_confidence_in") @db.Decimal(4, 3)
-  frConfidenceOut      Decimal?         @map("fr_confidence_out") @db.Decimal(4, 3)
   isRegularized        Boolean          @default(false) @map("is_regularized")
   regularizedBy        String?          @map("regularized_by")
   regularizationReason String?          @map("regularization_reason")

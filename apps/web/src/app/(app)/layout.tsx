@@ -10,7 +10,7 @@ import { NotificationsDrawer } from '@/components/layouts/NotificationsDrawer';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  const { accessToken, setAccessToken, clearAuth } = useAuthStore();
+  const { accessToken, setAuth, setAccessToken, clearAuth } = useAuthStore();
   const [authReady, setAuthReady] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
@@ -28,13 +28,17 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     }
 
     axios
-      .post<{ accessToken: string }>(
+      .post<{ accessToken: string; user?: { id: string; email: string; firstName: string; lastName: string; role: string } }>(
         `${process.env['NEXT_PUBLIC_API_URL']}/api/v1/auth/refresh`,
         {},
         { withCredentials: true },
       )
       .then((res) => {
-        setAccessToken(res.data.accessToken);
+        if (res.data.user) {
+          setAuth(res.data.accessToken, res.data.user);
+        } else {
+          setAccessToken(res.data.accessToken);
+        }
         setAuthReady(true);
       })
       .catch(() => {

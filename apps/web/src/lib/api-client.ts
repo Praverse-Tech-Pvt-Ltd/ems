@@ -45,12 +45,17 @@ apiClient.interceptors.response.use(
         // Deduplicate: if a refresh is already underway reuse the same promise.
         if (!refreshPromise) {
           refreshPromise = axios
-            .post<{ accessToken: string }>(
+            .post<{ accessToken: string; user?: { id: string; email: string; firstName: string; lastName: string; role: string } }>(
               `${process.env['NEXT_PUBLIC_API_URL']}/api/v1/auth/refresh`,
               {},
               { withCredentials: true }, // cookie is sent automatically
             )
-            .then((r) => r.data.accessToken)
+            .then((r) => {
+              if (r.data.user) {
+                useAuthStore.getState().setAuth(r.data.accessToken, r.data.user);
+              }
+              return r.data.accessToken;
+            })
             .finally(() => {
               refreshPromise = null;
             });

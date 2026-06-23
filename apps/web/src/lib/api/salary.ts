@@ -28,6 +28,9 @@ export const salaryService = {
   payrollRuns: (params?: { month?: number; year?: number }) =>
     apiClient.get('/salary/payroll-runs', { params }).then(r => r.data),
 
+  payrollRun: (id: string) =>
+    apiClient.get(`/salary/payroll-runs/${id}`).then(r => r.data),
+
   generatePayrollRun: (data: { month: number; year: number; notes?: string }) =>
     apiClient.post('/salary/payroll-runs/generate', data).then(r => r.data),
 

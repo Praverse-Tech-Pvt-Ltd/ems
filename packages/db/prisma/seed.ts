@@ -20,7 +20,31 @@ const INTERN_LEAVE_DEFAULTS = PERMANENT_LEAVE_DEFAULTS.map((leave) => ({
 
 type SeedEmployee = Awaited<ReturnType<typeof prisma.employee.findUnique>>;
 
+function salaryBreakup(monthlyAmount: number, applyStatutoryDeductions = true) {
+  if (!applyStatutoryDeductions) {
+    return {
+      basic: monthlyAmount,
+      hra: 0,
+      allowances: 0,
+      pfDeduction: 0,
+      professionalTax: 0,
+      tds: 0,
+    };
+  }
 
+  const basic = Math.round(monthlyAmount * 0.5);
+  const hra = Math.round(monthlyAmount * 0.3);
+  const allowances = monthlyAmount - basic - hra;
+  const pfWageBase = Math.min(basic, 15000);
+  return {
+    basic,
+    hra,
+    allowances,
+    pfDeduction: Math.round(pfWageBase * 0.12),
+    professionalTax: monthlyAmount > 12000 ? 200 : 0,
+    tds: 0,
+  };
+}
 
 async function seedLeaves(employeeId: string, isIntern = false) {
   const year = new Date().getFullYear();
@@ -40,7 +64,9 @@ async function seedSalaryStructure(
   monthlyAmount: number,
   notes: string,
   approvedBy?: string,
+  applyStatutoryDeductions = true,
 ) {
+  const breakup = salaryBreakup(monthlyAmount, applyStatutoryDeductions);
   await prisma.salaryStructure.upsert({
     where: {
       employeeId_effectiveFrom: {
@@ -49,24 +75,14 @@ async function seedSalaryStructure(
       },
     },
     update: {
-      basic: monthlyAmount,
-      hra: 0,
-      allowances: 0,
-      pfDeduction: 0,
-      professionalTax: 0,
-      tds: 0,
+      ...breakup,
       notes,
       approvedBy,
       approvedAt: approvedBy ? new Date() : undefined,
     },
     create: {
       employeeId,
-      basic: monthlyAmount,
-      hra: 0,
-      allowances: 0,
-      pfDeduction: 0,
-      professionalTax: 0,
-      tds: 0,
+      ...breakup,
       effectiveFrom: new Date(effectiveFrom),
       notes,
       approvedBy,
@@ -366,7 +382,7 @@ async function main() {
       chandni.id,
       '2026-06-01',
       25000,
-      'Permanent employee salary: INR 25,000 per month, no deductions.',
+      'Permanent employee salary: INR 25,000 per month. Statutory breakup: Basic 50%, HRA 30%, allowance balance, employee PF 12% of Basic capped at INR 15,000, Gujarat PT INR 200 where applicable.',
       admin?.id,
     );
   }
@@ -425,6 +441,7 @@ async function main() {
       10000,
       'Intern stipend: INR 10,000 per month from April 2026 onward. Leave during internship is deductible/unpaid.',
       admin?.id,
+      false,
     );
     await seedMonthlySlips(
       dev,
@@ -506,6 +523,7 @@ async function main() {
       10000,
       'Intern stipend: INR 10,000 per month. Leave during internship is deductible/unpaid.',
       admin?.id,
+      false,
     );
     await seedMonthlySlips(
       maanav,
@@ -570,7 +588,7 @@ async function main() {
       shifa.id,
       '2026-02-02',
       25000,
-      'Permanent employee salary: INR 25,000 per month, no deductions.',
+      'Permanent employee salary: INR 25,000 per month. Statutory breakup: Basic 50%, HRA 30%, allowance balance, employee PF 12% of Basic capped at INR 15,000, Gujarat PT INR 200 where applicable.',
       admin?.id,
     );
     await seedMonthlySlips(
@@ -580,58 +598,10 @@ async function main() {
       5,
       year,
       25000,
-      'Monthly salary, no deductions.',
+      'Monthly salary with statutory PF/PT deductions applied where applicable.',
     );
   }
   console.log(`✓ Employee 4    →  shifa.mobh@nexgenpharmasolutions.com   /  ${shifaPassword}`);
-
-  // 5. Dilip (QA department — same attendance window as Shifa/Chandni)
-  const dilipPassword = 'Dilip@NEX2026';
-  const dilipHash = await bcrypt.hash(dilipPassword, 10);
-
-  let dilipRecord = await prisma.employee.findFirst({
-    where: { OR: [{ employeeCode: 'NEX-QA-002' }, { email: 'dilip@nexgenpharmasolutions.com' }] },
-  });
-
-  if (dilipRecord) {
-    await prisma.employee.update({
-      where: { id: dilipRecord.id },
-      data: {
-        email: 'dilip@nexgenpharmasolutions.com',
-        passwordHash: dilipHash,
-        joiningDate: new Date('2026-01-01'),
-        designation: 'QA Officer',
-        departmentId: qaDept.id,
-        salaryGrade: 'PERMANENT',
-        grossSalary: 25000,
-      },
-    });
-  } else {
-    await prisma.employee.create({
-      data: {
-        employeeCode: 'NEX-QA-002',
-        email:        'dilip@nexgenpharmasolutions.com',
-        passwordHash: dilipHash,
-        firstName:    'Dilip',
-        lastName:     'Mehta',
-        role:         Role.EMPLOYEE,
-        status:       EmployeeStatus.ACTIVE,
-        joiningDate:  new Date('2026-01-01'),
-        designation:  'QA Officer',
-        departmentId: qaDept.id,
-        salaryGrade:  'PERMANENT',
-        grossSalary:  25000,
-      },
-    });
-  }
-
-  const dilip = await prisma.employee.findUnique({ where: { email: 'dilip@nexgenpharmasolutions.com' } });
-  if (dilip) {
-    await seedLeaves(dilip.id);
-    await seedSalaryStructure(dilip.id, '2026-01-01', 25000, 'Permanent employee salary: INR 25,000 per month.', admin?.id);
-    await seedMonthlySlips(dilip, admin?.id ?? dilip.id, 1, 5, year, 25000, 'Monthly salary, no deductions.');
-  }
-  console.log(`✓ Employee 5    →  dilip@nexgenpharmasolutions.com          /  ${dilipPassword}`);
 
   // ── Set Pratham as manager for all employees ───────────────────────────────
   console.log(`\n── Setting Pratham as manager for all employees ─`);
@@ -647,7 +617,7 @@ async function main() {
     console.log(`✓ All employees now report to Pratham (${admin.email})`);
   }
 
-  // ── Remove unknown employees (keep only the 7 canonical ones) ─────────────
+  // ── Remove unknown employees (keep only the 6 canonical ones) ─────────────
   console.log(`\n── Cleaning up unknown employee accounts ────────`);
   const canonicalEmails = new Set([
     'ashwani@nexgenpharmasolutions.com',
@@ -656,7 +626,6 @@ async function main() {
     'dev.patel@praversetech.com',
     'maanav.shah@praversetech.com',
     'shifa.mobh@nexgenpharmasolutions.com',
-    'dilip@nexgenpharmasolutions.com',
   ]);
   const allEmps = await prisma.employee.findMany({ select: { id: true, email: true } });
   const toDelete = allEmps.filter(e => !canonicalEmails.has(e.email));

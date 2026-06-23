@@ -2,6 +2,7 @@ import {
   Injectable,
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
@@ -9,6 +10,7 @@ import { PrismaService } from '../../common/prisma/prisma.service';
 import { GeoFenceService } from './geo-fence.service';
 import { PunchInDto } from './dto/punch-in.dto';
 import { RegularizeDto } from './dto/regularize.dto';
+import { OdPunchInDto, OdPunchOutDto } from './dto/od-punch.dto';
 
 // ── Attendance Policy Constants ────────────────────────────────────────────────
 const HALF_DAY_HOURS = 4;           // < 4 h worked → auto HALF_DAY at punch-out
@@ -36,6 +38,28 @@ export class AttendanceService {
     const utc = now.getTime() + now.getTimezoneOffset() * 60000;
     const ist = new Date(utc + (3600000 * 5.5));
     return new Date(Date.UTC(ist.getFullYear(), ist.getMonth(), ist.getDate()));
+  }
+
+  private getISTDateFor(date: Date): Date {
+    const utc = date.getTime() + date.getTimezoneOffset() * 60000;
+    const ist = new Date(utc + (3600000 * 5.5));
+    return new Date(Date.UTC(ist.getFullYear(), ist.getMonth(), ist.getDate()));
+  }
+
+  private calculateWorkingHours(punchInTime: Date, punchOutTime: Date): number {
+    return Math.round(
+      ((punchOutTime.getTime() - punchInTime.getTime()) / (1000 * 60 * 60)) * 100,
+    ) / 100;
+  }
+
+  private async assertPunchAllowed(employeeId: string) {
+    const employee = await this.prisma.employee.findUnique({
+      where: { id: employeeId },
+      select: { email: true },
+    });
+    if (employee?.email?.toLowerCase() === 'ashwani@nexgenpharmasolutions.com') {
+      throw new ForbiddenException('Attendance punch is disabled for this user.');
+    }
   }
 
   /** Returns true if today is a non-working day for this employee.
@@ -178,6 +202,7 @@ export class AttendanceService {
   // ── Punch-in ───────────────────────────────────────────────────────────────
 
   async punchIn(employeeId: string, dto: PunchInDto, ip?: string, userAgent?: string) {
+    await this.assertPunchAllowed(employeeId);
     const today = this.getISTToday();
 
     const holiday = await this.prisma.holiday.findFirst({ where: { date: today } });
@@ -242,7 +267,6 @@ export class AttendanceService {
         punchInLat:  dto.latitude,
         punchInLng:  dto.longitude,
         isGeoValidIn: isGeoValid,
-        frConfidenceIn: null,
         isManualPunch: false,
         manualPunchReason: dto.manualPunchReason ?? null,
         status: punchInStatus,
@@ -253,7 +277,6 @@ export class AttendanceService {
         punchInLat:  dto.latitude,
         punchInLng:  dto.longitude,
         isGeoValidIn: isGeoValid,
-        frConfidenceIn: null,
         isManualPunch: false,
         manualPunchReason: dto.manualPunchReason ?? null,
         status: punchInStatus,
@@ -292,6 +315,7 @@ export class AttendanceService {
   // ── Punch-out ──────────────────────────────────────────────────────────────
 
   async punchOut(employeeId: string, dto: PunchInDto, ip?: string, userAgent?: string) {
+    await this.assertPunchAllowed(employeeId);
     const today = this.getISTToday();
 
     const record = await this.prisma.attendanceRecord.findUnique({
@@ -357,7 +381,6 @@ export class AttendanceService {
         punchOutLat:    dto.latitude,
         punchOutLng:    dto.longitude,
         isGeoValidOut:  isGeoValid,
-        frConfidenceOut: null,
         workingHours:   Math.round(workingHours * 100) / 100,
         status:         finalStatus as any,
         // Mark as manual if punch-out is manual (preserve existing true if already set)
@@ -392,6 +415,122 @@ export class AttendanceService {
   }
 
   // ── Other methods (unchanged) ─────────────────────────────────────────────
+
+  async getOpenOd(employeeId: string) {
+    return this.prisma.attendanceRecord.findFirst({
+      where: {
+        employeeId,
+        notes: 'OD',
+        punchInTime: { not: null },
+        punchOutTime: null,
+      },
+      orderBy: { punchInTime: 'desc' },
+    });
+  }
+
+  async odPunchIn(employeeId: string, dto: OdPunchInDto, ip?: string, userAgent?: string) {
+    await this.assertPunchAllowed(employeeId);
+
+    const openOd = await this.getOpenOd(employeeId);
+    if (openOd) {
+      throw new ConflictException('You already have an open OD entry. Please add the punch-out time first.');
+    }
+
+    const punchInTime = new Date(dto.punchInTime);
+    if (Number.isNaN(punchInTime.getTime())) {
+      throw new BadRequestException('Invalid OD punch-in time.');
+    }
+
+    const date = this.getISTDateFor(punchInTime);
+    const existing = await this.prisma.attendanceRecord.findUnique({
+      where: { employeeId_date: { employeeId, date } },
+    });
+    if (existing?.punchInTime || existing?.punchOutTime) {
+      throw new ConflictException('Attendance already exists for this date.');
+    }
+
+    const reason = dto.reason?.trim() || 'OD';
+    const record = await this.prisma.attendanceRecord.upsert({
+      where: { employeeId_date: { employeeId, date } },
+      create: {
+        employeeId,
+        date,
+        punchInTime,
+        status: 'WFH',
+        isManualPunch: true,
+        manualPunchReason: reason,
+        notes: 'OD',
+        deviceInfo: {},
+      },
+      update: {
+        punchInTime,
+        status: 'WFH',
+        isManualPunch: true,
+        manualPunchReason: reason,
+        notes: 'OD',
+      },
+    });
+
+    await this.prisma.auditLog.create({
+      data: {
+        actorId: employeeId,
+        action: 'OD_PUNCH_IN',
+        resourceType: 'attendance',
+        resourceId: record.id,
+        ipAddress: ip,
+        userAgent,
+        newValue: record as object,
+      },
+    });
+
+    return record;
+  }
+
+  async odPunchOut(employeeId: string, dto: OdPunchOutDto, ip?: string, userAgent?: string) {
+    await this.assertPunchAllowed(employeeId);
+
+    const record = await this.getOpenOd(employeeId);
+    if (!record?.punchInTime) {
+      throw new BadRequestException('No open OD entry found.');
+    }
+
+    const punchOutTime = new Date(dto.punchOutTime);
+    if (Number.isNaN(punchOutTime.getTime())) {
+      throw new BadRequestException('Invalid OD punch-out time.');
+    }
+    if (punchOutTime <= record.punchInTime) {
+      throw new BadRequestException('OD punch-out time must be after punch-in time.');
+    }
+
+    const reason = dto.reason?.trim() || record.manualPunchReason || 'OD';
+    const workingHours = this.calculateWorkingHours(record.punchInTime, punchOutTime);
+    const updated = await this.prisma.attendanceRecord.update({
+      where: { id: record.id },
+      data: {
+        punchOutTime,
+        workingHours,
+        status: 'WFH',
+        isManualPunch: true,
+        manualPunchReason: reason,
+        notes: 'OD',
+      },
+    });
+
+    await this.prisma.auditLog.create({
+      data: {
+        actorId: employeeId,
+        action: 'OD_PUNCH_OUT',
+        resourceType: 'attendance',
+        resourceId: updated.id,
+        ipAddress: ip,
+        userAgent,
+        oldValue: record as object,
+        newValue: updated as object,
+      },
+    });
+
+    return updated;
+  }
 
   async getToday(employeeId: string) {
     const today = this.getISTToday();

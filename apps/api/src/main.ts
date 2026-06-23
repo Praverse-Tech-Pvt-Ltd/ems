@@ -11,10 +11,9 @@ import { GlobalExceptionFilter } from './common/filters/http-exception.filter';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bodyParser: false });
 
-  // Increase body limit to 20mb for base64 face image payloads (5 frames ~3mb each)
   const bodyParser = await import('body-parser');
-  app.use(bodyParser.json({ limit: '20mb' }));
-  app.use(bodyParser.urlencoded({ limit: '20mb', extended: true }));
+  app.use(bodyParser.json({ limit: '1mb' }));
+  app.use(bodyParser.urlencoded({ limit: '1mb', extended: true }));
 
   app.use(helmet());
   app.use(cookieParser());
@@ -42,10 +41,10 @@ async function bootstrap() {
     origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
       // Allow requests with no origin (mobile apps, curl, Swagger)
       if (!origin) return callback(null, true);
-      // Allow any Vercel deployment preview or the explicit FRONTEND_URL
+      // Allow specific nexgen-ems Vercel deployment previews or the explicit FRONTEND_URL
       if (
         explicitOrigins.includes(origin) ||
-        /\.vercel\.app$/.test(origin)
+        /^https:\/\/nexgen-ems.*\.vercel\.app$/.test(origin)
       ) {
         return callback(null, true);
       }

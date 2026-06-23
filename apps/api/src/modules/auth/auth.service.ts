@@ -59,7 +59,7 @@ export class AuthService {
   async refresh(token: string) {
     const stored = await this.prisma.refreshToken.findUnique({
       where: { token },
-      include: { employee: { select: { id: true, email: true, role: true, status: true } } },
+      include: { employee: { select: { id: true, email: true, role: true, status: true, firstName: true, lastName: true } } },
     });
 
     if (!stored || stored.isRevoked || stored.expiresAt < new Date()) {
@@ -75,11 +75,22 @@ export class AuthService {
       data: { isRevoked: true },
     });
 
-    return this.generateTokens(
+    const tokens = await this.generateTokens(
       stored.employee.id,
       stored.employee.email,
       stored.employee.role,
     );
+
+    return {
+      ...tokens,
+      user: {
+        id: stored.employee.id,
+        email: stored.employee.email,
+        firstName: stored.employee.firstName,
+        lastName: stored.employee.lastName,
+        role: stored.employee.role,
+      },
+    };
   }
 
   async logout(token: string) {

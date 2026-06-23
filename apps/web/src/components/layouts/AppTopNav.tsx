@@ -15,6 +15,7 @@ const PAGE_LABELS: Record<string, string> = {
   '/expense-tracker':             'Expenses',
   '/requests':                    'Requests',
   '/salary-payslips':             'Salary',
+  '/wage-sheet':                  'Wage Sheet',
   '/employee-directory':          'Employees',
   '/messaging-chat-hub':          'Chat',
   '/invoices':                    'Invoices',

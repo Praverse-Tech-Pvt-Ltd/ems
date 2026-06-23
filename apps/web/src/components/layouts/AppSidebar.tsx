@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '@/store/auth.store';
 import { Avatar } from '@/components/ui/Avatar';
 import { LogOut } from 'lucide-react';
@@ -20,6 +21,7 @@ const navGroups: NavGroup[] = [
       { href: '/expense-tracker',          label: 'Expenses',   icon: 'receipt_long'    },
       { href: '/requests',                 label: 'Requests',   icon: 'send'            },
       { href: '/salary-payslips',          label: 'Salary',     icon: 'payments'        },
+      { href: '/wage-sheet',               label: 'Wage Sheet', icon: 'table_view', roles: ['ADMIN', 'SUPER_ADMIN'] },
     ],
   },
   {
@@ -64,20 +66,24 @@ const roleLabel: Record<string, string> = {
 export function AppSidebar({ className = '', onNavigate }: { className?: string; onNavigate?: () => void }) {
   const pathname  = usePathname();
   const router    = useRouter();
+  const queryClient = useQueryClient();
   const clearAuth = useAuthStore((s) => s.clearAuth);
   const user      = useAuthStore((s) => s.user);
   const role      = user?.role ?? 'EMPLOYEE';
+  const isAshwani = user?.email?.toLowerCase() === 'ashwani@nexgenpharmasolutions.com';
 
   const canSee = (roles?: string[]) => !roles || roles.includes(role);
+  const canSeeItem = (item: NavItem) => canSee(item.roles) && !(isAshwani && item.href === '/attendance-punch-station');
 
   const handleLogout = () => {
+    queryClient.clear();
     clearAuth();
     router.push('/login');
   };
 
   const visibleGroups = navGroups
     .filter(g => canSee(g.roles))
-    .map(g => ({ ...g, items: g.items.filter(i => canSee(i.roles)) }))
+    .map(g => ({ ...g, items: g.items.filter(canSeeItem) }))
     .filter(g => g.items.length > 0);
 
   return (

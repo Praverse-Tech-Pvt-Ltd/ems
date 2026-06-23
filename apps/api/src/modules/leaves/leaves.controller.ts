@@ -53,9 +53,9 @@ export class LeavesController {
   @Roles('MANAGER', 'ADMIN', 'SUPER_ADMIN')
   approve(
     @Param('id', ParseUUIDPipe) id: string,
-    @CurrentUser() user: { id: string },
+    @CurrentUser() user: { id: string; role: string },
     @Body() dto: ApproveLeaveDto,
   ) {
-    return this.service.approve(id, user.id, dto.action, dto.rejectionReason);
+    return this.service.approve(id, user.id, user.role, dto.action, dto.rejectionReason);
   }
 }

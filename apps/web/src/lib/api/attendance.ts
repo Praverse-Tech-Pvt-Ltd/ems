@@ -7,6 +7,15 @@ export const attendanceService = {
   punchOut: (latitude?: number, longitude?: number) =>
     apiClient.post('/attendance/punch-out', { latitude, longitude }).then(r => r.data),
 
+  odPunchIn: (data: { punchInTime: string; reason?: string }) =>
+    apiClient.post('/attendance/od/punch-in', data).then(r => r.data),
+
+  odPunchOut: (data: { punchOutTime: string; reason?: string }) =>
+    apiClient.post('/attendance/od/punch-out', data).then(r => r.data),
+
+  openOd: () =>
+    apiClient.get('/attendance/od/open').then(r => r.data),
+
   today: () =>
     apiClient.get('/attendance/today').then(r => r.data),
 
@@ -24,4 +33,7 @@ export const attendanceService = {
 
   regularize: (id: string, data: { date: string; punchIn: string; punchOut: string; reason: string }) =>
     apiClient.patch(`/attendance/${id}/regularize`, data).then(r => r.data),
+
+  holidays: () =>
+    apiClient.get('/corporate/holidays').then(r => r.data),
 };

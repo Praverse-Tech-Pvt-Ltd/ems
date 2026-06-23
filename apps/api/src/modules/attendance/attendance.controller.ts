@@ -4,6 +4,7 @@ import { AttendanceService } from './attendance.service';
 
 import { PunchInDto } from './dto/punch-in.dto';
 import { RegularizeDto } from './dto/regularize.dto';
+import { OdPunchInDto, OdPunchOutDto } from './dto/od-punch.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -36,6 +37,31 @@ export class AttendanceController {
     @Headers('user-agent') userAgent?: string,
   ) {
     return this.service.punchOut(user.id, dto, ip, userAgent);
+  }
+
+  @Post('od/punch-in')
+  odPunchIn(
+    @CurrentUser() user: { id: string },
+    @Body() dto: OdPunchInDto,
+    @Ip() ip: string,
+    @Headers('user-agent') userAgent?: string,
+  ) {
+    return this.service.odPunchIn(user.id, dto, ip, userAgent);
+  }
+
+  @Post('od/punch-out')
+  odPunchOut(
+    @CurrentUser() user: { id: string },
+    @Body() dto: OdPunchOutDto,
+    @Ip() ip: string,
+    @Headers('user-agent') userAgent?: string,
+  ) {
+    return this.service.odPunchOut(user.id, dto, ip, userAgent);
+  }
+
+  @Get('od/open')
+  getOpenOd(@CurrentUser() user: { id: string }) {
+    return this.service.getOpenOd(user.id);
   }
 
 

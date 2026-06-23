@@ -1,7 +1,6 @@
 import { z } from 'zod';
 
 export const PunchInSchema = z.object({
-  faceImageBase64: z.string().min(1),
   latitude: z.number().min(-90).max(90),
   longitude: z.number().min(-180).max(180),
   deviceInfo: z
@@ -37,6 +36,5 @@ export interface AttendanceRecord {
   status: string;
   workingHours: number | null;
   isGeoValidIn: boolean | null;
-  frConfidenceIn: number | null;
   isRegularized: boolean;
 }

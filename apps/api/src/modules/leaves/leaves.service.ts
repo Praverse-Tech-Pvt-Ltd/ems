@@ -90,11 +90,21 @@ export class LeavesService {
     });
   }
 
-  async approve(id: string, approverId: string, action: 'approve' | 'reject', rejectionReason?: string) {
-    const leave = await this.prisma.leaveRequest.findUnique({ where: { id } });
+  async approve(id: string, approverId: string, approverRole: string, action: 'approve' | 'reject', rejectionReason?: string) {
+    const leave = await this.prisma.leaveRequest.findUnique({
+      where: { id },
+      include: { employee: { select: { managerId: true } } },
+    });
     if (!leave) throw new NotFoundException('Leave request not found');
     if (leave.employeeId === approverId) {
       throw new ForbiddenException('You cannot approve your own leave request');
+    }
+
+    const isPrivileged = approverRole === 'ADMIN' || approverRole === 'SUPER_ADMIN';
+    if (!isPrivileged) {
+      if (leave.employee.managerId !== approverId) {
+        throw new ForbiddenException('You are not authorized to approve this leave request');
+      }
     }
 
     const updated = await this.prisma.leaveRequest.update({

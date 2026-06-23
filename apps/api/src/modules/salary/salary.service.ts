@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, ConflictException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, ConflictException, NotFoundException, ForbiddenException } from '@nestjs/common';
 import * as fs from 'fs';
 import * as path from 'path';
 import PDFDocument from 'pdfkit';
@@ -79,19 +79,20 @@ export class SalaryService {
 
   async listStructures() {
     const rows = await this.prisma.salaryStructure.findMany({
-      include: {
-        employee: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            employeeCode: true,
-            email: true,
-            designation: true,
+          include: {
+            employee: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                employeeCode: true,
+                email: true,
+                designation: true,
+                salaryGrade: true,
+              },
+            },
+            approver: { select: { firstName: true, lastName: true } },
           },
-        },
-        approver: { select: { firstName: true, lastName: true } },
-      },
       orderBy: [{ updatedAt: 'desc' }],
     });
     return rows.map((row) => this.toPlain(row));
@@ -129,7 +130,7 @@ export class SalaryService {
       update: data,
       create: { employeeId, ...data },
       include: {
-        employee: { select: { id: true, firstName: true, lastName: true, employeeCode: true, email: true, designation: true } },
+        employee: { select: { id: true, firstName: true, lastName: true, employeeCode: true, email: true, designation: true, salaryGrade: true } },
         approver: { select: { firstName: true, lastName: true } },
       },
     });
@@ -196,11 +197,14 @@ export class SalaryService {
         const earnedBaseSalary = this.roundMoney(baseSalary * paidFactor);
         const reimbursements = await this.approvedReimbursements(employee.id, dto.month, dto.year);
         const incentives = 0;
+        const isIntern = employee.salaryGrade === 'INTERN';
         const pfDeduction = this.roundMoney(this.money(structure?.pfDeduction) * paidFactor);
         const professionalTax = earnedBaseSalary > 0 ? this.money(structure?.professionalTax) : 0;
         const tds = this.roundMoney(this.money(structure?.tds) * paidFactor);
-        const esicDeduction = 0;
         const grossSalary = this.roundMoney(earnedBaseSalary + incentives + reimbursements);
+        const esicDeduction = !isIntern && baseSalary > 0 && baseSalary <= 21000
+          ? this.roundMoney(grossSalary * 0.0075)
+          : 0;
         const deductions = this.roundMoney(pfDeduction + professionalTax + tds + esicDeduction);
         const netPayable = Math.max(this.roundMoney(grossSalary - deductions), 0);
 
@@ -237,7 +241,13 @@ export class SalaryService {
             year: dto.year,
             paidFactor,
             salarySource: structure ? 'salary_structure' : 'employee_gross_salary',
-            note: 'ESIC is not calculated until statutory employee profiles are available.',
+            statutoryBasis: {
+              employeePf: '12% of Basic, capped to INR 15,000 PF wage base',
+              employerPf: 'Shown in UI as EPF/EPS split; not deducted from employee net pay',
+              esic: 'Employee ESIC 0.75% only when non-intern gross wage is up to INR 21,000',
+              professionalTax: 'Gujarat PT INR 200 when monthly salary exceeds INR 12,000',
+              interns: 'Intern stipends are kept outside statutory payroll deductions unless HR converts them to salary employees',
+            },
           },
         };
       }),
@@ -569,8 +579,11 @@ export class SalaryService {
     return this.toPlain(slip);
   }
 
-  async generatePdf(id: string): Promise<Buffer> {
+  async generatePdf(id: string, user: { id: string; role: string }): Promise<Buffer> {
     const slip = await this.findSlipOrThrow(id);
+    if (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN' && slip.employeeId !== user.id) {
+      throw new ForbiddenException('Access denied');
+    }
     const chunks: Buffer[] = [];
     const doc = new PDFDocument({ size: 'A4', margin: 42, bufferPages: false });
     doc.on('data', (chunk: Buffer) => chunks.push(chunk));

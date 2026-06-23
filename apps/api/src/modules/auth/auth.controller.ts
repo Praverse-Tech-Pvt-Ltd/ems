@@ -76,7 +76,7 @@ export class AuthController {
     if (!token) throw new UnauthorizedException('No refresh token');
     const result = await this.authService.refresh(token);
     res.cookie('refresh_token', result.refreshToken, REFRESH_COOKIE_OPTIONS);
-    return { accessToken: result.accessToken };
+    return { accessToken: result.accessToken, user: result.user };
   }
 
   @Post('logout')

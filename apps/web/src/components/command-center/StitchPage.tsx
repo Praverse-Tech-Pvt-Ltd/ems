@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api-client';
 import { PunchModal } from '@/components/PunchModal';
+import { useAuthStore } from '@/store/auth.store';
 
 /* Maps generic dashboard action labels to the dedicated page that implements them. */
 const ACTION_ROUTES: Record<string, string> = {
@@ -101,6 +102,11 @@ function WorkdayClock() {
   );
 }
 
+function toDateTimeLocalValue(date: Date) {
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 16);
+}
+
 function getByPath(source: unknown, path: string): unknown {
   return path.split('.').reduce<unknown>((value, key) => {
     if (value && typeof value === 'object' && key in value) {
@@ -162,28 +168,106 @@ function DataBadge({ children, tone = 'muted' }: { children: React.ReactNode; to
 
 export function StitchPage({ config }: { config: StitchPageConfig }) {
   const router = useRouter();
+  const user = useAuthStore(s => s.user);
+  const isAshwani = user?.email?.toLowerCase() === 'ashwani@nexgenpharmasolutions.com';
   const [question, setQuestion] = useState('');
   const [punchType, setPunchType] = useState<'in' | 'out' | null>(null);
+  const [odMode, setOdMode] = useState<'in' | 'out' | null>(null);
+  const [odPunchInTime, setOdPunchInTime] = useState(() => toDateTimeLocalValue(new Date()));
+  const [odPunchOutTime, setOdPunchOutTime] = useState(() => toDateTimeLocalValue(new Date()));
+  const [odReason, setOdReason] = useState('');
+  const [odSubmitting, setOdSubmitting] = useState(false);
   const [actionNote, setActionNote] = useState('');
 
   // Fetch today's attendance only for workday layout to determine punch state
   const todayQuery = useQuery({
-    queryKey: ['attendance-today'],
+    queryKey: ['attendance-today', user?.id],
     queryFn: () => apiClient.get('/attendance/today').then(r => r.data),
-    enabled: config.layout === 'workday',
+    enabled: config.layout === 'workday' && !!user?.id,
     retry: false,
   });
   const todayData = todayQuery.data as { punchInTime?: string | null; punchOutTime?: string | null } | undefined;
   const isPunchedIn  = !!(todayData?.punchInTime && !todayData?.punchOutTime);
   const isPunchedOut = !!(todayData?.punchInTime && todayData?.punchOutTime);
+  const openOdQuery = useQuery({
+    queryKey: ['attendance-od-open', user?.id],
+    queryFn: () => apiClient.get('/attendance/od/open').then(r => r.data),
+    enabled: config.layout === 'workday' && !isAshwani && !!user?.id,
+    retry: false,
+  });
+  const openOd = openOdQuery.data as { id?: string; punchInTime?: string | null; manualPunchReason?: string | null } | null | undefined;
+  const visibleActions = (config.actions ?? []).filter(action => {
+    if (!isAshwani) return true;
+    return !['Punch In', 'Punch Out', 'OD', 'Regularize'].includes(action);
+  });
+  const visibleMetrics = config.metrics.filter(metric => {
+    if (!isAshwani) return true;
+    return !['Punch', 'Today Status', 'Regularize', 'Policy Use', 'Face Proxy'].includes(metric.label);
+  });
 
   const runAction = (label: string) => {
+    if (isAshwani && ['Punch In', 'Punch Out', 'OD', 'Regularize'].includes(label)) return;
     if (label === 'Punch In') { setPunchType('in'); return; }
     if (label === 'Punch Out') { setPunchType('out'); return; }
+    if (label === 'OD') {
+      if (openOd?.id) {
+        setOdMode('out');
+        setOdPunchOutTime(toDateTimeLocalValue(new Date()));
+        setOdReason(openOd.manualPunchReason === 'OD' ? '' : openOd.manualPunchReason ?? '');
+      } else {
+        setOdMode('in');
+        setOdPunchInTime(toDateTimeLocalValue(new Date()));
+        setOdReason('');
+      }
+      return;
+    }
     const route = ACTION_ROUTES[label];
     if (route) { router.push(route); return; }
     setActionNote(`"${label}" lives on this workspace's detail screens — open the records below to act on it.`);
     window.setTimeout(() => setActionNote(''), 4000);
+  };
+
+  useEffect(() => {
+    if (config.layout !== 'workday' || !openOd?.id) return;
+    setOdMode('out');
+    setOdPunchOutTime(toDateTimeLocalValue(new Date()));
+    setOdReason(openOd.manualPunchReason === 'OD' ? '' : openOd.manualPunchReason ?? '');
+  }, [config.layout, openOd?.id, openOd?.manualPunchReason]);
+
+  const submitOdPunchIn = async () => {
+    setOdSubmitting(true);
+    try {
+      await apiClient.post('/attendance/od/punch-in', {
+        punchInTime: new Date(odPunchInTime).toISOString(),
+        reason: odReason || undefined,
+      });
+      setActionNote('OD punch-in time saved. Add punch-out time when duty is complete.');
+      setOdMode(null);
+      await Promise.all([todayQuery.refetch(), openOdQuery.refetch()]);
+    } catch (error: any) {
+      const message = error?.response?.data?.message ?? 'Could not save OD punch-in.';
+      setActionNote(Array.isArray(message) ? message.join('. ') : message);
+    } finally {
+      setOdSubmitting(false);
+    }
+  };
+
+  const submitOdPunchOut = async () => {
+    setOdSubmitting(true);
+    try {
+      await apiClient.post('/attendance/od/punch-out', {
+        punchOutTime: new Date(odPunchOutTime).toISOString(),
+        reason: odReason || undefined,
+      });
+      setActionNote('OD punch-out time saved.');
+      setOdMode(null);
+      await Promise.all([todayQuery.refetch(), openOdQuery.refetch()]);
+    } catch (error: any) {
+      const message = error?.response?.data?.message ?? 'Could not save OD punch-out.';
+      setActionNote(Array.isArray(message) ? message.join('. ') : message);
+    } finally {
+      setOdSubmitting(false);
+    }
   };
 
   const query = useQuery({
@@ -281,7 +365,7 @@ export function StitchPage({ config }: { config: StitchPageConfig }) {
     <section>
       <h3 className="font-label-caps text-label-caps text-on-surface-variant mb-sm tracking-widest">LIVE OPERATING METRICS</h3>
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-sm">
-        {config.metrics.map((metric) => (
+        {visibleMetrics.map((metric) => (
           <div key={metric.label} className={`glass-card rounded-lg p-sm flex flex-col gap-xs card-hover ${metric.tone === 'primary' ? 'border-l-[3px] border-l-primary' : metric.tone === 'tertiary' ? 'border-l-[3px] border-l-tertiary' : metric.tone === 'error' ? 'border-l-[3px] border-l-error' : ''}`}>
             <span className="font-label-caps text-label-caps text-on-surface-variant">{metric.label}</span>
             <div className="font-headline-lg text-headline-lg text-on-surface">{metric.value}</div>
@@ -300,7 +384,7 @@ export function StitchPage({ config }: { config: StitchPageConfig }) {
     <section>
       <h3 className="font-label-caps text-label-caps text-on-surface-variant mb-sm tracking-widest">LIVE OPERATING METRICS</h3>
       <div className="grid grid-cols-2 gap-sm">
-        {config.metrics.map((metric) => (
+        {visibleMetrics.map((metric) => (
           <div key={metric.label} className={`glass-card rounded-lg p-sm flex flex-col gap-xs card-hover ${metric.tone === 'primary' ? 'border-l-[3px] border-l-primary' : metric.tone === 'tertiary' ? 'border-l-[3px] border-l-tertiary' : metric.tone === 'error' ? 'border-l-[3px] border-l-error' : ''}`}>
             <span className="font-label-caps text-[10px] text-on-surface-variant truncate">{metric.label}</span>
             <div className="font-title-lg text-title-lg text-on-surface font-bold truncate">{metric.value}</div>
@@ -336,11 +420,79 @@ export function StitchPage({ config }: { config: StitchPageConfig }) {
   if (layout === 'workday') {
     const actionIcons: Record<string, string> = {
       'Punch In': 'login', 'Punch Out': 'logout',
-      'Apply Leave': 'event_available', 'View Payslip': 'payments',
+      'OD': 'work_history', 'Apply Leave': 'event_available', 'View Payslip': 'payments',
     };
     return (
       <div className="max-w-[1040px] mx-auto w-full flex flex-col gap-5 pb-6">
-        {punchType && <PunchModal punchType={punchType} onClose={() => setPunchType(null)} />}
+        {!isAshwani && punchType && <PunchModal punchType={punchType} onClose={() => setPunchType(null)} />}
+        {!isAshwani && odMode && (
+          <div className="fixed inset-0 z-50 bg-scrim/40 backdrop-blur-sm flex items-center justify-center p-md">
+            <div className="w-full max-w-md rounded-2xl bg-surface-container-lowest border border-outline-variant/40 shadow-xl p-lg">
+              <div className="flex items-start justify-between gap-md">
+                <div>
+                  <p className="font-label-caps text-label-caps text-primary tracking-widest">
+                    {odMode === 'in' ? 'OD PUNCH IN' : 'OD PUNCH OUT'}
+                  </p>
+                  <h3 className="font-title-lg text-title-lg text-on-surface mt-xs">
+                    {odMode === 'in' ? 'Enter OD start time' : 'Complete OD entry'}
+                  </h3>
+                  {odMode === 'out' && openOd?.punchInTime && (
+                    <p className="text-sm text-on-surface-variant mt-xs">
+                      OD started at {new Date(openOd.punchInTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}.
+                    </p>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setOdMode(null)}
+                  className="w-8 h-8 rounded-full bg-surface-container-low text-on-surface-variant hover:bg-surface-container-high transition-colors"
+                  aria-label="Close OD form"
+                >
+                  <span className="material-symbols-outlined text-[18px]">close</span>
+                </button>
+              </div>
+              <div className="mt-md space-y-sm">
+                <label className="block">
+                  <span className="font-label-caps text-[10px] text-on-surface-variant tracking-widest">
+                    {odMode === 'in' ? 'Punch In Time' : 'Punch Out Time'}
+                  </span>
+                  <input
+                    type="datetime-local"
+                    value={odMode === 'in' ? odPunchInTime : odPunchOutTime}
+                    onChange={(event) => odMode === 'in' ? setOdPunchInTime(event.target.value) : setOdPunchOutTime(event.target.value)}
+                    className="mt-1 w-full rounded-xl border border-outline-variant/50 bg-surface-container-low px-sm py-2 text-on-surface focus:border-primary focus:outline-none"
+                  />
+                </label>
+                <label className="block">
+                  <span className="font-label-caps text-[10px] text-on-surface-variant tracking-widest">OD Note</span>
+                  <input
+                    value={odReason}
+                    onChange={(event) => setOdReason(event.target.value)}
+                    placeholder="Client visit, field work, travel..."
+                    className="mt-1 w-full rounded-xl border border-outline-variant/50 bg-surface-container-low px-sm py-2 text-on-surface placeholder:text-on-surface-variant/50 focus:border-primary focus:outline-none"
+                  />
+                </label>
+              </div>
+              <div className="mt-lg flex gap-sm justify-end">
+                <button
+                  type="button"
+                  onClick={() => setOdMode(null)}
+                  className="px-4 py-2 rounded-full border border-outline-variant/50 text-on-surface-variant hover:bg-surface-container-low transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={odMode === 'in' ? submitOdPunchIn : submitOdPunchOut}
+                  disabled={odSubmitting}
+                  className="px-5 py-2 rounded-full bg-primary text-on-primary font-bold disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {odSubmitting ? 'Saving...' : odMode === 'in' ? 'Save OD In' : 'Save OD Out'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* ── Page title row ── */}
         <div className="flex items-start justify-between gap-4 flex-wrap pt-1">
@@ -354,7 +506,7 @@ export function StitchPage({ config }: { config: StitchPageConfig }) {
             </h1>
             <p className="text-[13px] text-on-surface-variant mt-0.5">{config.description}</p>
           </div>
-          <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold ${
+          {!isAshwani && <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold ${
             isPunchedIn  ? 'bg-success/10 text-success border border-success/20' :
             isPunchedOut ? 'bg-secondary/10 text-secondary border border-secondary/20' :
             todayQuery.isLoading ? 'bg-on-surface-variant/8 text-on-surface-variant border border-card-border' :
@@ -364,7 +516,7 @@ export function StitchPage({ config }: { config: StitchPageConfig }) {
               isPunchedIn ? 'bg-success animate-pulse' : isPunchedOut ? 'bg-secondary' : 'bg-tertiary/50'
             }`} />
             {todayQuery.isLoading ? 'Syncing…' : isPunchedIn ? 'Punched In' : isPunchedOut ? 'Punched Out' : 'Not Punched'}
-          </div>
+          </div>}
         </div>
 
         {actionNote && (
@@ -375,7 +527,7 @@ export function StitchPage({ config }: { config: StitchPageConfig }) {
         )}
 
         {/* ── Hero punch card ── */}
-        <div
+        {!isAshwani && <div
           className="rounded-2xl p-5 relative overflow-hidden"
           style={{
             background: 'linear-gradient(135deg, rgba(170,48,0,0.08) 0%, rgba(1,103,125,0.06) 60%, rgba(250,248,255,0) 100%)',
@@ -412,16 +564,18 @@ export function StitchPage({ config }: { config: StitchPageConfig }) {
 
             {/* Right — action buttons */}
             <div className="flex flex-row sm:flex-row flex-wrap gap-2 w-full md:w-auto">
-              {(config.actions ?? []).slice(0, 3).map((rawAction, index) => {
+              {visibleActions.slice(0, 4).map((rawAction, index) => {
                 // Dynamically swap "Punch In" → "Punch Out" when user is already clocked in
                 const action = (index === 0 && rawAction === 'Punch In' && isPunchedIn) ? 'Punch Out' : rawAction;
                 const icon = actionIcons[action] ?? (index === 0 ? 'fingerprint' : 'arrow_forward');
                 const isPrimary = index === 0;
+                const isDisabled = !!openOd?.id && (action === 'Punch In' || action === 'Punch Out');
                 return (
                   <button
                     key={rawAction}
                     onClick={() => runAction(action)}
-                    className="flex items-center justify-center gap-1.5 px-3 py-2.5 sm:px-5 sm:py-3 rounded-xl text-[12px] sm:text-[13.5px] font-bold transition-all duration-150 active:scale-95 flex-1 sm:flex-none"
+                    disabled={isDisabled}
+                    className="flex items-center justify-center gap-1.5 px-3 py-2.5 sm:px-5 sm:py-3 rounded-xl text-[12px] sm:text-[13.5px] font-bold transition-all duration-150 active:scale-95 flex-1 sm:flex-none disabled:opacity-50 disabled:cursor-not-allowed"
                     style={isPrimary ? (
                       action === 'Punch Out'
                         ? { background: 'linear-gradient(135deg, #01677d 0%, #015f73 100%)', color: '#fff', boxShadow: '0 4px 16px rgba(1,103,125,0.30)' }
@@ -445,11 +599,11 @@ export function StitchPage({ config }: { config: StitchPageConfig }) {
               })}
             </div>
           </div>
-        </div>
+        </div>}
 
         {/* ── Quick stat chips ── */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {config.metrics.map(metric => {
+          {visibleMetrics.map(metric => {
             const accent = metric.tone === 'primary' ? '#aa3000' : metric.tone === 'tertiary' ? '#01677d' : metric.tone === 'error' ? '#ba1a1a' : '#59413a';
             return (
               <div
@@ -568,12 +722,12 @@ export function StitchPage({ config }: { config: StitchPageConfig }) {
           {actionNote}
         </div>
       )}
-      {punchType && <PunchModal punchType={punchType} onClose={() => setPunchType(null)} />}
+      {!isAshwani && punchType && <PunchModal punchType={punchType} onClose={() => setPunchType(null)} />}
         <div className="flex flex-col xl:grid xl:grid-cols-[300px_1fr] gap-lg">
           <aside className="flex flex-col gap-md">
             {aiPanelCompact}
             <div className="glass-card rounded-xl p-sm flex flex-col gap-xs">
-              {(config.actions ?? []).map((action) => (
+              {visibleActions.map((action) => (
                 <button key={action} onClick={() => runAction(action)} className="flex items-center justify-between rounded-lg bg-surface-container-lowest px-sm py-3 text-left font-label-caps text-label-caps text-primary hover:bg-surface-container-high cursor-pointer">
                   {action}
                   <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
@@ -616,9 +770,9 @@ export function StitchPage({ config }: { config: StitchPageConfig }) {
           {actionNote}
         </div>
       )}
-      {punchType && <PunchModal punchType={punchType} onClose={() => setPunchType(null)} />}
+      {!isAshwani && punchType && <PunchModal punchType={punchType} onClose={() => setPunchType(null)} />}
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-sm">
-          {config.metrics.map((metric) => (
+          {visibleMetrics.map((metric) => (
             <div key={metric.label} className="glass-card rounded-xl p-md min-h-[150px] flex flex-col justify-between">
               <span className="material-symbols-outlined text-primary">{metric.icon}</span>
               <div>
@@ -666,7 +820,7 @@ export function StitchPage({ config }: { config: StitchPageConfig }) {
           {actionNote}
         </div>
       )}
-      {punchType && <PunchModal punchType={punchType} onClose={() => setPunchType(null)} />}
+      {!isAshwani && punchType && <PunchModal punchType={punchType} onClose={() => setPunchType(null)} />}
         <div className="flex flex-col xl:grid xl:grid-cols-[1fr_380px] gap-lg">
           <section className="glass-card rounded-xl p-md">
             <h3 className="font-label-caps text-label-caps text-on-surface-variant mb-md tracking-widest">TIMELINE</h3>
@@ -707,7 +861,7 @@ export function StitchPage({ config }: { config: StitchPageConfig }) {
           {actionNote}
         </div>
       )}
-      {punchType && <PunchModal punchType={punchType} onClose={() => setPunchType(null)} />}
+      {!isAshwani && punchType && <PunchModal punchType={punchType} onClose={() => setPunchType(null)} />}
         <div className="flex flex-col xl:grid xl:grid-cols-[280px_1fr_280px] gap-md min-h-[500px] xl:min-h-[640px]">
           <aside className="glass-card rounded-xl overflow-hidden">
             <div className="p-md border-b border-outline-variant/30">
@@ -762,7 +916,7 @@ export function StitchPage({ config }: { config: StitchPageConfig }) {
           {actionNote}
         </div>
       )}
-      {punchType && <PunchModal punchType={punchType} onClose={() => setPunchType(null)} />}
+      {!isAshwani && punchType && <PunchModal punchType={punchType} onClose={() => setPunchType(null)} />}
       {layout === 'command' ? aiPanel : metricGrid}
       {layout === 'command' ? metricGrid : aiPanel}
 
@@ -791,7 +945,7 @@ export function StitchPage({ config }: { config: StitchPageConfig }) {
             ))}
           </div>
           <div className="glass-card rounded-xl p-sm flex flex-wrap gap-xs mt-xs">
-            {(config.actions ?? ['Export', 'Review', 'Notify']).map((action) => (
+            {(visibleActions.length ? visibleActions : ['Export', 'Review', 'Notify']).map((action) => (
               <button key={action} onClick={() => runAction(action)} className="text-label-caps font-label-caps text-primary border border-outline-variant px-3 py-2 rounded-full hover:bg-surface-container-high transition-colors cursor-pointer">
                 {action}
               </button>

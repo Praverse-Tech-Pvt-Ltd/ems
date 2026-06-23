@@ -1,7 +1,7 @@
 import {
   Controller, Get, Post, Patch, Delete, Body, Param, Query,
   UseGuards, HttpCode, HttpStatus,
-  UploadedFile, UseInterceptors,
+  UploadedFile, UseInterceptors, BadRequestException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
@@ -13,6 +13,19 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+
+const ALLOWED_MIME_TYPES = [
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'text/plain',
+];
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 
 @ApiTags('Employees')
 @ApiBearerAuth()
@@ -52,13 +65,24 @@ export class EmployeesController {
   }
 
   @Post('me/documents/upload')
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileInterceptor('file', {
+    limits: { fileSize: MAX_FILE_SIZE },
+    fileFilter: (_req, file, cb) => {
+      if (!ALLOWED_MIME_TYPES.includes(file.mimetype)) {
+        return cb(new BadRequestException(
+          `File type not allowed. Allowed: PDF, Word, Excel, images, text.`
+        ), false);
+      }
+      cb(null, true);
+    },
+  }))
   @ApiOperation({ summary: 'Upload own onboarding document file' })
   uploadMyDocument(
     @CurrentUser() user: { id: string },
     @UploadedFile() file: Express.Multer.File,
     @Body('docType') docType: string,
   ) {
+    if (!file) throw new BadRequestException('No file provided');
     return this.service.uploadMyDocument(user.id, docType, file);
   }
 

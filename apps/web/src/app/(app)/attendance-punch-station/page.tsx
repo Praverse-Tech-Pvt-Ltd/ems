@@ -24,7 +24,7 @@ const STATUS_COLOR: Record<string, string> = {
   WFH: 'bg-[#7c3aed] text-white',
   LEAVE: 'bg-on-surface-variant text-inverse-on-surface',
   HOLIDAY: 'bg-tertiary-fixed-dim text-on-tertiary-fixed',
-  MISSING_PUNCH_OUT: 'bg-error/20 text-error',
+  MISSING_PUNCH_OUT: 'bg-error-container text-on-error-container border border-error/20',
 };
 
 // WFH #7c3aed (purple) + HALF_DAY #01677d (teal secondary)
@@ -42,7 +42,7 @@ const CALENDAR_MARK: Record<AttendanceStatus, string> = {
   WFH: 'bg-[#7c3aed] text-white border-[#7c3aed]',
   LEAVE: 'bg-on-surface-variant text-inverse-on-surface border-on-surface-variant',
   HOLIDAY: 'bg-tertiary-fixed-dim text-on-tertiary-fixed border-tertiary-fixed-dim',
-  MISSING_PUNCH_OUT: 'bg-error/10 text-error border-error/30',
+  MISSING_PUNCH_OUT: 'bg-error-container/50 text-on-error-container border-error/30',
 };
 
 const WEEKEND_MARK = 'bg-surface-container-highest text-on-surface-variant border-outline-variant';
@@ -69,6 +69,11 @@ function monthBounds(month: Date) {
   const first = new Date(month.getFullYear(), month.getMonth(), 1);
   const last = new Date(month.getFullYear(), month.getMonth() + 1, 0);
   return { from: dateKey(first), to: dateKey(last) };
+}
+
+function toDateTimeLocalValue(date: Date) {
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 16);
 }
 
 function buildCalendarDays(month: Date) {
@@ -111,25 +116,39 @@ export default function AttendancePunchStationPage() {
   const [stats, setStats] = useState<any>(null);
   const [allRecords, setAllRecords] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [holidays, setHolidays] = useState<any[]>([]);
   const [punching, setPunching] = useState(false);
-  const [isScanning, setIsScanning] = useState(false);
-  const [scanProgress, setScanProgress] = useState(0);
+  const [odRecord, setOdRecord] = useState<any>(null);
+  const [odMode, setOdMode] = useState<'in' | 'out' | null>(null);
+  const [odPunchInTime, setOdPunchInTime] = useState(() => toDateTimeLocalValue(new Date()));
+  const [odPunchOutTime, setOdPunchOutTime] = useState(() => toDateTimeLocalValue(new Date()));
+  const [odReason, setOdReason] = useState('');
+  const [odSubmitting, setOdSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
   const load = async () => {
     try {
       const { from, to } = monthBounds(calendarMonth);
-      const [todayData, statsData, recordsData, calendarData] = await Promise.all([
+      const [todayData, statsData, recordsData, calendarData, holidaysData, openOdData] = await Promise.all([
         attendanceService.today().catch(() => null),
         attendanceService.myStats().catch(() => null),
         attendanceService.my({ limit: 14 }).catch(() => []),
         attendanceService.my({ from, to }).catch(() => []),
+        attendanceService.holidays().catch(() => []),
+        attendanceService.openOd().catch(() => null),
       ]);
       setToday(todayData);
       setStats(statsData);
       setRecords(Array.isArray(recordsData) ? recordsData : recordsData?.data ?? []);
       setCalendarRecords(Array.isArray(calendarData) ? calendarData : calendarData?.data ?? []);
+      setHolidays(Array.isArray(holidaysData) ? holidaysData : holidaysData?.data ?? []);
+      setOdRecord(openOdData);
+      if (openOdData?.id) {
+        setOdMode('out');
+        setOdPunchOutTime(toDateTimeLocalValue(new Date()));
+        setOdReason(openOdData.manualPunchReason === 'OD' ? '' : openOdData.manualPunchReason ?? '');
+      }
 
       if (isAdmin) {
         const all = await attendanceService.all().catch(() => []);
@@ -148,28 +167,8 @@ export default function AttendancePunchStationPage() {
   const isPunchedOut = today?.punchInTime && today?.punchOutTime;
 
   const handlePunch = async () => {
-    setIsScanning(true);
-    setScanProgress(0);
     setError('');
     setSuccess('');
-
-    // Simulated holographic face scan loop
-    const scanPromise = new Promise<void>((resolve) => {
-      const interval = setInterval(() => {
-        setScanProgress((p) => {
-          if (p >= 100) {
-            clearInterval(interval);
-            setIsScanning(false);
-            resolve();
-            return 0;
-          }
-          return p + 10;
-        });
-      }, 150);
-    });
-
-    await scanPromise;
-
     setPunching(true);
     try {
       let pos: GeolocationPosition | null = null;
@@ -184,13 +183,59 @@ export default function AttendancePunchStationPage() {
         setSuccess('Punched out successfully!');
       } else {
         await attendanceService.punchIn(pos?.coords.latitude, pos?.coords.longitude);
-        setSuccess('Punched in successfully with face verification!');
+        setSuccess('Punched in successfully!');
       }
       await load();
     } catch (e: any) {
       setError(e?.response?.data?.message ?? 'Punch failed. Please try again.');
     } finally {
       setPunching(false);
+    }
+  };
+
+  const openOdPunchIn = () => {
+    setError('');
+    setSuccess('');
+    setOdMode('in');
+    setOdPunchInTime(toDateTimeLocalValue(new Date()));
+    setOdReason('');
+  };
+
+  const submitOdPunchIn = async () => {
+    setError('');
+    setSuccess('');
+    setOdSubmitting(true);
+    try {
+      await attendanceService.odPunchIn({
+        punchInTime: new Date(odPunchInTime).toISOString(),
+        reason: odReason || undefined,
+      });
+      setSuccess('OD punch-in time saved. Add punch-out time when duty is complete.');
+      setOdMode(null);
+      await load();
+    } catch (e: any) {
+      setError(e?.response?.data?.message ?? 'Could not save OD punch-in.');
+    } finally {
+      setOdSubmitting(false);
+    }
+  };
+
+  const submitOdPunchOut = async () => {
+    setError('');
+    setSuccess('');
+    setOdSubmitting(true);
+    try {
+      await attendanceService.odPunchOut({
+        punchOutTime: new Date(odPunchOutTime).toISOString(),
+        reason: odReason || undefined,
+      });
+      setSuccess('OD punch-out time saved.');
+      setOdMode(null);
+      await load();
+    } catch (e: any) {
+      setError(e?.response?.data?.message ?? 'Could not save OD punch-out.');
+    } finally {
+      setOdSubmitting(false);
     }
   };
 
@@ -206,7 +251,12 @@ export default function AttendancePunchStationPage() {
     return `${hrs}h ${mins}m`;
   };
 
-  const last7 = records.slice(0, 7);
+  const statusLabel = (rec: any) => {
+    if (rec?.notes === 'OD') return 'OD';
+    if (rec?.status === 'MISSING_PUNCH_OUT') return 'Missing punch';
+    return rec?.status?.replaceAll('_', ' ') ?? 'NOT MARKED';
+  };
+
   const calendarDays = useMemo(() => buildCalendarDays(calendarMonth), [calendarMonth]);
   const recordsByDate = useMemo(() => {
     return calendarRecords.reduce<Record<string, AttendanceRecord>>((acc, rec) => {
@@ -214,9 +264,17 @@ export default function AttendancePunchStationPage() {
       return acc;
     }, {});
   }, [calendarRecords]);
+  const holidaysByDate = useMemo(() => {
+    return holidays.reduce<Record<string, any>>((acc, h) => {
+      acc[dateKey(h.date)] = h;
+      return acc;
+    }, {});
+  }, [holidays]);
   const selectedRecord = recordsByDate[selectedDate];
+  const selectedHoliday = holidaysByDate[selectedDate];
+  const selectedIsHoliday = !!selectedHoliday && !selectedRecord;
   const saturdayOff = hasSaturdayOff(user);
-  const selectedIsWeekendOff = isWeekendOff(new Date(selectedDate), saturdayOff) && !selectedRecord;
+  const selectedIsWeekendOff = isWeekendOff(new Date(selectedDate), saturdayOff) && !selectedRecord && !selectedHoliday;
   const monthLabel = calendarMonth.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
   const changeMonth = (delta: number) => {
     setCalendarMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + delta, 1));
@@ -245,17 +303,12 @@ export default function AttendancePunchStationPage() {
       {/* Clock + Punch */}
       <div className="grid grid-cols-1 lg:grid-cols-[1.5fr_1fr] gap-lg">
         <div className="glass-card rounded-2xl p-xl border border-outline-variant/30 flex flex-col items-center justify-center gap-md text-center relative overflow-hidden min-h-[300px]">
-          {/* Holographic scanner overlay */}
-          {isScanning && (
-            <div className="absolute inset-0 bg-background/95 dark:bg-[#0b111e]/95 backdrop-blur-sm z-20 flex flex-col items-center justify-center p-4">
-              <div
-                className="w-full h-[2px] bg-gradient-to-r from-transparent via-primary/60 to-transparent absolute shadow-[0_0_12px_rgba(170,48,0,0.6)]"
-                style={{ top: `${scanProgress}%`, transition: 'top 0.15s ease-out' }}
-              ></div>
-              <span className="material-symbols-outlined text-primary text-5xl animate-pulse mb-sm">face</span>
-              <span className="font-label-caps text-label-caps text-primary tracking-widest text-[11px] font-bold font-mono">
-                AWS REKOGNITION VERIFICATION... {scanProgress}%
-              </span>
+          {odRecord?.id && (
+            <div className="w-full max-w-sm rounded-2xl bg-primary/10 border border-primary/20 px-md py-sm text-left">
+              <p className="text-xs font-black text-primary tracking-widest">OD PUNCH-OUT PENDING</p>
+              <p className="text-sm text-on-surface-variant mt-1">
+                Add your OD punch-out time to complete the entry from {fmtTime(odRecord.punchInTime)}.
+              </p>
             </div>
           )}
 
@@ -277,7 +330,7 @@ export default function AttendancePunchStationPage() {
               <div className="flex flex-col gap-sm w-full max-w-sm">
                 <button
                   onClick={handlePunch}
-                  disabled={punching || isScanning || isPunchedOut}
+                  disabled={punching || isPunchedOut || !!odRecord}
                   className={`w-full py-4 rounded-full font-title-md text-title-md transition-all flex items-center justify-center gap-sm disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 ${
                     isPunchedIn
                       ? 'bg-error text-on-error hover:opacity-90 shadow-[0_0_20px_rgba(186,26,26,0.25)]'
@@ -289,7 +342,18 @@ export default function AttendancePunchStationPage() {
                   <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>
                     {punching ? 'hourglass_empty' : isPunchedIn ? 'logout' : isPunchedOut ? 'check_circle' : 'login'}
                   </span>
-                  {punching ? 'Processing...' : isPunchedIn ? 'Punch Out' : isPunchedOut ? 'Punched Out' : 'Punch In with Face Match'}
+                  {punching ? 'Processing...' : isPunchedIn ? 'Punch Out' : isPunchedOut ? 'Punched Out' : 'Punch In'}
+                </button>
+                <button
+                  type="button"
+                  onClick={odRecord?.id ? () => setOdMode('out') : openOdPunchIn}
+                  disabled={punching || (!odRecord?.id && (isPunchedIn || isPunchedOut))}
+                  className="w-full py-3 rounded-full font-title-md text-title-md transition-all flex items-center justify-center gap-sm border border-outline-variant/50 bg-surface-container-low text-on-surface hover:bg-surface-container disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>
+                    {odRecord?.id ? 'edit_note' : 'work_history'}
+                  </span>
+                  {odRecord?.id ? 'Add OD Punch Out' : 'OD'}
                 </button>
               </div>
               {stats && (
@@ -330,7 +394,7 @@ export default function AttendancePunchStationPage() {
                     <p className="text-[10px] text-on-surface-variant font-label-caps tracking-widest">{item.label}</p>
                     {item.badge && today?.status ? (
                       <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-xs font-bold ${STATUS_COLOR[today.status] ?? 'bg-surface-container-high text-on-surface'}`}>
-                        {today.status}
+                        {statusLabel(today)}
                       </span>
                     ) : (
                       <p className="font-bold text-on-surface mt-0.5">{item.value as string}</p>
@@ -353,6 +417,78 @@ export default function AttendancePunchStationPage() {
           </div>
         </div>
       </div>
+
+      {odMode && (
+        <div className="fixed inset-0 z-50 bg-scrim/40 backdrop-blur-sm flex items-center justify-center p-md">
+          <div className="w-full max-w-md rounded-2xl bg-surface-container-lowest border border-outline-variant/40 shadow-xl p-lg">
+            <div className="flex items-start justify-between gap-md">
+              <div>
+                <p className="font-label-caps text-label-caps text-primary tracking-widest">
+                  {odMode === 'in' ? 'OD PUNCH IN' : 'OD PUNCH OUT'}
+                </p>
+                <h3 className="font-title-lg text-title-lg text-on-surface mt-xs">
+                  {odMode === 'in' ? 'Enter OD start time' : 'Complete OD entry'}
+                </h3>
+                {odMode === 'out' && odRecord?.punchInTime && (
+                  <p className="text-sm text-on-surface-variant mt-xs">
+                    OD started at {fmtTime(odRecord.punchInTime)}.
+                  </p>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => setOdMode(null)}
+                className="w-8 h-8 rounded-full bg-surface-container-low text-on-surface-variant hover:bg-surface-container-high transition-colors"
+                aria-label="Close OD form"
+              >
+                <span className="material-symbols-outlined text-[18px]">close</span>
+              </button>
+            </div>
+
+            <div className="mt-md space-y-sm">
+              <label className="block">
+                <span className="font-label-caps text-[10px] text-on-surface-variant tracking-widest">
+                  {odMode === 'in' ? 'Punch In Time' : 'Punch Out Time'}
+                </span>
+                <input
+                  type="datetime-local"
+                  value={odMode === 'in' ? odPunchInTime : odPunchOutTime}
+                  onChange={(event) => odMode === 'in' ? setOdPunchInTime(event.target.value) : setOdPunchOutTime(event.target.value)}
+                  className="mt-1 w-full rounded-xl border border-outline-variant/50 bg-surface-container-low px-sm py-2 text-on-surface focus:border-primary focus:outline-none"
+                />
+              </label>
+
+              <label className="block">
+                <span className="font-label-caps text-[10px] text-on-surface-variant tracking-widest">OD Note</span>
+                <input
+                  value={odReason}
+                  onChange={(event) => setOdReason(event.target.value)}
+                  placeholder="Client visit, field work, travel..."
+                  className="mt-1 w-full rounded-xl border border-outline-variant/50 bg-surface-container-low px-sm py-2 text-on-surface placeholder:text-on-surface-variant/50 focus:border-primary focus:outline-none"
+                />
+              </label>
+            </div>
+
+            <div className="mt-lg flex gap-sm justify-end">
+              <button
+                type="button"
+                onClick={() => setOdMode(null)}
+                className="px-4 py-2 rounded-full border border-outline-variant/50 text-on-surface-variant hover:bg-surface-container-low transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={odMode === 'in' ? submitOdPunchIn : submitOdPunchOut}
+                disabled={odSubmitting}
+                className="px-5 py-2 rounded-full bg-primary text-on-primary font-bold disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {odSubmitting ? 'Saving...' : odMode === 'in' ? 'Save OD In' : 'Save OD Out'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Monthly calendar */}
       <div className="glass-card rounded-2xl p-lg border border-outline-variant/30">
@@ -406,14 +542,17 @@ export default function AttendancePunchStationPage() {
             <div className="grid grid-cols-7 gap-2">
               {calendarDays.map(day => {
                 const rec = recordsByDate[day.key];
-                const weekendOff = day.inMonth && !rec && isWeekendOff(day.date, saturdayOff);
+                const holiday = holidaysByDate[day.key];
+                const weekendOff = day.inMonth && !rec && !holiday && isWeekendOff(day.date, saturdayOff);
                 const isSelected = selectedDate === day.key;
                 const isSplitDay = rec?.notes === 'HALF_DAY_WFH';
                 const markClass = rec
                   ? (isSplitDay ? '' : CALENDAR_MARK[rec.status])
-                  : weekendOff
-                    ? WEEKEND_MARK
-                    : 'bg-surface-container-low text-on-surface-variant border-outline-variant/30';
+                  : holiday
+                    ? CALENDAR_MARK['HOLIDAY']
+                    : weekendOff
+                      ? WEEKEND_MARK
+                      : 'bg-surface-container-low text-on-surface-variant border-outline-variant/30';
 
                 return (
                   <button
@@ -422,7 +561,7 @@ export default function AttendancePunchStationPage() {
                     onClick={() => setSelectedDate(day.key)}
                     className={[
                       'min-h-[72px] rounded-2xl border p-2 text-left transition-all hover:-translate-y-0.5 hover:shadow-sm',
-                      day.inMonth ? (isSplitDay ? 'text-white' : markClass) : 'bg-transparent text-on-surface-variant/30 border-transparent',
+                      day.inMonth ? (isSplitDay ? 'text-white border-transparent' : markClass) : 'bg-transparent text-on-surface-variant/30 border-transparent',
                       isSelected ? 'ring-2 ring-primary ring-offset-2 ring-offset-background' : '',
                     ].join(' ')}
                     style={day.inMonth && isSplitDay ? SPLIT_WFH_HALFDAY_STYLE : undefined}
@@ -438,14 +577,20 @@ export default function AttendancePunchStationPage() {
                     {rec && (
                       <div className="mt-2 space-y-1">
                         <p className="text-[10px] font-black tracking-wide truncate">
-                          {isSplitDay ? 'WFH · HALF DAY' : rec.status.replaceAll('_', ' ')}
+                          {isSplitDay ? 'WFH · HALF DAY' : statusLabel(rec).toUpperCase()}
                         </p>
                         <p className="text-[10px] opacity-80 tabular-nums">{fmtHrs(rec.workingHours)}</p>
                       </div>
                     )}
+                    {holiday && !rec && (
+                      <div className="mt-2">
+                        <p className="text-[10px] font-black tracking-wide truncate text-on-tertiary-fixed">{holiday.title.toUpperCase()}</p>
+                        <p className="text-[9px] opacity-85 text-on-tertiary-fixed font-semibold">HOLIDAY</p>
+                      </div>
+                    )}
                     {weekendOff && (
                       <div className="mt-2">
-                        <p className="text-[10px] font-black tracking-wide truncate">WEEKEND OFF</p>
+                        <p className="text-[10px] font-black tracking-wide truncate text-on-surface-variant">WEEKEND OFF</p>
                       </div>
                     )}
                   </button>
@@ -471,7 +616,7 @@ export default function AttendancePunchStationPage() {
                   </div>
                 ) : (
                   <span className={`inline-flex px-3 py-1 rounded-full text-xs font-bold ${STATUS_COLOR[selectedRecord.status] ?? 'bg-surface-container-high text-on-surface'}`}>
-                    {selectedRecord.status.replaceAll('_', ' ')}
+                    {statusLabel(selectedRecord)}
                   </span>
                 )}
                 <div className="grid grid-cols-2 gap-sm">
@@ -487,6 +632,16 @@ export default function AttendancePunchStationPage() {
                     </div>
                   ))}
                 </div>
+              </div>
+            ) : selectedIsHoliday ? (
+              <div className="mt-md space-y-sm">
+                <span className="inline-flex px-3 py-1 rounded-full text-xs font-bold bg-tertiary-fixed-dim text-on-tertiary-fixed border border-tertiary-fixed-dim">
+                  HOLIDAY
+                </span>
+                <h5 className="font-bold text-on-surface text-sm mt-xs">{selectedHoliday?.title}</h5>
+                <p className="text-sm text-on-surface-variant">
+                  This day is marked as an official company holiday.
+                </p>
               </div>
             ) : selectedIsWeekendOff ? (
               <div className="mt-md space-y-sm">
@@ -525,57 +680,6 @@ export default function AttendancePunchStationPage() {
         </div>
       </div>
 
-      {/* Recent records */}
-      <div>
-        <p className="font-label-caps text-label-caps text-on-surface-variant tracking-widest mb-sm">RECENT RECORDS</p>
-        {loading ? (
-          <div className="flex flex-col gap-xs">
-            {[1, 2, 3, 4, 5].map(i => <div key={i} className="h-14 rounded-xl bg-surface-container-high animate-pulse" />)}
-          </div>
-        ) : last7.length === 0 ? (
-          <div className="glass-card rounded-xl p-lg text-center text-on-surface-variant border border-outline-variant/30">
-            No attendance records found.
-          </div>
-        ) : (
-          <div className="glass-card rounded-xl overflow-hidden border border-outline-variant/30">
-            <div className="divide-y divide-outline-variant/20">
-              {last7.map(rec => (
-                <div key={rec.id} className="flex items-center gap-md p-sm hover:bg-surface-container-low transition-colors">
-                  <div className="w-16 shrink-0">
-                    <p className="font-semibold text-on-surface text-sm">
-                      {new Date(rec.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', timeZone: 'Asia/Kolkata' })}
-                    </p>
-                    <p className="text-[10px] text-on-surface-variant">
-                      {new Date(rec.date).toLocaleDateString('en-IN', { weekday: 'short', timeZone: 'Asia/Kolkata' })}
-                    </p>
-                  </div>
-                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${STATUS_COLOR[rec.status] ?? 'bg-surface-container-high text-on-surface-variant'}`}>
-                    {rec.status}
-                  </span>
-                  <div className="flex-1 grid grid-cols-3 gap-sm text-center">
-                    <div>
-                      <p className="text-[9px] text-on-surface-variant">In</p>
-                      <p className="text-xs font-semibold text-on-surface">{fmtTime(rec.punchInTime)}</p>
-                    </div>
-                    <div>
-                      <p className="text-[9px] text-on-surface-variant">Out</p>
-                      <p className="text-xs font-semibold text-on-surface">{fmtTime(rec.punchOutTime)}</p>
-                    </div>
-                    <div>
-                      <p className="text-[9px] text-on-surface-variant">Hours</p>
-                      <p className="text-xs font-semibold text-on-surface">{fmtHrs(rec.workingHours)}</p>
-                    </div>
-                  </div>
-                  {rec.isRegularized && (
-                    <span className="text-[9px] bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded-full shrink-0">Regularized</span>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-
       {/* Admin view: all team records */}
       {isAdmin && allRecords.length > 0 && (
         <div>
@@ -592,7 +696,7 @@ export default function AttendancePunchStationPage() {
                     <p className="text-[10px] text-on-surface-variant">{rec.employee?.designation ?? rec.employee?.role}</p>
                   </div>
                   <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${STATUS_COLOR[rec.status] ?? 'bg-surface-container-high text-on-surface-variant'}`}>
-                    {rec.status}
+                    {statusLabel(rec)}
                   </span>
                   <p className="text-body-sm text-on-surface-variant hidden md:block">{fmtTime(rec.punchInTime)} → {fmtTime(rec.punchOutTime)}</p>
                   <p className="font-semibold text-on-surface text-sm hidden md:block">{fmtHrs(rec.workingHours)}</p>

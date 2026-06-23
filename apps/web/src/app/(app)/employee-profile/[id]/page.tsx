@@ -422,6 +422,7 @@ export default function EmployeeProfilePage() {
   const rawId     = params?.id as string;
   const isSelf    = rawId === 'me' || rawId === me?.id;
   const isAdmin   = ['ADMIN', 'SUPER_ADMIN'].includes(me?.role ?? '');
+  const isAshwaniSelf = isSelf && me?.email?.toLowerCase() === 'ashwani@nexgenpharmasolutions.com';
 
   const [emp,       setEmp]       = useState<Employee | null>(null);
   const [stats,     setStats]     = useState<AttendanceStats | null>(null);
@@ -441,7 +442,7 @@ export default function EmployeeProfilePage() {
           : await employeesService.byId(rawId);
         setEmp(empData);
 
-        if (isSelf) {
+        if (isSelf && !isAshwaniSelf) {
           const [s, b] = await Promise.allSettled([
             attendanceService.myStats(),
             leavesService.balance(),
@@ -602,7 +603,7 @@ export default function EmployeeProfilePage() {
             </div>
 
             {/* Stats row — self only */}
-            {isSelf && (
+            {isSelf && !isAshwaniSelf && (
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {[
                   { label: 'Attendance', value: attendancePct != null ? `${attendancePct.toFixed(1)}%` : '—', icon: 'fingerprint', accent: '#01677d', sub: stats ? `${stats.daysPresent}/${stats.totalWorkingDays} days` : 'This month' },
@@ -706,7 +707,7 @@ export default function EmployeeProfilePage() {
                   <div className="flex flex-col gap-2">
                     {[
                       { label: 'Send Message',   icon: 'forum',           href: '/messaging-chat-hub',        accent: '#01677d' },
-                      { label: 'View Attendance',icon: 'fingerprint',      href: isSelf ? '/attendance-punch-station' : null, accent: '#aa3000' },
+                      ...(!isAshwaniSelf ? [{ label: 'View Attendance', icon: 'fingerprint', href: isSelf ? '/attendance-punch-station' : null, accent: '#aa3000' }] : []),
                       ...(isSelf ? [{ label: 'Apply for Leave', icon: 'event_available', href: '/leave-center', accent: '#059669' }] : []),
                     ].map(a => (
                       <button key={a.label}

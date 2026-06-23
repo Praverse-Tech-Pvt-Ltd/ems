@@ -6,6 +6,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import Image from 'next/image';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '@/store/auth.store';
 import { apiClient } from '@/lib/api-client';
 import { AlertCircle, Eye, EyeOff, ArrowLeft, CheckCircle, MapPin, Wallet, Bell, BarChart2 } from 'lucide-react';
@@ -204,6 +205,7 @@ function SubmitBtn({ label, loadingLabel, loading }: { label: string; loadingLab
 ═══════════════════════════════════════════════════════════════════ */
 export default function LoginPage() {
   const router  = useRouter();
+  const queryClient = useQueryClient();
   const setAuth = useAuthStore((s) => s.setAuth);
 
   const [view, setView]           = useState<'login' | 'forgot'>('login');
@@ -219,6 +221,7 @@ export default function LoginPage() {
     setLoading(true); setError('');
     try {
       const res = await apiClient.post('/auth/login', data);
+      queryClient.clear();
       setAuth(res.data.accessToken, res.data.user);
       router.push('/employee-my-workday');
     } catch (err: unknown) {

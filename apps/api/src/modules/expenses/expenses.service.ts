@@ -38,7 +38,7 @@ export class ExpensesService {
     });
   }
 
-  async findAll(status?: string, employeeId?: string) {
+  async findAll(user: { id: string; role: string }, status?: string, employeeId?: string) {
     if (status && !VALID_EXPENSE_STATUSES.has(status)) {
       throw new BadRequestException(`Invalid status value: ${status}`);
     }
@@ -46,9 +46,36 @@ export class ExpensesService {
     if (status) {
       where.status = status as ExpenseStatus;
     }
-    if (employeeId) {
-      where.employeeId = employeeId;
+
+    if (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN') {
+      if (employeeId) {
+        where.employeeId = employeeId;
+      }
+    } else if (user.role === 'MANAGER') {
+      if (employeeId) {
+        if (employeeId !== user.id) {
+          const employee = await this.prisma.employee.findUnique({
+            where: { id: employeeId },
+            select: { managerId: true },
+          });
+          if (employee?.managerId !== user.id) {
+            throw new ForbiddenException('Access denied');
+          }
+        }
+        where.employeeId = employeeId;
+      } else {
+        where.OR = [
+          { employeeId: user.id },
+          { employee: { managerId: user.id } },
+        ];
+      }
+    } else {
+      if (employeeId && employeeId !== user.id) {
+        throw new ForbiddenException('Access denied');
+      }
+      where.employeeId = user.id;
     }
+
     return this.prisma.expense.findMany({
       where,
       include: {
@@ -90,6 +117,7 @@ export class ExpensesService {
   async approveL1(
     id: string,
     approverId: string,
+    approverRole: string,
     action: 'approve' | 'reject',
     reason?: string,
   ) {
@@ -99,6 +127,17 @@ export class ExpensesService {
     }
     if (expense.employeeId === approverId) {
       throw new ForbiddenException('You cannot approve your own expense');
+    }
+
+    const isPrivileged = approverRole === 'ADMIN' || approverRole === 'SUPER_ADMIN';
+    if (!isPrivileged) {
+      const employee = await this.prisma.employee.findUnique({
+        where: { id: expense.employeeId },
+        select: { managerId: true },
+      });
+      if (employee?.managerId !== approverId) {
+        throw new ForbiddenException('You are not authorized to approve this expense claim');
+      }
     }
 
     return this.prisma.expense.update({

@@ -175,10 +175,16 @@ export class EmployeesService {
   }
 
   async findOne(id: string, currentUser?: { id: string; role: string }) {
+    const employeeToCheck = await this.prisma.employee.findUnique({
+      where: { id },
+      select: { managerId: true },
+    });
+    if (!employeeToCheck) throw new NotFoundException('Employee not found');
+
     const isPrivileged = currentUser && (
       currentUser.role === 'ADMIN' ||
       currentUser.role === 'SUPER_ADMIN' ||
-      currentUser.role === 'MANAGER' ||
+      (currentUser.role === 'MANAGER' && employeeToCheck.managerId === currentUser.id) ||
       currentUser.id === id
     );
 
@@ -311,7 +317,11 @@ export class EmployeesService {
   }
 
   private encodeSensitive(value: string) {
-    const key = crypto.createHash('sha256').update(this.config.get<string>('ENCRYPTION_KEY') ?? 'dev').digest();
+    const encryptionKey = this.config.get<string>('ENCRYPTION_KEY');
+    if (!encryptionKey && process.env.NODE_ENV === 'production') {
+      throw new Error('ENCRYPTION_KEY is not configured in production environment');
+    }
+    const key = crypto.createHash('sha256').update(encryptionKey ?? 'dev').digest();
     const iv = crypto.randomBytes(12);
     const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
     const encrypted = Buffer.concat([cipher.update(value, 'utf8'), cipher.final()]);

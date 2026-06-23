@@ -15,6 +15,43 @@ const SLIP_STATUS_COLOR: Record<string, string> = {
   REJECTED:         'bg-error/10 text-error border-error/20',
 };
 
+type SalaryStructure = {
+  id: string;
+  basic: number | string;
+  hra: number | string;
+  allowances: number | string;
+  pfDeduction: number | string;
+  professionalTax: number | string;
+  tds: number | string;
+  effectiveFrom: string;
+  notes?: string | null;
+  employee?: {
+    firstName?: string;
+    lastName?: string;
+    employeeCode?: string;
+    email?: string;
+    designation?: string;
+    salaryGrade?: string | null;
+  };
+  approver?: {
+    firstName?: string;
+    lastName?: string;
+  } | null;
+};
+
+function formatMoney(value: number | string | undefined | null) {
+  return `INR ${Number(value ?? 0).toLocaleString('en-IN')}`;
+}
+
+function formatDate(value?: string) {
+  if (!value) return '-';
+  return new Date(value).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+function roundMoney(value: number) {
+  return Math.round(value * 100) / 100;
+}
+
 export default function SalaryPayslipsPage() {
   const user = useAuthStore(s => s.user);
   const isAdmin = ['ADMIN', 'SUPER_ADMIN'].includes(user?.role ?? '');
@@ -24,6 +61,7 @@ export default function SalaryPayslipsPage() {
   const [selectedYear] = useState(now.getFullYear());
   const [mySlips, setMySlips] = useState<SalarySlip[]>([]);
   const [allSlips, setAllSlips] = useState<any[]>([]);
+  const [structures, setStructures] = useState<SalaryStructure[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
@@ -34,6 +72,8 @@ export default function SalaryPayslipsPage() {
       if (isAdmin) {
         const all = await salaryService.allSlips({ month: selectedMonth, year: selectedYear }).catch(() => []);
         setAllSlips(Array.isArray(all) ? all : all?.data ?? []);
+        const structureRows = await salaryService.structures().catch(() => []);
+        setStructures(Array.isArray(structureRows) ? structureRows : structureRows?.data ?? []);
       }
     } finally {
       setLoading(false);
@@ -102,6 +142,110 @@ export default function SalaryPayslipsPage() {
           </button>
         ))}
       </div>
+
+      {/* Admin: salary structures */}
+      {isAdmin && (
+        <div className="bg-card border border-card-border rounded-3xl overflow-hidden shadow-sm">
+          <div className="p-5 border-b border-card-border flex items-center justify-between gap-4 flex-wrap">
+            <div>
+              <p className="font-label-caps text-label-caps text-on-surface-variant tracking-widest font-bold">
+                DETAILED SALARY STRUCTURES
+              </p>
+              <p className="text-xs text-on-surface-variant mt-1">
+                Current salary components and statutory split from employee documents and EMS payroll records.
+              </p>
+            </div>
+            <span className="text-[10px] font-bold text-on-surface-variant bg-surface-container-low border border-card-border px-3 py-1 rounded-full">
+              {structures.length} records
+            </span>
+          </div>
+
+          {loading ? (
+            <div className="p-4 space-y-2">
+              {[1, 2, 3].map(i => (
+                <div key={i} className="h-14 rounded-2xl bg-surface-container-highest animate-pulse" />
+              ))}
+            </div>
+          ) : structures.length === 0 ? (
+            <div className="p-lg text-center text-on-surface-variant text-sm">
+              No salary structures have been defined yet.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-surface-container-low text-on-surface-variant uppercase tracking-wider text-[9px]">
+                  <tr>
+                    <th className="px-4 py-3 font-bold">Employee</th>
+                    <th className="px-4 py-3 font-bold">Effective</th>
+                    <th className="px-4 py-3 font-bold">Basic</th>
+                    <th className="px-4 py-3 font-bold">HRA</th>
+                    <th className="px-4 py-3 font-bold">Allowances</th>
+                    <th className="px-4 py-3 font-bold">Gross</th>
+                    <th className="px-4 py-3 font-bold">Emp. PF</th>
+                    <th className="px-4 py-3 font-bold">Employer EPF</th>
+                    <th className="px-4 py-3 font-bold">Employer EPS</th>
+                    <th className="px-4 py-3 font-bold">Emp. ESIC</th>
+                    <th className="px-4 py-3 font-bold">Employer ESIC</th>
+                    <th className="px-4 py-3 font-bold">PT</th>
+                    <th className="px-4 py-3 font-bold">TDS</th>
+                    <th className="px-4 py-3 font-bold">Net Model</th>
+                    <th className="px-4 py-3 font-bold">Approved By</th>
+                    <th className="px-4 py-3 font-bold">Notes</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-card-border">
+                  {structures.map((structure) => {
+                    const basic = Number(structure.basic ?? 0);
+                    const hra = Number(structure.hra ?? 0);
+                    const allowances = Number(structure.allowances ?? 0);
+                    const pf = Number(structure.pfDeduction ?? 0);
+                    const pt = Number(structure.professionalTax ?? 0);
+                    const tds = Number(structure.tds ?? 0);
+                    const gross = basic + hra + allowances;
+                    const isIntern = structure.employee?.salaryGrade === 'INTERN' || /intern stipend/i.test(structure.notes ?? '');
+                    const pfWageBase = pf > 0 ? pf / 0.12 : Math.min(basic, 15000);
+                    const employerEps = pf > 0 ? Math.min(roundMoney(pfWageBase * 0.0833), 1250) : 0;
+                    const employerEpf = pf > 0 ? roundMoney(pf - employerEps) : 0;
+                    const employeeEsic = !isIntern && gross > 0 && gross <= 21000 ? roundMoney(gross * 0.0075) : 0;
+                    const employerEsic = !isIntern && gross > 0 && gross <= 21000 ? roundMoney(gross * 0.0325) : 0;
+                    const net = Math.max(roundMoney(gross - pf - employeeEsic - pt - tds), 0);
+                    const employeeName = `${structure.employee?.firstName ?? ''} ${structure.employee?.lastName ?? ''}`.trim() || 'Employee';
+                    const approverName = structure.approver
+                      ? `${structure.approver.firstName ?? ''} ${structure.approver.lastName ?? ''}`.trim()
+                      : '-';
+
+                    return (
+                      <tr key={structure.id} className="hover:bg-surface-container-low transition-colors align-top">
+                        <td className="px-4 py-3 min-w-[220px]">
+                          <div className="font-bold text-on-surface">{employeeName}</div>
+                          <div className="text-[10px] text-on-surface-variant mt-0.5">
+                            {structure.employee?.employeeCode ?? 'No code'} - {structure.employee?.designation ?? 'No designation'}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 font-mono text-on-surface whitespace-nowrap">{formatDate(structure.effectiveFrom)}</td>
+                        <td className="px-4 py-3 font-mono text-on-surface whitespace-nowrap">{formatMoney(basic)}</td>
+                        <td className="px-4 py-3 font-mono text-on-surface whitespace-nowrap">{formatMoney(hra)}</td>
+                        <td className="px-4 py-3 font-mono text-on-surface whitespace-nowrap">{formatMoney(allowances)}</td>
+                        <td className="px-4 py-3 font-mono text-secondary font-bold whitespace-nowrap">{formatMoney(gross)}</td>
+                        <td className="px-4 py-3 font-mono text-error whitespace-nowrap">{formatMoney(pf)}</td>
+                        <td className="px-4 py-3 font-mono text-on-surface whitespace-nowrap">{formatMoney(employerEpf)}</td>
+                        <td className="px-4 py-3 font-mono text-on-surface whitespace-nowrap">{formatMoney(employerEps)}</td>
+                        <td className="px-4 py-3 font-mono text-error whitespace-nowrap">{formatMoney(employeeEsic)}</td>
+                        <td className="px-4 py-3 font-mono text-on-surface whitespace-nowrap">{formatMoney(employerEsic)}</td>
+                        <td className="px-4 py-3 font-mono text-error whitespace-nowrap">{formatMoney(pt)}</td>
+                        <td className="px-4 py-3 font-mono text-error whitespace-nowrap">{formatMoney(tds)}</td>
+                        <td className="px-4 py-3 font-mono text-success font-bold whitespace-nowrap">{formatMoney(net)}</td>
+                        <td className="px-4 py-3 text-on-surface-variant whitespace-nowrap">{approverName || '-'}</td>
+                        <td className="px-4 py-3 text-on-surface-variant min-w-[260px]">{structure.notes ?? '-'}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Two Columns Dashboard */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-lg">

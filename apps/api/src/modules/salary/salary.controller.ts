@@ -11,6 +11,7 @@ import {
   UploadedFile,
   UseInterceptors,
   UseGuards,
+  BadRequestException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
@@ -105,13 +106,22 @@ export class SalaryController {
 
   @Post('payroll-runs/:id/reconcile')
   @Roles('ADMIN', 'SUPER_ADMIN')
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileInterceptor('file', {
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
+    fileFilter: (_req, file, cb) => {
+      if (file.mimetype !== 'application/pdf') {
+        return cb(new BadRequestException('Only PDF files are allowed for reconciliation'), false);
+      }
+      cb(null, true);
+    },
+  }))
   reconcilePayrollRun(
     @CurrentUser() user: { id: string },
     @Param('id', ParseUUIDPipe) id: string,
     @Body() body: ReconcilePayrollRunDto,
     @UploadedFile() file: Express.Multer.File,
   ) {
+    if (!file) throw new BadRequestException('No file provided');
     return this.service.reconcilePayrollRun(user.id, id, body.documentType, file);
   }
 
@@ -148,8 +158,12 @@ export class SalaryController {
   }
 
   @Get('slips/:id/pdf')
-  async pdf(@Param('id', ParseUUIDPipe) id: string, @Res() res: any) {
-    const buffer = await this.service.generatePdf(id);
+  async pdf(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: { id: string; role: string },
+    @Res() res: any,
+  ) {
+    const buffer = await this.service.generatePdf(id, user);
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename="salary-slip-${id}.pdf"`);
     res.end(buffer);

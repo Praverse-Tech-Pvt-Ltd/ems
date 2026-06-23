@@ -42,14 +42,11 @@ export class ExpensesController {
   @Get()
   @Roles('ADMIN', 'SUPER_ADMIN', 'MANAGER')
   findAll(
-    @CurrentUser() user: { id: string; email: string },
+    @CurrentUser() user: { id: string; role: string },
     @Query('status') status?: string,
     @Query('employeeId') employeeId?: string,
   ) {
-    if (employeeId && user.id !== employeeId && user.email !== 'pratham.s@nexgenpharmasolutions.com' && user.email !== 'ashwani@nexgenpharmasolutions.com') {
-      throw new ForbiddenException('Access denied');
-    }
-    return this.service.findAll(status, employeeId);
+    return this.service.findAll(user, status, employeeId);
   }
 
   /** Ownership-checked: employees can only see their own expense. */
@@ -65,10 +62,10 @@ export class ExpensesController {
   @Roles('MANAGER', 'ADMIN', 'SUPER_ADMIN')
   approveL1(
     @Param('id', ParseUUIDPipe) id: string,
-    @CurrentUser() user: { id: string },
+    @CurrentUser() user: { id: string; role: string },
     @Body() dto: ApproveExpenseDto,
   ) {
-    return this.service.approveL1(id, user.id, dto.action, dto.reason);
+    return this.service.approveL1(id, user.id, user.role, dto.action, dto.reason);
   }
 
   @Patch(':id/approve-finance')

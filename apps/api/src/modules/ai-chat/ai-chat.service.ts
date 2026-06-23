@@ -6,11 +6,6 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { NotificationsGateway } from '../notifications/notifications.gateway';
 import { CompanyCalendarService } from '../company-calendar/company-calendar.service';
 
-const OWNER_EMAILS = [
-  'ashwani@nexgenpharmasolutions.com',
-  'pratham.s@nexgenpharmasolutions.com',
-];
-
 @Injectable()
 export class AIChatService {
   constructor(
@@ -22,8 +17,8 @@ export class AIChatService {
     private companyCalendar: CompanyCalendarService,
   ) {}
 
-  private assertOwner(email: string) {
-    if (!OWNER_EMAILS.includes(email.toLowerCase())) {
+  private assertOwner(role: string) {
+    if (role !== 'SUPER_ADMIN') {
       throw new ForbiddenException('AI Chat is restricted to owners only');
     }
   }
@@ -589,8 +584,8 @@ export class AIChatService {
 
   }
 
-  async sendMessage(sessionId: string, question: string, userId: string, userEmail: string) {
-    this.assertOwner(userEmail);
+  async sendMessage(sessionId: string, question: string, userId: string, userRole: string) {
+    this.assertOwner(userRole);
 
     const recordedUpdate = await this.recordOperationalUpdate(question, userId);
     const actionConfirmation = await this.tryExecuteAction(question, userId);
@@ -625,16 +620,16 @@ OWNER'S QUESTION: ${question}`;
     return { answer, sessionId };
   }
 
-  async getHistory(sessionId: string, userId: string, userEmail: string) {
-    this.assertOwner(userEmail);
+  async getHistory(sessionId: string, userId: string, userRole: string) {
+    this.assertOwner(userRole);
     return this.prisma.aIChatMessage.findMany({
       where: { sessionId, createdBy: userId },
       orderBy: { createdAt: 'asc' },
     });
   }
 
-  async clearHistory(sessionId: string, userId: string, userEmail: string) {
-    this.assertOwner(userEmail);
+  async clearHistory(sessionId: string, userId: string, userRole: string) {
+    this.assertOwner(userRole);
     await this.prisma.aIChatMessage.deleteMany({
       where: { sessionId, createdBy: userId },
     });
