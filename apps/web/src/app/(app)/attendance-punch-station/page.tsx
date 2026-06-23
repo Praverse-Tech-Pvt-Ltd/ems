@@ -5,6 +5,7 @@ import { attendanceService } from '@/lib/api/attendance';
 import { useAuthStore } from '@/store/auth.store';
 import type { AttendanceRecord, AttendanceStatus } from '@/types';
 import { isAttendanceBlockedUser } from '@/lib/attendance-access';
+import { AdminAttendanceAdjustModal } from '@/components/AdminAttendanceAdjustModal';
 
 function Clock() {
   const [time, setTime] = useState('');
@@ -128,6 +129,7 @@ export default function AttendancePunchStationPage() {
   const [odSubmitting, setOdSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [adminModalOpen, setAdminModalOpen] = useState(false);
 
   const load = async () => {
     if (attendanceBlocked) {
@@ -326,6 +328,15 @@ export default function AttendancePunchStationPage() {
               {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Asia/Kolkata' })}
             </p>
           </div>
+          {['ADMIN', 'SUPER_ADMIN'].includes(user?.role ?? '') && (
+            <button
+              onClick={() => setAdminModalOpen(true)}
+              className="px-4 py-2 rounded-xl text-sm border border-outline-variant bg-surface-container-low text-on-surface hover:bg-surface-container hover:shadow-sm transition-all flex items-center gap-xs"
+            >
+              <span className="material-symbols-outlined text-[18px]">edit_calendar</span>
+              Admin Adjustment
+            </button>
+          )}
         </div>
       </div>
 
@@ -746,6 +757,13 @@ export default function AttendancePunchStationPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {adminModalOpen && (
+        <AdminAttendanceAdjustModal
+          onClose={() => setAdminModalOpen(false)}
+          onSuccess={load}
+        />
       )}
     </div>
   );

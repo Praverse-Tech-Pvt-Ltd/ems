@@ -11,6 +11,7 @@ import { GeoFenceService } from './geo-fence.service';
 import { PunchInDto } from './dto/punch-in.dto';
 import { RegularizeDto } from './dto/regularize.dto';
 import { OdPunchInDto, OdPunchOutDto } from './dto/od-punch.dto';
+import { AdminUpsertAttendanceDto } from './dto/admin-upsert.dto';
 import { ATTENDANCE_BLOCKED_MESSAGE, isAttendanceBlockedIdentity } from './attendance-blocklist';
 
 // ── Attendance Policy Constants ────────────────────────────────────────────────
@@ -795,5 +796,98 @@ export class AttendanceService {
       include: { editor: { select: { id: true, firstName: true, lastName: true } } },
       orderBy: { createdAt: 'desc' },
     });
+  }
+
+  async adminUpsert(adminId: string, dto: AdminUpsertAttendanceDto) {
+    const employee = await this.prisma.employee.findUnique({
+      where: { id: dto.employeeId },
+      select: { id: true, firstName: true, lastName: true }
+    });
+    if (!employee) {
+      throw new BadRequestException('Employee not found');
+    }
+
+    const date = new Date(dto.date);
+    date.setUTCHours(0, 0, 0, 0);
+
+    const punchInTime = dto.punchInTime ? new Date(dto.punchInTime) : null;
+    const punchOutTime = dto.punchOutTime ? new Date(dto.punchOutTime) : null;
+
+    let workingHours = null;
+    if (punchInTime && punchOutTime) {
+      workingHours = Math.round(
+        ((punchOutTime.getTime() - punchInTime.getTime()) / (1000 * 60 * 60)) * 100
+      ) / 100;
+    }
+
+    const record = await this.prisma.attendanceRecord.upsert({
+      where: {
+        employeeId_date: {
+          employeeId: dto.employeeId,
+          date,
+        }
+      },
+      create: {
+        employeeId: dto.employeeId,
+        date,
+        punchInTime,
+        punchOutTime,
+        punchInLat: 22.3097,
+        punchInLng: 73.1376,
+        punchOutLat: punchOutTime ? 22.3097 : null,
+        punchOutLng: punchOutTime ? 73.1376 : null,
+        isGeoValidIn: true,
+        isGeoValidOut: punchOutTime ? true : null,
+        status: dto.status,
+        workingHours,
+        isRegularized: true,
+        regularizedBy: adminId,
+        regularizationReason: dto.reason,
+        isManualPunch: true,
+        manualPunchReason: 'Admin manual punch adjustment',
+        notes: dto.reason,
+      },
+      update: {
+        punchInTime,
+        punchOutTime,
+        punchInLat: 22.3097,
+        punchInLng: 73.1376,
+        punchOutLat: punchOutTime ? 22.3097 : null,
+        punchOutLng: punchOutTime ? 73.1376 : null,
+        isGeoValidIn: true,
+        isGeoValidOut: punchOutTime ? true : null,
+        status: dto.status,
+        workingHours,
+        isRegularized: true,
+        regularizedBy: adminId,
+        regularizationReason: dto.reason,
+        isManualPunch: true,
+        manualPunchReason: 'Admin manual punch adjustment',
+        notes: dto.reason,
+      }
+    });
+
+    await this.prisma.auditLog.create({
+      data: {
+        actorId: adminId,
+        action: 'ADMIN_UPSERT_ATTENDANCE',
+        resourceType: 'attendance',
+        resourceId: record.id,
+        newValue: {
+          employeeId: dto.employeeId,
+          date: dto.date,
+          punchInTime,
+          punchOutTime,
+          status: dto.status,
+          workingHours,
+          reason: dto.reason,
+        }
+      }
+    });
+
+    return {
+      ...record,
+      designatedHours: 8.5
+    };
   }
 }

@@ -5,6 +5,7 @@ import { AttendanceService } from './attendance.service';
 import { PunchInDto } from './dto/punch-in.dto';
 import { RegularizeDto } from './dto/regularize.dto';
 import { OdPunchInDto, OdPunchOutDto } from './dto/od-punch.dto';
+import { AdminUpsertAttendanceDto } from './dto/admin-upsert.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -140,5 +141,14 @@ export class AttendanceController {
   @Roles('ADMIN', 'SUPER_ADMIN')
   getEditHistory(@Param('id') id: string) {
     return this.service.getEditHistory(id);
+  }
+
+  @Post('admin-upsert')
+  @Roles('ADMIN', 'SUPER_ADMIN')
+  adminUpsert(
+    @CurrentUser() user: { id: string },
+    @Body() dto: AdminUpsertAttendanceDto,
+  ) {
+    return this.service.adminUpsert(user.id, dto);
   }
 }

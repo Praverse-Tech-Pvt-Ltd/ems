@@ -34,6 +34,9 @@ export const attendanceService = {
   regularize: (id: string, data: { date: string; punchIn: string; punchOut: string; reason: string }) =>
     apiClient.patch(`/attendance/${id}/regularize`, data).then(r => r.data),
 
+  adminUpsert: (data: { employeeId: string; date: string; punchInTime?: string; punchOutTime?: string; status: string; reason: string }) =>
+    apiClient.post('/attendance/admin-upsert', data).then(r => r.data),
+
   holidays: () =>
     apiClient.get('/corporate/holidays').then(r => r.data),
 };
