@@ -33,16 +33,23 @@ import {
 
 @Injectable()
 export class EmailService {
-  private readonly resend: ReturnType<typeof createResendClient>;
+  private resend: ReturnType<typeof createResendClient> | undefined;
   private readonly logger = new Logger(EmailService.name);
 
   constructor(
     private readonly config: ConfigService,
     private readonly prisma: PrismaService,
     @InjectQueue('email') private readonly emailQueue: Queue,
-  ) {
-    const apiKey = this.config.getOrThrow<string>('RESEND_API_KEY');
+  ) {}
+
+  private getResend() {
+    if (this.resend) return this.resend;
+    const apiKey = this.config.get<string>('RESEND_API_KEY');
+    if (!apiKey) {
+      throw new Error('RESEND_API_KEY is not configured');
+    }
     this.resend = createResendClient(apiKey);
+    return this.resend;
   }
 
   // Helper helper to enqueue jobs
@@ -71,7 +78,7 @@ export class EmailService {
     const html = await render(React.createElement(OtpEmail, { otpCode }));
     const text = getOtpText(otpCode);
 
-    const response = await this.resend.emails.send({
+    const response = await this.getResend().emails.send({
       from,
       to,
       subject: 'Verify Your Identity — NexGen Pharma',
@@ -251,7 +258,7 @@ export class EmailService {
     }
 
     const from = `${this.config.get<string>('RESEND_FROM_NAME', 'NexGen Pharma EMS')} <${this.config.get<string>('RESEND_FROM_EMAIL', 'noreply@nexgenpharma.com')}>`;
-    const response = await this.resend.emails.send({
+    const response = await this.getResend().emails.send({
       from,
       to,
       subject,
