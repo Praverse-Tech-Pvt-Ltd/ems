@@ -3,7 +3,7 @@
   "version": "0.0.1",
   "private": true,
   "scripts": {
-    "build": "prisma generate --schema=./packages/db/prisma/schema.prisma && nest build",
+    "build": "prisma generate --schema=../../packages/db/prisma/schema.prisma && nest build",
     "start": "node dist/main",
     "dev": "nest start --watch",
     "lint": "eslint src --ext .ts",
