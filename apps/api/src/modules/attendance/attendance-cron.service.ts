@@ -13,17 +13,18 @@ export class AttendanceCronService {
     private attendanceService: AttendanceService,
   ) {}
 
-  @Cron('0 22 * * *', { name: 'missing-punch-out', timeZone: 'Asia/Kolkata' })
+  @Cron('10 0 * * *', { name: 'missing-punch-out', timeZone: 'Asia/Kolkata' })
   async flagMissingPunchOuts() {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const attendanceDate = new Date();
+    attendanceDate.setDate(attendanceDate.getDate() - 1);
+    attendanceDate.setHours(0, 0, 0, 0);
 
     const missing = await this.prisma.attendanceRecord.findMany({
       where: {
-        date: today,
+        date: attendanceDate,
         punchInTime: { not: null },
         punchOutTime: null,
-        status: { not: 'MISSING_PUNCH_OUT' },
+        status: { notIn: ['HALF_DAY', 'LEAVE', 'HOLIDAY'] },
       },
       include: { employee: { select: { id: true, firstName: true, email: true } } },
     });
@@ -33,7 +34,7 @@ export class AttendanceCronService {
 
     await this.prisma.attendanceRecord.updateMany({
       where: { id: { in: eligibleMissing.map((r) => r.id) } },
-      data: { status: 'MISSING_PUNCH_OUT' },
+      data: { status: 'HALF_DAY' },
     });
 
     await Promise.all(
@@ -41,20 +42,21 @@ export class AttendanceCronService {
         this.prisma.auditLog.create({
           data: {
             actorId: record.employeeId,
-            action: 'MISSING_PUNCH_OUT',
+            action: 'MISSING_PUNCH_OUT_HALF_DAY',
             resourceType: 'attendance',
             resourceId: record.id,
             newValue: {
-              status: 'MISSING_PUNCH_OUT',
-              date: today.toISOString(),
-              message: `Your punch-out was not recorded for ${today.toDateString()}. Please contact admin.`,
+              status: 'HALF_DAY',
+              previousStatus: record.status,
+              date: attendanceDate.toISOString(),
+              message: `Punch-out was not recorded for ${attendanceDate.toDateString()}; attendance was marked as half day.`,
             },
           },
         })
       )
     );
 
-    this.logger.log(`Flagged ${eligibleMissing.length} missing punch-outs`);
+    this.logger.log(`Marked ${eligibleMissing.length} missing punch-outs as half day`);
   }
 
   @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT, { timeZone: 'Asia/Kolkata' })

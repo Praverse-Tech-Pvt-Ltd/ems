@@ -37,6 +37,8 @@ const SPLIT_WFH_HALFDAY_STYLE: React.CSSProperties = {
   border: '1px solid transparent',
 };
 
+type CalendarLegendKey = AttendanceStatus | 'OD' | 'WEEKEND_OFF' | 'WFH_HALF_DAY';
+
 const CALENDAR_MARK: Record<AttendanceStatus, string> = {
   PRESENT: 'bg-success text-white border-success',
   LATE: 'bg-primary text-on-primary border-primary',
@@ -51,7 +53,14 @@ const CALENDAR_MARK: Record<AttendanceStatus, string> = {
 const WEEKEND_MARK = 'bg-surface-container-highest text-on-surface-variant border-outline-variant';
 const OD_MARK = 'bg-[#0f766e] text-white border-[#0f766e]';
 
-const CALENDAR_LEGEND: Array<{ key: AttendanceStatus | 'OD' | 'WEEKEND_OFF' | 'WFH_HALF_DAY'; label: string; dot: string; splitDot?: boolean }> = [
+const CALENDAR_MARK_BY_LEGEND: Record<CalendarLegendKey, string> = {
+  ...CALENDAR_MARK,
+  OD: OD_MARK,
+  WEEKEND_OFF: WEEKEND_MARK,
+  WFH_HALF_DAY: '',
+};
+
+const CALENDAR_LEGEND: Array<{ key: CalendarLegendKey; label: string; dot: string; splitDot?: boolean }> = [
   { key: 'PRESENT', label: 'Present', dot: 'bg-success border-success' },
   { key: 'LATE', label: 'Late', dot: 'bg-primary border-primary' },
   { key: 'ABSENT', label: 'Absent', dot: 'bg-error border-error' },
@@ -107,6 +116,33 @@ function hasSaturdayOff(user?: { firstName?: string } | null) {
 function isWeekendOff(date: Date, saturdayOff: boolean) {
   const day = date.getDay();
   return day === 0 || (saturdayOff && day === 6);
+}
+
+function isPastDate(date: Date) {
+  return dateKey(date) < dateKey(new Date());
+}
+
+function getCalendarLegendKey({
+  record,
+  holiday,
+  date,
+  inMonth,
+  saturdayOff,
+}: {
+  record?: AttendanceRecord;
+  holiday?: unknown;
+  date: Date;
+  inMonth: boolean;
+  saturdayOff: boolean;
+}): CalendarLegendKey | null {
+  if (!inMonth) return null;
+  if (record?.notes === 'HALF_DAY_WFH') return 'WFH_HALF_DAY';
+  if (record?.notes === 'OD') return 'OD';
+  if (record?.status) return record.status;
+  if (holiday) return 'HOLIDAY';
+  if (isWeekendOff(date, saturdayOff)) return 'WEEKEND_OFF';
+  if (isPastDate(date)) return 'ABSENT';
+  return null;
 }
 
 export default function AttendancePunchStationPage() {
@@ -292,9 +328,14 @@ export default function AttendancePunchStationPage() {
   }, [holidays]);
   const selectedRecord = recordsByDate[selectedDate];
   const selectedHoliday = holidaysByDate[selectedDate];
-  const selectedIsHoliday = !!selectedHoliday && !selectedRecord;
   const saturdayOff = hasSaturdayOff(user);
-  const selectedIsWeekendOff = isWeekendOff(new Date(selectedDate), saturdayOff) && !selectedRecord && !selectedHoliday;
+  const selectedLegendKey = getCalendarLegendKey({
+    record: selectedRecord,
+    holiday: selectedHoliday,
+    date: new Date(selectedDate),
+    inMonth: selectedDate.startsWith(`${calendarMonth.getFullYear()}-${String(calendarMonth.getMonth() + 1).padStart(2, '0')}`),
+    saturdayOff,
+  });
   const monthLabel = calendarMonth.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
   const changeMonth = (delta: number) => {
     setCalendarMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + delta, 1));
@@ -605,17 +646,18 @@ export default function AttendancePunchStationPage() {
                 {calendarDays.map(day => {
                   const rec = recordsByDate[day.key];
                   const holiday = holidaysByDate[day.key];
-                  const weekendOff = day.inMonth && !rec && !holiday && isWeekendOff(day.date, saturdayOff);
+                  const legendKey = getCalendarLegendKey({
+                    record: rec,
+                    holiday,
+                    date: day.date,
+                    inMonth: day.inMonth,
+                    saturdayOff,
+                  });
                   const isSelected = selectedDate === day.key;
-                  const isSplitDay = rec?.notes === 'HALF_DAY_WFH';
-                  const isOdDay = rec?.notes === 'OD';
-                  const markClass = rec
-                    ? (isSplitDay ? '' : isOdDay ? OD_MARK : CALENDAR_MARK[rec.status])
-                    : holiday
-                      ? CALENDAR_MARK['HOLIDAY']
-                      : weekendOff
-                        ? WEEKEND_MARK
-                        : 'bg-surface-container-low text-on-surface-variant border-outline-variant/30';
+                  const isSplitDay = legendKey === 'WFH_HALF_DAY';
+                  const markClass = legendKey
+                    ? CALENDAR_MARK_BY_LEGEND[legendKey]
+                    : 'bg-surface-container-low text-on-surface-variant border-outline-variant/30';
 
                   return (
                     <button
@@ -651,9 +693,15 @@ export default function AttendancePunchStationPage() {
                           <p className="text-[9px] opacity-85 text-on-tertiary-fixed font-semibold">HOLIDAY</p>
                         </div>
                       )}
-                      {weekendOff && (
+                      {legendKey === 'WEEKEND_OFF' && (
                         <div className="mt-2">
                           <p className="text-[10px] font-black tracking-wide truncate text-on-surface-variant">WEEKEND OFF</p>
+                        </div>
+                      )}
+                      {legendKey === 'ABSENT' && !rec && (
+                        <div className="mt-2">
+                          <p className="text-[10px] font-black tracking-wide truncate">ABSENT</p>
+                          <p className="text-[9px] opacity-85 font-semibold">NO PUNCH</p>
                         </div>
                       )}
                     </button>
@@ -696,7 +744,7 @@ export default function AttendancePunchStationPage() {
                     ))}
                   </div>
                 </div>
-              ) : selectedIsHoliday ? (
+              ) : selectedLegendKey === 'HOLIDAY' ? (
                 <div className="mt-md space-y-sm">
                   <span className="inline-flex px-3 py-1 rounded-full text-xs font-bold bg-tertiary-fixed-dim text-on-tertiary-fixed border border-tertiary-fixed-dim">
                     HOLIDAY
@@ -706,13 +754,22 @@ export default function AttendancePunchStationPage() {
                     This day is marked as an official company holiday.
                   </p>
                 </div>
-              ) : selectedIsWeekendOff ? (
+              ) : selectedLegendKey === 'WEEKEND_OFF' ? (
                 <div className="mt-md space-y-sm">
                   <span className="inline-flex px-3 py-1 rounded-full text-xs font-bold bg-surface-container-high text-on-surface-variant border border-outline-variant">
                     WEEKEND OFF
                   </span>
                   <p className="text-sm text-on-surface-variant">
                     This day is configured as a weekly off for {saturdayOff ? 'this employee' : 'employees on the standard schedule'}.
+                  </p>
+                </div>
+              ) : selectedLegendKey === 'ABSENT' ? (
+                <div className="mt-md space-y-sm">
+                  <span className="inline-flex px-3 py-1 rounded-full text-xs font-bold bg-error text-on-error">
+                    ABSENT
+                  </span>
+                  <p className="text-sm text-on-surface-variant">
+                    No punch-in or punch-out was recorded for this working day.
                   </p>
                 </div>
               ) : (

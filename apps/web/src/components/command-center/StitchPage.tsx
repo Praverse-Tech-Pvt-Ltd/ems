@@ -48,6 +48,65 @@ const ACTION_ROUTES: Record<string, string> = {
   'Run AI Summary': '/ai-work-intelligence',
 };
 
+const METRIC_ROUTES: Record<string, string> = {
+  'AI Recs': '/ai-talent-mapping',
+  Approvals: '/admin-approvals',
+  Audit: '/audit-compliance-log',
+  Punch: '/attendance-punch-station',
+  'Today Status': '/attendance-punch-station',
+  Regularize: '/attendance-punch-station',
+  'Geo Punch': '/attendance-punch-station',
+  'Policy Use': '/attendance-punch-station',
+  Leave: '/leave-center',
+  Balance: '/leave-center',
+  Requests: '/leave-center',
+  'Overlap Risk': '/leave-center',
+  Policy: '/leave-center',
+  Payslip: '/salary-payslips',
+  Payroll: '/salary-payslips',
+  Generated: '/salary-payslips',
+  Structures: '/salary-payslips',
+  Transfers: '/salary-payslips',
+  Inbox: '/messaging-chat-hub',
+  Messages: '/messaging-chat-hub',
+  Channels: '/messaging-chat-hub',
+  'Read State': '/messaging-chat-hub',
+  Unread: '/messaging-chat-hub',
+  Employees: '/employee-directory',
+  Departments: '/employee-directory',
+  Documents: '/employee-directory',
+  Docs: '/employee-directory',
+  Onboarding: '/employee-directory',
+  Expenses: '/expense-tracker',
+  Claims: '/expense-tracker',
+  'L1 Queue': '/expense-tracker',
+  Clients: '/client-companies-overview',
+  Companies: '/client-companies-overview',
+  Invoices: '/invoices',
+  'Follow-ups': '/client-companies-overview',
+  Gaps: '/client-detail-gap-analysis',
+  Visits: '/client-detail-gap-analysis',
+  Timeline: '/client-detail-gap-analysis',
+  Tasks: '/requests',
+  'Open Tasks': '/requests',
+  Logs: '/audit-compliance-log',
+  Evidence: '/audit-compliance-log',
+  Regulatory: '/calendar-meeting-notes',
+  Notes: '/calendar-meeting-notes',
+  Upcoming: '/calendar-meeting-notes',
+  Performance: '/management-review-hub',
+  Weekly: '/management-review-hub',
+  Exports: '/management-review-hub',
+  'Risk Signals': '/management-review-hub',
+  'Health Score': '/owner-command-center',
+  'Live Modules': '/owner-command-center',
+  'Talent Map': '/ai-talent-mapping',
+  Updates: '/ai-talent-mapping',
+  Corporate: '/company-employee-assignment',
+  Finance: '/wage-sheet',
+  Exceptions: '/reports',
+};
+
 type Metric = {
   label: string;
   value: string;
@@ -225,12 +284,18 @@ export function StitchPage({ config }: { config: StitchPageConfig }) {
     if (!attendanceBlocked) return true;
     return !['Punch', 'Today Status', 'Regularize', 'Policy Use', 'Face Proxy'].includes(metric.label);
   });
+  const getMetricRoute = (metric: Metric) => METRIC_ROUTES[metric.label] ?? METRIC_ROUTES[metric.value];
+  const runMetric = (metric: Metric) => {
+    const route = getMetricRoute(metric);
+    if (route) router.push(route);
+  };
 
   const runAction = (label: string) => {
-    if (attendanceBlocked && ['Punch In', 'Punch Out', 'OD', 'Regularize'].includes(label)) return;
+    if (attendanceBlocked && ['Punch In', 'Punch Out', 'Punched Out', 'OD', 'OD Punch In', 'OD Punch Out', 'Regularize'].includes(label)) return;
     if (label === 'Punch In') { setPunchType('in'); return; }
     if (label === 'Punch Out') { setPunchType('out'); return; }
-    if (label === 'OD') {
+    if (label === 'Punched Out') return;
+    if (label === 'OD' || label === 'OD Punch In' || label === 'OD Punch Out') {
       if (openOd?.id) {
         setOdMode('out');
         setOdPunchOutTime(toDateTimeLocalValue(new Date()));
@@ -390,14 +455,14 @@ export function StitchPage({ config }: { config: StitchPageConfig }) {
       <h3 className="font-label-caps text-label-caps text-on-surface-variant mb-sm tracking-widest">LIVE OPERATING METRICS</h3>
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-sm">
         {visibleMetrics.map((metric) => (
-          <div key={metric.label} className={`glass-card rounded-lg p-sm flex flex-col gap-xs card-hover ${metric.tone === 'primary' ? 'border-l-[3px] border-l-primary' : metric.tone === 'tertiary' ? 'border-l-[3px] border-l-tertiary' : metric.tone === 'error' ? 'border-l-[3px] border-l-error' : ''}`}>
+          <button type="button" onClick={() => runMetric(metric)} key={metric.label} className={`glass-card rounded-lg p-sm flex flex-col gap-xs card-hover text-left cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/40 ${metric.tone === 'primary' ? 'border-l-[3px] border-l-primary' : metric.tone === 'tertiary' ? 'border-l-[3px] border-l-tertiary' : metric.tone === 'error' ? 'border-l-[3px] border-l-error' : ''}`}>
             <span className="font-label-caps text-label-caps text-on-surface-variant">{metric.label}</span>
             <div className="font-headline-lg text-headline-lg text-on-surface">{metric.value}</div>
             <div className={`flex items-center gap-xs text-sm font-label-caps text-label-caps ${metric.tone === 'error' ? 'text-error' : metric.tone === 'tertiary' ? 'text-tertiary' : metric.tone === 'primary' ? 'text-primary' : 'text-on-surface-variant'}`}>
               <span className="material-symbols-outlined text-sm">{metric.icon}</span>
               {metric.meta}
             </div>
-          </div>
+          </button>
         ))}
       </div>
     </section>
@@ -409,14 +474,14 @@ export function StitchPage({ config }: { config: StitchPageConfig }) {
       <h3 className="font-label-caps text-label-caps text-on-surface-variant mb-sm tracking-widest">LIVE OPERATING METRICS</h3>
       <div className="grid grid-cols-2 gap-sm">
         {visibleMetrics.map((metric) => (
-          <div key={metric.label} className={`glass-card rounded-lg p-sm flex flex-col gap-xs card-hover ${metric.tone === 'primary' ? 'border-l-[3px] border-l-primary' : metric.tone === 'tertiary' ? 'border-l-[3px] border-l-tertiary' : metric.tone === 'error' ? 'border-l-[3px] border-l-error' : ''}`}>
+          <button type="button" onClick={() => runMetric(metric)} key={metric.label} className={`glass-card rounded-lg p-sm flex flex-col gap-xs card-hover text-left cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/40 ${metric.tone === 'primary' ? 'border-l-[3px] border-l-primary' : metric.tone === 'tertiary' ? 'border-l-[3px] border-l-tertiary' : metric.tone === 'error' ? 'border-l-[3px] border-l-error' : ''}`}>
             <span className="font-label-caps text-[10px] text-on-surface-variant truncate">{metric.label}</span>
             <div className="font-title-lg text-title-lg text-on-surface font-bold truncate">{metric.value}</div>
             <div className={`flex items-center gap-xs font-label-caps text-[10px] truncate ${metric.tone === 'error' ? 'text-error' : metric.tone === 'tertiary' ? 'text-tertiary' : metric.tone === 'primary' ? 'text-primary' : 'text-on-surface-variant'}`}>
               <span className="material-symbols-outlined text-sm shrink-0">{metric.icon}</span>
               <span className="truncate">{metric.meta}</span>
             </div>
-          </div>
+          </button>
         ))}
       </div>
     </section>
@@ -443,8 +508,9 @@ export function StitchPage({ config }: { config: StitchPageConfig }) {
 
   if (layout === 'workday') {
     const actionIcons: Record<string, string> = {
-      'Punch In': 'login', 'Punch Out': 'logout',
-      'OD': 'work_history', 'Apply Leave': 'event_available', 'View Payslip': 'payments',
+      'Punch In': 'login', 'Punch Out': 'logout', 'Punched Out': 'check_circle',
+      'OD': 'work_history', 'OD Punch In': 'work_history', 'OD Punch Out': 'edit_note',
+      'Apply Leave': 'event_available', 'View Payslip': 'payments',
     };
     return (
       <div className="max-w-[1040px] mx-auto w-full flex flex-col gap-5 pb-6">
@@ -590,10 +656,19 @@ export function StitchPage({ config }: { config: StitchPageConfig }) {
             <div className="flex flex-row sm:flex-row flex-wrap gap-2 w-full md:w-auto">
               {visibleActions.slice(0, 4).map((rawAction, index) => {
                 // Dynamically swap "Punch In" → "Punch Out" when user is already clocked in
-                const action = (index === 0 && rawAction === 'Punch In' && isPunchedIn) ? 'Punch Out' : rawAction;
+                const action = rawAction === 'Punch In'
+                  ? isPunchedIn ? 'Punch Out' : isPunchedOut ? 'Punched Out' : 'Punch In'
+                  : rawAction === 'OD'
+                    ? openOd?.id ? 'OD Punch Out' : 'OD Punch In'
+                    : rawAction;
                 const icon = actionIcons[action] ?? (index === 0 ? 'fingerprint' : 'arrow_forward');
                 const isPrimary = index === 0;
-                const isDisabled = !!openOd?.id && (action === 'Punch In' || action === 'Punch Out');
+                const isPunchAction = action === 'Punch In' || action === 'Punch Out';
+                const isOdPunchIn = action === 'OD Punch In';
+                const isDisabled =
+                  action === 'Punched Out' ||
+                  (!!openOd?.id && isPunchAction) ||
+                  (isOdPunchIn && (isPunchedIn || isPunchedOut));
                 return (
                   <button
                     key={rawAction}
@@ -630,9 +705,11 @@ export function StitchPage({ config }: { config: StitchPageConfig }) {
           {visibleMetrics.map(metric => {
             const accent = metric.tone === 'primary' ? '#aa3000' : metric.tone === 'tertiary' ? '#01677d' : metric.tone === 'error' ? '#ba1a1a' : '#59413a';
             return (
-              <div
+              <button
+                type="button"
                 key={metric.label}
-                className="glass-card rounded-2xl p-4 flex flex-col gap-3 card-hover"
+                onClick={() => runMetric(metric)}
+                className="glass-card rounded-2xl p-4 flex flex-col gap-3 card-hover text-left cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/40"
                 style={{ borderLeft: `3px solid ${accent}` }}
               >
                 <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: `${accent}12` }}>
@@ -643,7 +720,7 @@ export function StitchPage({ config }: { config: StitchPageConfig }) {
                   <div className="text-[11px] text-on-surface-variant mt-0.5 font-medium">{metric.label}</div>
                   <div className="text-[10.5px] mt-0.5" style={{ color: accent }}>{metric.meta}</div>
                 </div>
-              </div>
+              </button>
             );
           })}
         </div>
@@ -794,17 +871,17 @@ export function StitchPage({ config }: { config: StitchPageConfig }) {
           {actionNote}
         </div>
       )}
-      {!attendanceBlocked && punchType && <PunchModal punchType={punchType} onClose={() => setPunchType(null)} />}
+        {!attendanceBlocked && punchType && <PunchModal punchType={punchType} onClose={() => setPunchType(null)} />}
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-sm">
           {visibleMetrics.map((metric) => (
-            <div key={metric.label} className="glass-card rounded-xl p-md min-h-[150px] flex flex-col justify-between">
+            <button type="button" onClick={() => runMetric(metric)} key={metric.label} className="glass-card rounded-xl p-md min-h-[150px] flex flex-col justify-between text-left cursor-pointer card-hover focus:outline-none focus:ring-2 focus:ring-primary/40">
               <span className="material-symbols-outlined text-primary">{metric.icon}</span>
               <div>
                 <p className="font-label-caps text-label-caps text-on-surface-variant">{metric.label}</p>
                 <p className="font-display-lg text-display-lg text-on-surface">{metric.value}</p>
                 <p className="text-body-sm text-on-surface-variant">{metric.meta}</p>
               </div>
-            </div>
+            </button>
           ))}
         </div>
         <div className="flex flex-col xl:grid xl:grid-cols-[1fr_380px] gap-lg">
