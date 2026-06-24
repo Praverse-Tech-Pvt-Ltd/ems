@@ -21,6 +21,7 @@ const HALF_DAY_HOURS = 4;           // < 4 h worked → auto HALF_DAY at punch-o
 const MAX_LATE_PM      = 2;             // late punch-in allowances per month
 const MAX_EARLY_PM     = 4;             // early punch-out allowances per month
 const MAX_HALFDAY_PM   = 4;             // > 4 half-days in a month → LEAVE
+const ATTENDANCE_TIME_ZONE = 'Asia/Kolkata';
 
 // ──────────────────────────────────────────────────────────────────────────────
 
@@ -153,8 +154,8 @@ export class AttendanceService {
 
   /** Returns the first day of the current month at midnight. */
   private currentMonthStart(): Date {
-    const now = new Date();
-    return new Date(now.getFullYear(), now.getMonth(), 1);
+    const today = this.getISTToday();
+    return new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1));
   }
 
   /**
@@ -718,7 +719,15 @@ export class AttendanceService {
 
 
   private minutesSinceMidnight(date: Date): number {
-    return date.getHours() * 60 + date.getMinutes();
+    const parts = new Intl.DateTimeFormat('en-GB', {
+      timeZone: ATTENDANCE_TIME_ZONE,
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+    }).formatToParts(date);
+    const hour = Number(parts.find((part) => part.type === 'hour')?.value ?? 0);
+    const minute = Number(parts.find((part) => part.type === 'minute')?.value ?? 0);
+    return hour * 60 + minute;
   }
 
   async editAttendanceTime(
@@ -890,3 +899,4 @@ export class AttendanceService {
     return record;
   }
 }
+
