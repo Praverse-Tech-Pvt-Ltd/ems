@@ -6,7 +6,7 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "turbo run dev",
+    "dev": "concurrently -n api,web -c green,blue \"npm run dev -w apps/api\" \"npm run dev -w apps/web\"",
     "build": "turbo run build",
     "lint": "turbo run lint",
     "test": "turbo run test",
@@ -17,6 +17,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.9.0",
+    "concurrently": "^10.0.3",
     "eslint": "^9.15.0",
     "form-data": "4.0.6",
     "lodash": "4.18.1",

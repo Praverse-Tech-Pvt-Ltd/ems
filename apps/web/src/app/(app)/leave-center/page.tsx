@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { leavesService } from '@/lib/api/leaves';
 import { useAuthStore } from '@/store/auth.store';
+import { useQueryClient } from '@tanstack/react-query';
 import type { LeaveBalance, LeaveRequest } from '@/types';
 
 const LEAVE_LABEL: Record<string, string> = {
@@ -65,6 +66,7 @@ function LeaveLimitCard({ title, label, used, max, colorKey, isUnlimited }: {
 }
 
 export default function LeaveCenterPage() {
+  const queryClient = useQueryClient();
   const user = useAuthStore(s => s.user);
   const isAdmin = ['ADMIN', 'SUPER_ADMIN', 'MANAGER'].includes(user?.role ?? '');
 
@@ -81,14 +83,14 @@ export default function LeaveCenterPage() {
   const load = async () => {
     try {
       const [bal, mine] = await Promise.all([
-        leavesService.balance().catch(() => []),
-        leavesService.my().catch(() => []),
+        queryClient.fetchQuery({ queryKey: ['leaves-balance', user?.id], queryFn: () => leavesService.balance() }).catch(() => []),
+        queryClient.fetchQuery({ queryKey: ['leaves-my', user?.id], queryFn: () => leavesService.my() }).catch(() => []),
       ]);
       setBalances(Array.isArray(bal) ? bal : []);
       setMyLeaves(Array.isArray(mine) ? mine : mine?.data ?? []);
 
       if (isAdmin) {
-        const all = await leavesService.all({ status: 'PENDING' }).catch(() => []);
+        const all = await queryClient.fetchQuery({ queryKey: ['leaves-all-pending'], queryFn: () => leavesService.all({ status: 'PENDING' }) }).catch(() => []);
         setPendingLeaves(Array.isArray(all) ? all : all?.data ?? []);
       }
     } finally {

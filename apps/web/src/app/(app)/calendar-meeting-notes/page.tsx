@@ -6,6 +6,7 @@ import { clientsService } from '@/lib/api/clients';
 import { employeesService } from '@/lib/api/employees';
 import { useAuthStore } from '@/store/auth.store';
 import { useNotifications } from '@/hooks/useNotifications';
+import { useQueryClient } from '@tanstack/react-query';
 
 const EVENT_TYPE_COLOR: Record<string, string> = {
   INTERNAL: 'border-l-primary bg-primary/5',
@@ -16,6 +17,7 @@ const EVENT_TYPE_COLOR: Record<string, string> = {
 };
 
 export default function CalendarMeetingNotesPage() {
+  const queryClient = useQueryClient();
   const user = useAuthStore(s => s.user);
   const isAdmin = ['ADMIN', 'SUPER_ADMIN', 'MANAGER'].includes(user?.role ?? '');
   const { latest: liveAssignment, dismiss: dismissLiveAssignment } = useNotifications();
@@ -43,11 +45,11 @@ export default function CalendarMeetingNotesPage() {
   const load = async () => {
     try {
       const [upcoming, notesData, cntd, companiesRes, employeesRes] = await Promise.all([
-        calendarService.upcoming(30).catch(() => []),
-        meetingNotesService.list({ limit: 10 }).catch(() => []),
-        calendarService.auditCountdowns().catch(() => []),
-        clientsService.list().catch(() => []),
-        employeesService.list().catch(() => []),
+        queryClient.fetchQuery({ queryKey: ['calendar-upcoming'], queryFn: () => calendarService.upcoming(30) }).catch(() => []),
+        queryClient.fetchQuery({ queryKey: ['calendar-notes'], queryFn: () => meetingNotesService.list({ limit: 10 }) }).catch(() => []),
+        queryClient.fetchQuery({ queryKey: ['calendar-audit-countdowns'], queryFn: () => calendarService.auditCountdowns() }).catch(() => []),
+        queryClient.fetchQuery({ queryKey: ['calendar-companies'], queryFn: () => clientsService.list() }).catch(() => []),
+        queryClient.fetchQuery({ queryKey: ['calendar-employees'], queryFn: () => employeesService.list() }).catch(() => []),
       ]);
       setEvents(Array.isArray(upcoming) ? upcoming : upcoming?.data ?? []);
       setNotes(Array.isArray(notesData) ? notesData : notesData?.data ?? []);

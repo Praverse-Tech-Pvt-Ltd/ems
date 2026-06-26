@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { clientsService } from '@/lib/api/clients';
 import { useAuthStore } from '@/store/auth.store';
 
@@ -55,6 +56,7 @@ function HealthRing({ score }: { score: number }) {
 }
 
 export default function ClientCompaniesOverviewPage() {
+  const queryClient = useQueryClient();
   const user = useAuthStore(s => s.user);
   const isAdmin = ['ADMIN', 'SUPER_ADMIN', 'MANAGER'].includes(user?.role ?? '');
 
@@ -76,7 +78,7 @@ export default function ClientCompaniesOverviewPage() {
 
   const load = async () => {
     try {
-      const data = await clientsService.list().catch(() => []);
+      const data = await queryClient.fetchQuery({ queryKey: ['overview-companies'], queryFn: () => clientsService.list() }).catch(() => []);
       setCompanies(Array.isArray(data) ? data : data?.data ?? []);
     } finally {
       setLoading(false);
@@ -101,7 +103,7 @@ export default function ClientCompaniesOverviewPage() {
     setTimeline([]);
     setTimelineLoading(true);
     try {
-      const data = await clientsService.timeline(company.id, 30).catch(() => []);
+      const data = await queryClient.fetchQuery({ queryKey: ['overview-timeline', company.id], queryFn: () => clientsService.timeline(company.id, 30) }).catch(() => []);
       setTimeline(Array.isArray(data) ? data : data?.data ?? []);
     } finally {
       setTimelineLoading(false);

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { salaryService } from '@/lib/api/salary';
 import { useAuthStore } from '@/store/auth.store';
+import { useQueryClient } from '@tanstack/react-query';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const WAGE_SHEET_MONTH = 6;
@@ -67,6 +68,7 @@ function money(value?: number) {
 }
 
 export default function WageSheetPage() {
+  const queryClient = useQueryClient();
   const user = useAuthStore(s => s.user);
   const isAdmin = ['ADMIN', 'SUPER_ADMIN'].includes(user?.role ?? '');
 
@@ -81,11 +83,11 @@ export default function WageSheetPage() {
     setLoading(true);
     setError(null);
     try {
-      const data = await salaryService.payrollRuns({ month: WAGE_SHEET_MONTH, year: WAGE_SHEET_YEAR });
+      const data = await queryClient.fetchQuery({ queryKey: ['wage-runs', WAGE_SHEET_MONTH, WAGE_SHEET_YEAR], queryFn: () => salaryService.payrollRuns({ month: WAGE_SHEET_MONTH, year: WAGE_SHEET_YEAR }) });
       const list = Array.isArray(data) ? data : data?.data ?? [];
       setRuns(list);
       if (list.length > 0) {
-        const detail = await salaryService.payrollRun(list[0].id).catch(() => list[0]);
+        const detail = await queryClient.fetchQuery({ queryKey: ['wage-run', list[0].id], queryFn: () => salaryService.payrollRun(list[0].id) }).catch(() => list[0]);
         setSelectedRun(detail);
       } else {
         setSelectedRun(null);

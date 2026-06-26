@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { workUpdatesService, aiService, aiProposalsService } from '@/lib/api/work-updates';
 import { useAuthStore } from '@/store/auth.store';
+import { useQueryClient } from '@tanstack/react-query';
 
 function parseUpdate(text: string) {
   if (!text || text.length < 10) return null;
@@ -32,6 +33,7 @@ function parseUpdate(text: string) {
 const heatColors = ['bg-surface-container-highest', 'bg-primary/20', 'bg-primary/40', 'bg-primary/70', 'bg-primary'];
 
 export default function AiWorkIntelligencePage() {
+  const queryClient = useQueryClient();
   const user = useAuthStore(s => s.user);
   const isAdmin = ['ADMIN', 'SUPER_ADMIN', 'MANAGER'].includes(user?.role ?? '');
   const isSuperAdmin = user?.role === 'SUPER_ADMIN';
@@ -60,17 +62,17 @@ export default function AiWorkIntelligencePage() {
   const load = async () => {
     try {
       const [mine, map] = await Promise.all([
-        workUpdatesService.my({ limit: 10 }).catch(() => []),
-        aiService.employeeWorkMap().catch(() => null),
+        queryClient.fetchQuery({ queryKey: ['ai-my-updates'], queryFn: () => workUpdatesService.my({ limit: 10 }) }).catch(() => []),
+        queryClient.fetchQuery({ queryKey: ['ai-work-map'], queryFn: () => aiService.employeeWorkMap() }).catch(() => null),
       ]);
       setMyUpdates(Array.isArray(mine) ? mine : mine?.data ?? []);
       setWorkMap(map);
       if (isAdmin) {
-        const all = await workUpdatesService.all({ limit: 20 }).catch(() => []);
+        const all = await queryClient.fetchQuery({ queryKey: ['ai-all-updates'], queryFn: () => workUpdatesService.all({ limit: 20 }) }).catch(() => []);
         setAllUpdates(Array.isArray(all) ? all : all?.data ?? []);
       }
       if (isSuperAdmin) {
-        const proposals = await aiProposalsService.all({ status: 'PENDING', limit: 20 }).catch(() => null);
+        const proposals = await queryClient.fetchQuery({ queryKey: ['ai-pending-proposals'], queryFn: () => aiProposalsService.all({ status: 'PENDING', limit: 20 }) }).catch(() => null);
         setPendingProposals(Array.isArray(proposals) ? proposals : proposals?.items ?? []);
       }
     } finally {

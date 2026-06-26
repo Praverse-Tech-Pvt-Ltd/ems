@@ -99,7 +99,7 @@ export function AdminAttendanceAdjustModal({
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div
-        className="w-full max-w-[500px] rounded-2xl overflow-hidden"
+        className="w-full max-w-[500px] rounded-2xl overflow-hidden flex flex-col max-h-[90vh]"
         style={{
           background: 'rgba(250,248,255,0.98)',
           boxShadow: '0 24px 64px rgba(19,27,46,0.18), 0 4px 16px rgba(19,27,46,0.08)',
@@ -150,7 +150,7 @@ export function AdminAttendanceAdjustModal({
             <p className="text-xs text-on-surface-variant">Loading employee directory...</p>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="p-5 space-y-md">
+          <form onSubmit={handleSubmit} className="p-5 space-y-md overflow-y-auto flex-1">
             {errorMsg && (
               <div className="flex items-center gap-2 p-sm bg-error/10 border border-error/20 rounded-xl text-error text-xs font-semibold">
                 <AlertCircle size={14} />

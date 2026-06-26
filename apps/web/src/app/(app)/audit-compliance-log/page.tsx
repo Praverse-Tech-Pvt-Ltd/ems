@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { auditLogsService, calendarService } from '@/lib/api/management';
 import { useAuthStore } from '@/store/auth.store';
+import { useQueryClient } from '@tanstack/react-query';
 
 const ACTION_COLOR: Record<string, string> = {
   CREATE: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20',
@@ -15,6 +16,7 @@ const ACTION_COLOR: Record<string, string> = {
 };
 
 export default function AuditComplianceLogPage() {
+  const queryClient = useQueryClient();
   const user = useAuthStore(s => s.user);
   const isAdmin = ['ADMIN', 'SUPER_ADMIN'].includes(user?.role ?? '');
 
@@ -28,8 +30,8 @@ export default function AuditComplianceLogPage() {
   const load = async (cur?: string) => {
     try {
       const [logsData, cntd] = await Promise.all([
-        isAdmin ? auditLogsService.list({ limit: 30, cursor: cur, resourceType: resourceFilter || undefined }).catch(() => ({ data: [], nextCursor: null })) : Promise.resolve({ data: [], nextCursor: null }),
-        calendarService.auditCountdowns().catch(() => []),
+        isAdmin ? queryClient.fetchQuery({ queryKey: ['audit-logs', cur, resourceFilter], queryFn: () => auditLogsService.list({ limit: 30, cursor: cur, resourceType: resourceFilter || undefined }) }).catch(() => ({ data: [], nextCursor: null })) : Promise.resolve({ data: [], nextCursor: null }),
+        queryClient.fetchQuery({ queryKey: ['audit-countdowns'], queryFn: () => calendarService.auditCountdowns() }).catch(() => []),
       ]);
       const newLogs = Array.isArray(logsData) ? logsData : logsData?.data ?? [];
       if (cur) {

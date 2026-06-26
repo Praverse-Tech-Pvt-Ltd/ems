@@ -3,9 +3,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { chatService } from '@/lib/api/management';
 import { useAuthStore } from '@/store/auth.store';
+import { useQueryClient } from '@tanstack/react-query';
 import type { ChatChannel, ChatMessage } from '@/types';
 
 export default function MessagingChatHubPage() {
+  const queryClient = useQueryClient();
   const user = useAuthStore(s => s.user);
 
   const [channels, setChannels] = useState<ChatChannel[]>([]);
@@ -19,7 +21,7 @@ export default function MessagingChatHubPage() {
 
   const loadChannels = async () => {
     try {
-      const data = await chatService.channels().catch(() => []);
+      const data = await queryClient.fetchQuery({ queryKey: ['chat-channels'], queryFn: () => chatService.channels() }).catch(() => []);
       const chans = Array.isArray(data) ? data : data?.data ?? [];
       setChannels(chans);
       if (chans.length > 0 && !activeChannel) {
@@ -33,7 +35,7 @@ export default function MessagingChatHubPage() {
   const loadMessages = async (channelId: string) => {
     setMsgLoading(true);
     try {
-      const data = await chatService.messages(channelId, { limit: 50 }).catch(() => []);
+      const data = await queryClient.fetchQuery({ queryKey: ['chat-messages', channelId], queryFn: () => chatService.messages(channelId, { limit: 50 }) }).catch(() => []);
       const msgs = Array.isArray(data) ? data : data?.data ?? data?.messages ?? [];
       setMessages(msgs.reverse());
       await chatService.markRead(channelId).catch(() => {});

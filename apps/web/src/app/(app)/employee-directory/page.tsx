@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { employeesService } from '@/lib/api/employees';
 import { useAuthStore } from '@/store/auth.store';
+import { useQueryClient } from '@tanstack/react-query';
 import type { Employee, Department } from '@/types';
 
 const ROLE_COLOR: Record<string, string> = {
@@ -19,6 +20,7 @@ const STATUS_COLOR: Record<string, string> = {
 };
 
 export default function EmployeeDirectoryPage() {
+  const queryClient = useQueryClient();
   const router  = useRouter();
   const user    = useAuthStore(s => s.user);
   const isAdmin = ['ADMIN', 'SUPER_ADMIN'].includes(user?.role ?? '');
@@ -32,8 +34,8 @@ export default function EmployeeDirectoryPage() {
   const load = async () => {
     try {
       const [emps, depts] = await Promise.all([
-        employeesService.list().catch(() => []),
-        employeesService.departments().catch(() => []),
+        queryClient.fetchQuery({ queryKey: ['directory-employees'], queryFn: () => employeesService.list() }).catch(() => []),
+        queryClient.fetchQuery({ queryKey: ['directory-departments'], queryFn: () => employeesService.departments() }).catch(() => []),
       ]);
       setEmployees(Array.isArray(emps) ? emps : emps?.data ?? []);
       setDepartments(Array.isArray(depts) ? depts : depts?.data ?? []);

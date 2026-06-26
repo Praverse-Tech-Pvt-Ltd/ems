@@ -6,6 +6,7 @@ import { useAuthStore } from '@/store/auth.store';
 import type { AttendanceRecord, AttendanceStatus } from '@/types';
 import { isAttendanceBlockedUser } from '@/lib/attendance-access';
 import { AdminAttendanceAdjustModal } from '@/components/AdminAttendanceAdjustModal';
+import { useQueryClient } from '@tanstack/react-query';
 
 function Clock() {
   const [time, setTime] = useState('');
@@ -145,7 +146,8 @@ function getCalendarLegendKey({
   return null;
 }
 
-export default function AttendancePunchStationPage() {
+export default function AttendancePunchStation() {
+  const queryClient = useQueryClient();
   const user = useAuthStore(s => s.user);
   const isAdmin = ['ADMIN', 'SUPER_ADMIN', 'MANAGER'].includes(user?.role ?? '');
   const attendanceBlocked = isAttendanceBlockedUser(user);
@@ -181,12 +183,12 @@ export default function AttendancePunchStationPage() {
       const { from, to } = monthBounds(calendarMonth);
       const [todayData, statsData, recordsData, calendarData, holidaysData, openOdData] = !attendanceBlocked
         ? await Promise.all([
-            attendanceService.today().catch(() => null),
-            attendanceService.myStats().catch(() => null),
-            attendanceService.my({ limit: 14 }).catch(() => []),
-            attendanceService.my({ from, to }).catch(() => []),
-            attendanceService.holidays().catch(() => []),
-            attendanceService.openOd().catch(() => null),
+            queryClient.fetchQuery({ queryKey: ['attendance-today', user?.id], queryFn: () => attendanceService.today() }).catch(() => null),
+            queryClient.fetchQuery({ queryKey: ['attendance-stats', user?.id], queryFn: () => attendanceService.myStats() }).catch(() => null),
+            queryClient.fetchQuery({ queryKey: ['attendance-records', user?.id], queryFn: () => attendanceService.my({ limit: 14 }) }).catch(() => []),
+            queryClient.fetchQuery({ queryKey: ['attendance-calendar', user?.id, from, to], queryFn: () => attendanceService.my({ from, to }) }).catch(() => []),
+            queryClient.fetchQuery({ queryKey: ['holidays'], queryFn: () => attendanceService.holidays() }).catch(() => []),
+            queryClient.fetchQuery({ queryKey: ['attendance-od-open', user?.id], queryFn: () => attendanceService.openOd() }).catch(() => null),
           ])
         : [null, null, [], [], [], null];
 
@@ -203,7 +205,7 @@ export default function AttendancePunchStationPage() {
       }
 
       if (isAdmin) {
-        const all = await attendanceService.all().catch(() => []);
+        const all = await queryClient.fetchQuery({ queryKey: ['attendance-all'], queryFn: () => attendanceService.all() }).catch(() => []);
         setAllRecords(Array.isArray(all) ? all.slice(0, 10) : all?.data?.slice(0, 10) ?? []);
       }
     } catch {
@@ -338,7 +340,14 @@ export default function AttendancePunchStationPage() {
   });
   const monthLabel = calendarMonth.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
   const changeMonth = (delta: number) => {
-    setCalendarMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + delta, 1));
+    setCalendarMonth(prev => {
+      const next = new Date(prev.getFullYear(), prev.getMonth() + delta, 1);
+      // June 2026 is month index 5 (0-indexed)
+      if (next.getFullYear() < 2026 || (next.getFullYear() === 2026 && next.getMonth() < 5)) {
+        return prev;
+      }
+      return next;
+    });
   };
 
   const isPowerUser = ['ADMIN', 'SUPER_ADMIN'].includes(user?.role ?? '');
@@ -606,7 +615,8 @@ export default function AttendancePunchStationPage() {
               <button
                 type="button"
                 onClick={() => changeMonth(-1)}
-                className="w-10 h-10 rounded-full border border-outline-variant/40 bg-surface-container-low text-on-surface hover:bg-surface-container-high transition-colors"
+                disabled={calendarMonth.getFullYear() === 2026 && calendarMonth.getMonth() <= 5}
+                className="w-10 h-10 rounded-full border border-outline-variant/40 bg-surface-container-low text-on-surface hover:bg-surface-container-high transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 aria-label="Previous month"
               >
                 <span className="material-symbols-outlined text-[20px]">chevron_left</span>
@@ -634,15 +644,16 @@ export default function AttendancePunchStationPage() {
           </div>
 
           <div className="mt-md grid grid-cols-1 xl:grid-cols-[1fr_280px] gap-lg">
-            <div>
-              <div className="grid grid-cols-7 gap-2 mb-2">
-                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                  <div key={day} className="text-center text-[10px] font-bold tracking-widest text-on-surface-variant uppercase">
-                    {day}
-                  </div>
-                ))}
-              </div>
-              <div className="grid grid-cols-7 gap-2">
+            <div className="overflow-x-auto pb-4">
+              <div className="min-w-[500px]">
+                <div className="grid grid-cols-7 gap-2 mb-2">
+                  {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                    <div key={day} className="text-center text-[10px] font-bold tracking-widest text-on-surface-variant uppercase">
+                      {day}
+                    </div>
+                  ))}
+                </div>
+                <div className="grid grid-cols-7 gap-2">
                 {calendarDays.map(day => {
                   const rec = recordsByDate[day.key];
                   const holiday = holidaysByDate[day.key];
@@ -708,6 +719,7 @@ export default function AttendancePunchStationPage() {
                   );
                 })}
               </div>
+            </div>
             </div>
 
             <aside className="rounded-2xl bg-surface-container-low border border-outline-variant/30 p-md">

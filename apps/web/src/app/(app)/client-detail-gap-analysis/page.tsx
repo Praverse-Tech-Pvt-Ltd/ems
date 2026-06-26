@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { clientsService, followUpService } from '@/lib/api/clients';
 import { employeesService } from '@/lib/api/employees';
+import { useQueryClient } from '@tanstack/react-query';
 
 type GapCategory = {
   label: string;
@@ -79,6 +80,7 @@ function buildCategories(company: any, followUps: any[]): GapCategory[] {
 }
 
 export default function ClientDetailGapAnalysisPage() {
+  const queryClient = useQueryClient();
   const [companies, setCompanies] = useState<any[]>([]);
   const [employees, setEmployees] = useState<any[]>([]);
   const [followUps, setFollowUps] = useState<any[]>([]);
@@ -92,9 +94,9 @@ export default function ClientDetailGapAnalysisPage() {
 
   const load = async () => {
     const [c, e, f] = await Promise.all([
-      clientsService.list().catch(() => []),
-      employeesService.list().catch(() => []),
-      followUpService.list().catch(() => []),
+      queryClient.fetchQuery({ queryKey: ['gap-companies'], queryFn: () => clientsService.list() }).catch(() => []),
+      queryClient.fetchQuery({ queryKey: ['gap-employees'], queryFn: () => employeesService.list() }).catch(() => []),
+      queryClient.fetchQuery({ queryKey: ['gap-followups'], queryFn: () => followUpService.list() }).catch(() => []),
     ]);
     const companyList = Array.isArray(c) ? c : c?.data ?? [];
     setCompanies(companyList);

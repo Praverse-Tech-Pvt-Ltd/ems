@@ -4,8 +4,10 @@ import { useEffect, useState } from 'react';
 import { aiProposalsService, workUpdatesService } from '@/lib/api/work-updates';
 import { clientsService } from '@/lib/api/clients';
 import { useAuthStore } from '@/store/auth.store';
+import { useQueryClient } from '@tanstack/react-query';
 
 export default function AdminApprovalsPage() {
+  const queryClient = useQueryClient();
   const user = useAuthStore(s => s.user);
   const isSuperAdmin = user?.role === 'SUPER_ADMIN';
   const [items, setItems] = useState<any[]>([]);
@@ -18,9 +20,9 @@ export default function AdminApprovalsPage() {
   const load = async () => {
     setLoading(true);
     try {
-      const data = await aiProposalsService.all({ status: 'PENDING', limit: 100 }).catch(() => null);
-      const updates = await workUpdatesService.all({ needsReview: true, limit: 100 }).catch(() => null);
-      const allCompanies = await clientsService.list().catch(() => []);
+      const data = await queryClient.fetchQuery({ queryKey: ['admin-ai-proposals'], queryFn: () => aiProposalsService.all({ status: 'PENDING', limit: 100 }) }).catch(() => null);
+      const updates = await queryClient.fetchQuery({ queryKey: ['admin-work-updates'], queryFn: () => workUpdatesService.all({ needsReview: true, limit: 100 }) }).catch(() => null);
+      const allCompanies = await queryClient.fetchQuery({ queryKey: ['admin-companies'], queryFn: () => clientsService.list() }).catch(() => []);
       setItems(Array.isArray(data) ? data : data?.items ?? []);
       setWorkUpdates(Array.isArray(updates) ? updates : updates?.items ?? []);
       setCompanies(Array.isArray(allCompanies) ? allCompanies : allCompanies?.data ?? []);

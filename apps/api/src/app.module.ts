@@ -46,8 +46,8 @@ import { ZohoSyncModule } from './modules/zoho-sync/zoho-sync.module';
     // during normal use.
     // Auth endpoints override this with a stricter 'auth' named throttler (5/60s).
     ThrottlerModule.forRoot([
-      { name: 'default', ttl: 60_000, limit: 300 },
-      { name: 'auth', ttl: 60_000, limit: 5 },
+      { name: 'default', ttl: 60_000, limit: 5000 },
+      { name: 'auth', ttl: 60_000, limit: 15 },
     ]),
     ScheduleModule.forRoot(),
     BullModule.forRootAsync({

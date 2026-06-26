@@ -416,7 +416,9 @@ function EditDrawer({
 }
 
 /* ── Page ────────────────────────────────────────────────────────────── */
+import { useQueryClient } from '@tanstack/react-query';
 export default function EmployeeProfilePage() {
+  const queryClient = useQueryClient();
   const params    = useParams();
   const router    = useRouter();
   const me        = useAuthStore(s => s.user);
@@ -439,14 +441,14 @@ export default function EmployeeProfilePage() {
       setError('');
       try {
         const empData: Employee = isSelf
-          ? await employeesService.me()
-          : await employeesService.byId(rawId);
+          ? await queryClient.fetchQuery({ queryKey: ['employee-me', me?.id], queryFn: () => employeesService.me() })
+          : await queryClient.fetchQuery({ queryKey: ['employee-id', rawId], queryFn: () => employeesService.byId(rawId) });
         setEmp(empData);
 
         if (isSelf && !attendanceBlockedSelf) {
           const [s, b] = await Promise.allSettled([
-            attendanceService.myStats(),
-            leavesService.balance(),
+            queryClient.fetchQuery({ queryKey: ['attendance-stats', me?.id], queryFn: () => attendanceService.myStats() }),
+            queryClient.fetchQuery({ queryKey: ['leaves-balance', me?.id], queryFn: () => leavesService.balance() }),
           ]);
           if (s.status === 'fulfilled') setStats(s.value);
           if (b.status === 'fulfilled') setBalance(Array.isArray(b.value) ? b.value : b.value?.data ?? []);

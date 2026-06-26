@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { salaryService } from '@/lib/api/salary';
 import { useAuthStore } from '@/store/auth.store';
+import { useQueryClient } from '@tanstack/react-query';
 import type { SalarySlip } from '@/types';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -53,6 +54,7 @@ function roundMoney(value: number) {
 }
 
 export default function SalaryPayslipsPage() {
+  const queryClient = useQueryClient();
   const user = useAuthStore(s => s.user);
   const isAdmin = ['ADMIN', 'SUPER_ADMIN'].includes(user?.role ?? '');
 
@@ -67,12 +69,12 @@ export default function SalaryPayslipsPage() {
 
   const load = async () => {
     try {
-      const mine = await salaryService.mySlips().catch(() => []);
+      const mine = await queryClient.fetchQuery({ queryKey: ['salary-my', user?.id], queryFn: () => salaryService.mySlips() }).catch(() => []);
       setMySlips(Array.isArray(mine) ? mine : mine?.data ?? []);
       if (isAdmin) {
-        const all = await salaryService.allSlips({ month: selectedMonth, year: selectedYear }).catch(() => []);
+        const all = await queryClient.fetchQuery({ queryKey: ['salary-all', selectedMonth, selectedYear], queryFn: () => salaryService.allSlips({ month: selectedMonth, year: selectedYear }) }).catch(() => []);
         setAllSlips(Array.isArray(all) ? all : all?.data ?? []);
-        const structureRows = await salaryService.structures().catch(() => []);
+        const structureRows = await queryClient.fetchQuery({ queryKey: ['salary-structures'], queryFn: () => salaryService.structures() }).catch(() => []);
         setStructures(Array.isArray(structureRows) ? structureRows : structureRows?.data ?? []);
       }
     } finally {

@@ -3,8 +3,10 @@
 import { useState, useEffect } from 'react';
 import { managementService } from '@/lib/api/management';
 import { useAuthStore } from '@/store/auth.store';
+import { useQueryClient } from '@tanstack/react-query';
 
 export default function ManagementReviewHubPage() {
+  const queryClient = useQueryClient();
   const user = useAuthStore(s => s.user);
   const isAdmin = ['ADMIN', 'SUPER_ADMIN', 'MANAGER'].includes(user?.role ?? '');
 
@@ -16,9 +18,9 @@ export default function ManagementReviewHubPage() {
   const load = async () => {
     try {
       const [weekly, recs, perf] = await Promise.all([
-        managementService.weeklyReview().catch(() => null),
-        managementService.aiRecommendations().catch(() => []),
-        managementService.employeePerformance(30).catch(() => []),
+        queryClient.fetchQuery({ queryKey: ['management-weekly'], queryFn: () => managementService.weeklyReview() }).catch(() => null),
+        queryClient.fetchQuery({ queryKey: ['management-ai-recs'], queryFn: () => managementService.aiRecommendations() }).catch(() => []),
+        queryClient.fetchQuery({ queryKey: ['management-perf', 30], queryFn: () => managementService.employeePerformance(30) }).catch(() => []),
       ]);
       setWeeklyData(weekly);
       setRecommendations(Array.isArray(recs) ? recs : recs?.recommendations ?? []);

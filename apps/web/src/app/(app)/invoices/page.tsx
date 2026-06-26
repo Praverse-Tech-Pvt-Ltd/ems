@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Search } from 'lucide-react';
 import { invoicesService } from '@/lib/api/invoices';
 import { useAuthStore } from '@/store/auth.store';
+import { useQueryClient } from '@tanstack/react-query';
 
 const FILTERS = ['All', 'PENDING', 'APPROVED', 'REJECTED', 'PAID', 'OVERDUE'] as const;
 
@@ -19,6 +20,7 @@ const statusClass: Record<string, string> = {
 };
 
 export default function InvoicesPage() {
+  const queryClient = useQueryClient();
   const user = useAuthStore(s => s.user);
   const isSuperAdmin = user?.role === 'SUPER_ADMIN';
   const [invoices, setInvoices] = useState<any[]>([]);
@@ -29,7 +31,7 @@ export default function InvoicesPage() {
   const load = async () => {
     setLoading(true);
     try {
-      const data = await invoicesService.list().catch(() => []);
+      const data = await queryClient.fetchQuery({ queryKey: ['invoices-all'], queryFn: () => invoicesService.list() }).catch(() => []);
       setInvoices(Array.isArray(data) ? data : data?.items ?? []);
     } finally {
       setLoading(false);

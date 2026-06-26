@@ -101,7 +101,7 @@ export function AppTopNav({
 
   return (
     <header
-      className="h-14 flex items-center px-4 gap-3 flex-shrink-0 z-30"
+      className="h-14 flex items-center px-2 md:px-4 gap-2 md:gap-3 flex-shrink-0 z-30"
       style={{
         background: 'rgba(250,248,255,0.92)',
         backdropFilter: 'blur(20px) saturate(1.4)',

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { expensesService } from '@/lib/api/expenses';
 import { useAuthStore } from '@/store/auth.store';
+import { useQueryClient } from '@tanstack/react-query';
 import type { Expense } from '@/types';
 
 const CATEGORY_ICONS: Record<string, string> = {
@@ -20,6 +21,7 @@ const STATUS_COLOR: Record<string, string> = {
 };
 
 export default function ExpenseTrackerPage() {
+  const queryClient = useQueryClient();
   const user = useAuthStore(s => s.user);
   const isAdmin = ['ADMIN', 'SUPER_ADMIN', 'MANAGER'].includes(user?.role ?? '');
 
@@ -40,10 +42,10 @@ export default function ExpenseTrackerPage() {
 
   const load = async () => {
     try {
-      const mine = await expensesService.my().catch(() => []);
+      const mine = await queryClient.fetchQuery({ queryKey: ['expenses-my', user?.id], queryFn: () => expensesService.my() }).catch(() => []);
       setMyExpenses(Array.isArray(mine) ? mine : mine?.data ?? []);
       if (isAdmin) {
-        const all = await expensesService.all({ status: 'SUBMITTED' }).catch(() => []);
+        const all = await queryClient.fetchQuery({ queryKey: ['expenses-all-submitted'], queryFn: () => expensesService.all({ status: 'SUBMITTED' }) }).catch(() => []);
         setAllExpenses(Array.isArray(all) ? all : all?.data ?? []);
       }
     } finally {
