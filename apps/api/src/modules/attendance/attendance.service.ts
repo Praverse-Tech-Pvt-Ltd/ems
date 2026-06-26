@@ -255,7 +255,7 @@ export class AttendanceService {
     const isGeoValid = await this.geoFence.isWithinAnyOffice(dto.latitude, dto.longitude);
     const now        = new Date();
     const punchMins  = this.minutesSinceMidnight(now);
-    const { DESIGNATED_START, LATE_CUTOFF } = await this.getEmployeeTimeConstraints(employeeId);
+    const { LATE_CUTOFF } = await this.getEmployeeTimeConstraints(employeeId);
 
     // ── Determine punch-in status ────────────────────────────────────────────
     let punchInStatus: 'PRESENT' | 'LATE' | 'HALF_DAY' | 'WFH' | 'LEAVE';
@@ -263,15 +263,11 @@ export class AttendanceService {
     if (!isGeoValid) {
       // Outside geo-fence: WFH, no time penalty
       punchInStatus = 'WFH';
-    } else if (punchMins <= DESIGNATED_START) {
-      // Punched in before or at designated start
-      punchInStatus = 'PRESENT';
     } else if (punchMins <= LATE_CUTOFF) {
-      // Late punch-in window (Grace window: up to 30 mins after designated start)
-      const lateCount = await this.countLateThisMonth(employeeId);
-      punchInStatus   = lateCount < MAX_LATE_PM ? 'LATE' : 'HALF_DAY';
+      // Punched in within the allowed grace window.
+      punchInStatus = 'PRESENT';
     } else {
-      // Punched in after 30 mins after designated start: HALF_DAY
+      // Punched in after the allowed grace window.
       punchInStatus = 'HALF_DAY';
     }
 
@@ -361,37 +357,19 @@ export class AttendanceService {
     const punchOutMins  = this.minutesSinceMidnight(now);
     const workingHours  = (now.getTime() - record.punchInTime.getTime()) / (1000 * 60 * 60);
     const timeStr       = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
-    const { DESIGNATED_END, EARLY_OUT_CUTOFF } = await this.getEmployeeTimeConstraints(employeeId);
+    const { EARLY_OUT_CUTOFF } = await this.getEmployeeTimeConstraints(employeeId);
 
     // ── Determine final status ───────────────────────────────────────────────
     let finalStatus: string = record.status;     // inherit punch-in status
-    let earlyExitWarning    = false;
-    let earlyOutRemaining   = 0;
 
     if (record.status === 'WFH') {
-      // WFH punch-outs are never penalised for time
       finalStatus = 'WFH';
     } else if (workingHours < HALF_DAY_HOURS) {
-      // Worked less than 4 h regardless of clock time → HALF_DAY
       finalStatus = 'HALF_DAY';
     } else if (punchOutMins < EARLY_OUT_CUTOFF) {
-      // Punched out earlier than 30 mins before designated punch out → HALF_DAY
       finalStatus = 'HALF_DAY';
-    } else if (punchOutMins < DESIGNATED_END) {
-      // Early punch out within 30-min window before designated end
-      const earlyCount = await this.countEarlyPunchOutsThisMonth(employeeId);
-      if (earlyCount >= MAX_EARLY_PM) {
-        // Allowances exhausted → HALF_DAY
-        finalStatus      = 'HALF_DAY';
-        earlyExitWarning = true;
-      } else {
-        // Within allowance: status stays as punch-in status
-        finalStatus      = record.status;
-        earlyExitWarning = true;
-        earlyOutRemaining = MAX_EARLY_PM - earlyCount - 1; // after this punch-out
-      }
     }
-    // else: punched out at 5:45 PM or later → keep punch-in status
+    // else: punched out at or after the allowed early punch-out limit.
 
     // If HALF_DAY, check monthly cap
     if (finalStatus === 'HALF_DAY') {
