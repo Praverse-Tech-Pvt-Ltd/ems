@@ -14,5 +14,8 @@ export const leavesService = {
     apiClient.get('/leaves', { params }).then(r => r.data),
 
   approve: (id: string, action: 'APPROVE' | 'REJECT', comment?: string) =>
-    apiClient.patch(`/leaves/${id}/approve`, { action, comment }).then(r => r.data),
+    apiClient.patch(`/leaves/${id}/approve`, {
+      action: action === 'APPROVE' ? 'approve' : 'reject',
+      rejectionReason: comment,
+    }).then(r => r.data),
 };
