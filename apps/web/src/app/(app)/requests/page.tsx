@@ -2,57 +2,43 @@
 
 import { useState } from 'react';
 import { useAuthStore } from '@/store/auth.store';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiClient } from '@/lib/api-client';
-import { X, Plus, ChevronRight, Clock, CheckCircle2, XCircle, AlertCircle, FileText, Laptop, Home, PlaneTakeoff, CreditCard, ClipboardList, MoreHorizontal } from 'lucide-react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { requestsService } from '@/lib/api/requests';
+import { X, Plus, ChevronRight, Clock, CheckCircle2, XCircle, AlertCircle, FileText, Laptop, Home, PlaneTakeoff, CreditCard, ClipboardList } from 'lucide-react';
 
 /* ── Types ──────────────────────────────────────────────────────────── */
-type RequestType = 'WFH' | 'ADVANCE' | 'DOCUMENT' | 'ASSET' | 'TRAVEL' | 'ATTENDANCE_CORRECTION' | 'OTHER';
-type RequestStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'IN_REVIEW';
+type RequestType = 'WFH' | 'ADVANCE_PAYMENT' | 'DOCUMENT_REQUEST' | 'ASSET_REQUEST' | 'TRAVEL_APPROVAL' | 'ATTENDANCE_CORRECTION' | 'OTHER';
+type RequestStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'UNDER_REVIEW' | 'CANCELLED';
 
 interface EmployeeRequest {
   id: string;
-  type: RequestType;
+  requestType: RequestType;
   status: RequestStatus;
-  subject: string;
-  description: string;
+  details: { subject?: string; description?: string } & Record<string, unknown>;
   createdAt: string;
-  resolvedAt?: string;
-  adminNote?: string;
+  reviewedAt?: string | null;
+  comment?: string | null;
   employee?: { firstName: string; lastName: string; employeeCode: string };
 }
 
 /* ── Config ─────────────────────────────────────────────────────────── */
 const REQUEST_TYPES: { key: RequestType; label: string; icon: React.ElementType; desc: string; color: string; bg: string }[] = [
   { key: 'WFH',                  label: 'Work From Home',       icon: Home,          desc: 'Request remote work days',         color: '#01677d', bg: 'rgba(1,103,125,0.10)' },
-  { key: 'ADVANCE',              label: 'Salary Advance',       icon: CreditCard,    desc: 'Early salary disbursement',        color: '#aa3000', bg: 'rgba(170,48,0,0.10)' },
-  { key: 'DOCUMENT',             label: 'Document Request',     icon: FileText,      desc: 'Letters, certificates, NOC',       color: '#6d5a00', bg: 'rgba(109,90,0,0.10)' },
-  { key: 'ASSET',                label: 'Asset Request',        icon: Laptop,        desc: 'Equipment, tools, hardware',       color: '#006637', bg: 'rgba(0,102,55,0.10)' },
-  { key: 'TRAVEL',               label: 'Travel Approval',      icon: PlaneTakeoff,  desc: 'Official travel & expenses',       color: '#4a1977', bg: 'rgba(74,25,119,0.10)' },
+  { key: 'ADVANCE_PAYMENT',      label: 'Salary Advance',       icon: CreditCard,    desc: 'Early salary disbursement',        color: '#aa3000', bg: 'rgba(170,48,0,0.10)' },
+  { key: 'DOCUMENT_REQUEST',     label: 'Document Request',     icon: FileText,      desc: 'Letters, certificates, NOC',       color: '#6d5a00', bg: 'rgba(109,90,0,0.10)' },
+  { key: 'ASSET_REQUEST',        label: 'Asset Request',        icon: Laptop,        desc: 'Equipment, tools, hardware',       color: '#006637', bg: 'rgba(0,102,55,0.10)' },
+  { key: 'TRAVEL_APPROVAL',      label: 'Travel Approval',      icon: PlaneTakeoff,  desc: 'Official travel & expenses',       color: '#4a1977', bg: 'rgba(74,25,119,0.10)' },
   { key: 'ATTENDANCE_CORRECTION',label: 'Attendance Fix',       icon: Clock,         desc: 'Correct punch in/out records',     color: '#8a2000', bg: 'rgba(138,32,0,0.10)' },
   { key: 'OTHER',                label: 'Other Request',        icon: ClipboardList, desc: 'Anything else you need',           color: '#59413a', bg: 'rgba(89,65,58,0.10)' },
 ];
 
 const STATUS_CONFIG: Record<RequestStatus, { label: string; icon: React.ElementType; pill: string; dot: string }> = {
-  PENDING:   { label: 'Pending',   icon: Clock,          pill: 'bg-tertiary/10 text-tertiary border-tertiary/20',                       dot: 'bg-tertiary' },
-  IN_REVIEW: { label: 'In Review', icon: AlertCircle,    pill: 'bg-secondary/10 text-secondary border-secondary/20',                    dot: 'bg-secondary animate-pulse' },
-  APPROVED:  { label: 'Approved',  icon: CheckCircle2,   pill: 'bg-success/10 text-success border-success/20',                          dot: 'bg-success' },
-  REJECTED:  { label: 'Rejected',  icon: XCircle,        pill: 'bg-error/10 text-error border-error/20',                               dot: 'bg-error' },
+  PENDING:      { label: 'Pending',   icon: Clock,          pill: 'bg-tertiary/10 text-tertiary border-tertiary/20',                       dot: 'bg-tertiary' },
+  UNDER_REVIEW: { label: 'In Review', icon: AlertCircle,    pill: 'bg-secondary/10 text-secondary border-secondary/20',                    dot: 'bg-secondary animate-pulse' },
+  APPROVED:     { label: 'Approved',  icon: CheckCircle2,   pill: 'bg-success/10 text-success border-success/20',                          dot: 'bg-success' },
+  REJECTED:     { label: 'Rejected',  icon: XCircle,        pill: 'bg-error/10 text-error border-error/20',                               dot: 'bg-error' },
+  CANCELLED:    { label: 'Cancelled', icon: XCircle,        pill: 'bg-on-surface-variant/10 text-on-surface-variant border-on-surface-variant/20', dot: 'bg-on-surface-variant' },
 };
-
-/* ── Mock data (shown while API loads / no backend data) ─────────────── */
-const MOCK_REQUESTS: EmployeeRequest[] = [
-  { id: 'm1', type: 'WFH',      status: 'APPROVED',  subject: 'WFH – June 10–12', description: 'Family obligations', createdAt: '2026-06-05T09:00:00Z', resolvedAt: '2026-06-06T10:00:00Z', adminNote: 'Approved. Ensure daily standups.' },
-  { id: 'm2', type: 'DOCUMENT', status: 'PENDING',   subject: 'Experience Letter', description: 'Need for visa application', createdAt: '2026-06-07T14:30:00Z' },
-  { id: 'm3', type: 'ADVANCE',  status: 'REJECTED',  subject: '₹20,000 Advance', description: 'Medical emergency expenses', createdAt: '2026-06-03T11:00:00Z', resolvedAt: '2026-06-04T09:00:00Z', adminNote: 'Policy allows one advance per quarter. Already utilised.' },
-  { id: 'm4', type: 'TRAVEL',   status: 'IN_REVIEW', subject: 'Mumbai Client Visit', description: 'Q2 review meeting with Cipla', createdAt: '2026-06-08T08:00:00Z' },
-];
-
-const MOCK_ADMIN_QUEUE: EmployeeRequest[] = [
-  { id: 'a1', type: 'WFH',      status: 'PENDING', subject: 'WFH – June 15', description: 'Personal work at home', createdAt: '2026-06-07T10:00:00Z', employee: { firstName: 'Chandni', lastName: 'Jha', employeeCode: 'EMP-004' } },
-  { id: 'a2', type: 'ASSET',    status: 'PENDING', subject: 'MacBook Pro 14"', description: 'Current laptop is 4 years old and slow', createdAt: '2026-06-06T14:00:00Z', employee: { firstName: 'Dev', lastName: 'Patel', employeeCode: 'EMP-002' } },
-  { id: 'a3', type: 'DOCUMENT', status: 'PENDING', subject: 'Salary Certificate', description: 'Required for home loan application', createdAt: '2026-06-05T09:30:00Z', employee: { firstName: 'Shifa', lastName: 'Mobh', employeeCode: 'EMP-005' } },
-];
 
 /* ── Helpers ─────────────────────────────────────────────────────────── */
 function typeConfig(type: RequestType): typeof REQUEST_TYPES[number] {
@@ -88,7 +74,7 @@ function NewRequestDrawer({ open, onClose }: { open: boolean; onClose: () => voi
     if (!selectedType || !form.subject || !form.description) return;
     setSubmitting(true);
     try {
-      await apiClient.post('/requests', { type: selectedType, subject: form.subject, description: form.description });
+      await requestsService.create(selectedType, { subject: form.subject, description: form.description });
       qc.invalidateQueries({ queryKey: ['my-requests'] });
       setDone(true);
     } catch {
@@ -237,20 +223,22 @@ function NewRequestDrawer({ open, onClose }: { open: boolean; onClose: () => voi
 }
 
 /* ── Request Card ────────────────────────────────────────────────────── */
-function RequestCard({ req, onAdminAction }: { req: EmployeeRequest; onAdminAction?: (id: string, action: 'APPROVE' | 'REJECT', note: string) => void }) {
+function RequestCard({ req, onAdminAction }: { req: EmployeeRequest; onAdminAction?: (id: string, status: 'APPROVED' | 'REJECTED', comment: string) => void }) {
   const [expanded, setExpanded] = useState(false);
   const [adminNote, setAdminNote] = useState('');
   const [actioning, setActioning] = useState<string | null>(null);
 
-  const tc = typeConfig(req.type);
+  const tc = typeConfig(req.requestType);
   const sc = STATUS_CONFIG[req.status];
   const Icon = tc.icon;
   const StatusIcon = sc.icon;
+  const subject = req.details?.subject ?? tc.label;
+  const description = req.details?.description ?? '';
 
-  const handleAction = async (action: 'APPROVE' | 'REJECT') => {
+  const handleAction = async (status: 'APPROVED' | 'REJECTED') => {
     if (!onAdminAction) return;
-    setActioning(action);
-    await onAdminAction(req.id, action, adminNote);
+    setActioning(status);
+    await onAdminAction(req.id, status, adminNote);
     setActioning(null);
     setExpanded(false);
   };
@@ -279,8 +267,8 @@ function RequestCard({ req, onAdminAction }: { req: EmployeeRequest; onAdminActi
                   {req.employee.firstName} {req.employee.lastName} · {req.employee.employeeCode}
                 </div>
               )}
-              <div className="text-[13px] sm:text-[14px] font-bold text-on-surface truncate">{req.subject}</div>
-              <div className="text-[11.5px] text-on-surface-variant mt-0.5 line-clamp-1">{req.description}</div>
+              <div className="text-[13px] sm:text-[14px] font-bold text-on-surface truncate">{subject}</div>
+              <div className="text-[11.5px] text-on-surface-variant mt-0.5 line-clamp-1">{description}</div>
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
               <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10.5px] font-bold border ${sc.pill}`}>
@@ -294,7 +282,7 @@ function RequestCard({ req, onAdminAction }: { req: EmployeeRequest; onAdminActi
             <span style={{ color: tc.color, fontWeight: 700, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{tc.label}</span>
             <span>·</span>
             <span>{fmtRel(req.createdAt)}</span>
-            {req.resolvedAt && <><span>·</span><span>Resolved {fmt(req.resolvedAt)}</span></>}
+            {req.reviewedAt && <><span>·</span><span>Resolved {fmt(req.reviewedAt)}</span></>}
           </div>
         </div>
 
@@ -311,12 +299,12 @@ function RequestCard({ req, onAdminAction }: { req: EmployeeRequest; onAdminActi
           <div className="mt-4 space-y-3">
             <div>
               <div className="text-[10px] font-bold text-on-surface-variant/60 uppercase tracking-widest mb-1">Full Description</div>
-              <p className="text-[12.5px] text-on-surface leading-relaxed">{req.description}</p>
+              <p className="text-[12.5px] text-on-surface leading-relaxed">{description}</p>
             </div>
-            {req.adminNote && (
+            {req.comment && (
               <div className="p-3 rounded-xl" style={{ background: 'rgba(1,103,125,0.06)', border: '1px solid rgba(1,103,125,0.15)' }}>
                 <div className="text-[10px] font-bold text-secondary uppercase tracking-widest mb-1">Admin Note</div>
-                <p className="text-[12.5px] text-on-surface">{req.adminNote}</p>
+                <p className="text-[12.5px] text-on-surface">{req.comment}</p>
               </div>
             )}
             {onAdminAction && req.status === 'PENDING' && (
@@ -330,18 +318,18 @@ function RequestCard({ req, onAdminAction }: { req: EmployeeRequest; onAdminActi
                 />
                 <div className="flex gap-2">
                   <button
-                    onClick={() => handleAction('APPROVE')}
+                    onClick={() => handleAction('APPROVED')}
                     disabled={actioning !== null}
                     className="flex-1 py-2 rounded-xl text-[12px] font-bold text-success bg-success/10 border border-success/20 hover:bg-success/20 transition-colors disabled:opacity-50"
                   >
-                    {actioning === 'APPROVE' ? '…' : '✓ Approve'}
+                    {actioning === 'APPROVED' ? '…' : '✓ Approve'}
                   </button>
                   <button
-                    onClick={() => handleAction('REJECT')}
+                    onClick={() => handleAction('REJECTED')}
                     disabled={actioning !== null}
                     className="flex-1 py-2 rounded-xl text-[12px] font-bold text-error bg-error/10 border border-error/20 hover:bg-error/20 transition-colors disabled:opacity-50"
                   >
-                    {actioning === 'REJECT' ? '…' : '✗ Reject'}
+                    {actioning === 'REJECTED' ? '…' : '✗ Reject'}
                   </button>
                 </div>
               </div>
@@ -377,22 +365,22 @@ export default function RequestsPage() {
   /* ── API: my requests ── */
   const myQ = useQuery({
     queryKey: ['my-requests'],
-    queryFn: () => apiClient.get('/requests/my').then(r => r.data as EmployeeRequest[]),
+    queryFn: () => requestsService.my() as Promise<EmployeeRequest[]>,
   });
-  const myRequests: EmployeeRequest[] = myQ.data ?? MOCK_REQUESTS;
+  const myRequests: EmployeeRequest[] = myQ.data ?? [];
 
   /* ── API: admin queue ── */
   const adminQ = useQuery({
     queryKey: ['admin-requests'],
-    queryFn: () => apiClient.get('/requests?status=PENDING').then(r => r.data as EmployeeRequest[]),
+    queryFn: () => requestsService.all({ status: 'PENDING' }) as Promise<EmployeeRequest[]>,
     enabled: isAdmin,
   });
-  const adminRequests: EmployeeRequest[] = adminQ.data ?? MOCK_ADMIN_QUEUE;
+  const adminRequests: EmployeeRequest[] = adminQ.data ?? [];
 
   /* ── Admin action ── */
-  const handleAdminAction = async (id: string, action: 'APPROVE' | 'REJECT', note: string) => {
+  const handleAdminAction = async (id: string, status: 'APPROVED' | 'REJECTED', comment: string) => {
     try {
-      await apiClient.patch(`/requests/${id}`, { status: action === 'APPROVE' ? 'APPROVED' : 'REJECTED', adminNote: note });
+      await requestsService.approve(id, status, comment || undefined);
       qc.invalidateQueries({ queryKey: ['admin-requests'] });
       qc.invalidateQueries({ queryKey: ['my-requests'] });
     } catch { /* ignore */ }
@@ -401,7 +389,7 @@ export default function RequestsPage() {
   /* ── Filtered lists ── */
   const filteredMine = myRequests.filter(r =>
     (filterStatus === 'ALL' || r.status === filterStatus) &&
-    (filterType === 'ALL' || r.type === filterType)
+    (filterType === 'ALL' || r.requestType === filterType)
   );
 
   const pendingCount = adminRequests.filter(r => r.status === 'PENDING').length;
@@ -505,7 +493,7 @@ export default function RequestsPage() {
         {/* ── Filters ── */}
         {(tab === 'mine' || !isAdmin) && (
           <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-hide">
-            {(['ALL', 'PENDING', 'IN_REVIEW', 'APPROVED', 'REJECTED'] as const).map(s => (
+            {(['ALL', 'PENDING', 'UNDER_REVIEW', 'APPROVED', 'REJECTED'] as const).map(s => (
               <button
                 key={s}
                 onClick={() => setFilterStatus(s)}
