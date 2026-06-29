@@ -10,6 +10,9 @@ export const leavesService = {
   balance: (year?: number) =>
     apiClient.get('/leaves/balance', { params: year ? { year } : {} }).then(r => r.data),
 
+  forEmployee: (id: string) =>
+    apiClient.get(`/leaves/employee/${id}`).then(r => r.data),
+
   all: (params?: { status?: string; page?: number; limit?: number }) =>
     apiClient.get('/leaves', { params }).then(r => r.data),
 

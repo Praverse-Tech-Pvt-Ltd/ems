@@ -21,6 +21,37 @@ const LEAVE_COLOR: Record<string, string> = {
   PL: '#aa3000', CL: '#059669', SL: '#ba1a1a', UL: '#7c4dff', CO: '#01677d',
 };
 
+type EmployeeAttendanceOverview = {
+  period: { month: string };
+  summary: {
+    totalRecords: number;
+    present: number;
+    late: number;
+    halfDay: number;
+    leave: number;
+    absent: number;
+    wfh: number;
+    attended: number;
+    lateFrequency: number;
+    punctuality: number;
+    totalHours: number;
+  };
+  today: any | null;
+  records: any[];
+};
+
+type EmployeeLeaveOverview = {
+  requests: any[];
+  balances: LeaveBalance[];
+  summary: {
+    submitted: number;
+    pending: number;
+    approved: number;
+    rejected: number;
+    approvedDays: number;
+  };
+};
+
 function initials(emp: Employee) {
   return `${emp.firstName[0] ?? ''}${emp.lastName[0] ?? ''}`.toUpperCase();
 }
@@ -426,6 +457,8 @@ export default function EmployeeProfilePage() {
   const [emp,       setEmp]       = useState<Employee | null>(null);
   const [stats,     setStats]     = useState<AttendanceStats | null>(null);
   const [balance,   setBalance]   = useState<LeaveBalance[]>([]);
+  const [attendanceOverview, setAttendanceOverview] = useState<EmployeeAttendanceOverview | null>(null);
+  const [leaveOverview, setLeaveOverview] = useState<EmployeeLeaveOverview | null>(null);
   const [loading,   setLoading]   = useState(true);
   const [error,     setError]     = useState('');
   const [showEdit,  setShowEdit]  = useState(false);
@@ -448,6 +481,16 @@ export default function EmployeeProfilePage() {
           ]);
           if (s.status === 'fulfilled') setStats(s.value);
           if (b.status === 'fulfilled') setBalance(Array.isArray(b.value) ? b.value : b.value?.data ?? []);
+        } else if (isAdmin) {
+          const [attendance, leave] = await Promise.allSettled([
+            attendanceService.employeeOverview(rawId),
+            leavesService.forEmployee(rawId),
+          ]);
+          if (attendance.status === 'fulfilled') setAttendanceOverview(attendance.value);
+          if (leave.status === 'fulfilled') {
+            setLeaveOverview(leave.value);
+            setBalance(Array.isArray(leave.value?.balances) ? leave.value.balances : []);
+          }
         }
       } catch {
         setError('Could not load profile. Please try again.');
@@ -509,6 +552,8 @@ export default function EmployeeProfilePage() {
   }
 
   const attendancePct = stats?.attendancePercent ?? null;
+  const employeeAttendance = attendanceOverview?.summary;
+  const employeeLeave = leaveOverview?.summary;
 
   return (
     <>
@@ -602,14 +647,19 @@ export default function EmployeeProfilePage() {
             </div>
 
             {/* Stats row — self only */}
-            {isSelf && (
+            {(isSelf || isAdmin) && (
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {[
+                {(isSelf ? [
                   { label: 'Attendance', value: attendancePct != null ? `${attendancePct.toFixed(1)}%` : '—', icon: 'fingerprint', accent: '#01677d', sub: stats ? `${stats.daysPresent}/${stats.totalWorkingDays} days` : 'This month' },
                   { label: 'Days Present', value: stats?.daysPresent != null ? String(stats.daysPresent) : '—', icon: 'how_to_reg', accent: '#059669', sub: 'This month' },
                   { label: 'Days on Leave', value: stats?.daysOnLeave != null ? String(stats.daysOnLeave) : '—', icon: 'event_available', accent: '#aa3000', sub: 'This month' },
                   { label: 'Days Absent', value: stats?.daysAbsent != null ? String(stats.daysAbsent) : '—', icon: 'event_busy', accent: '#ba1a1a', sub: 'This month' },
-                ].map(s => (
+                ] : [
+                  { label: 'Today', value: attendanceOverview?.today?.status ?? 'NO RECORD', icon: 'today', accent: '#01677d', sub: attendanceOverview?.period.month ?? 'Current month' },
+                  { label: 'Late Frequency', value: employeeAttendance ? `${employeeAttendance.lateFrequency}%` : '-', icon: 'schedule', accent: '#aa3000', sub: employeeAttendance ? `${employeeAttendance.late} late arrivals` : 'Current month' },
+                  { label: 'Leave Submitted', value: employeeLeave ? String(employeeLeave.submitted) : '-', icon: 'event_available', accent: '#7c4dff', sub: employeeLeave ? `${employeeLeave.pending} pending` : 'All requests' },
+                  { label: 'Punctuality', value: employeeAttendance ? `${employeeAttendance.punctuality}%` : '-', icon: 'verified', accent: '#059669', sub: employeeAttendance ? `${employeeAttendance.attended} attended days` : 'Current month' },
+                ]).map(s => (
                   <div key={s.label} className="glass-card rounded-2xl p-4 card-hover" style={{ borderLeft: `3px solid ${s.accent}` }}>
                     <div className="w-8 h-8 rounded-lg flex items-center justify-center mb-3" style={{ background: `${s.accent}14` }}>
                       <span className="material-symbols-outlined text-[16px]" style={{ color: s.accent, fontVariationSettings: "'FILL' 1" }}>{s.icon}</span>
@@ -619,6 +669,94 @@ export default function EmployeeProfilePage() {
                     <div className="text-[10.5px] text-on-surface-variant/50 mt-0.5">{s.sub}</div>
                   </div>
                 ))}
+              </div>
+            )}
+
+            {isAdmin && !isSelf && (
+              <div id="employee-attendance-status" className="space-y-4 scroll-mt-6">
+                <div className="glass-card rounded-2xl p-5 space-y-4">
+                  <div className="flex items-center justify-between gap-3 flex-wrap">
+                    <div>
+                      <h2 className="text-[14px] font-bold text-on-surface">Attendance Status</h2>
+                      <p className="text-[11.5px] text-on-surface-variant mt-0.5">{attendanceOverview?.period.month ?? 'Current month'}</p>
+                    </div>
+                    <span className={`chip border ${attendanceOverview?.today?.status === 'LATE' ? 'bg-primary/10 text-primary border-primary/20' : attendanceOverview?.today ? 'bg-success/10 text-success border-success/20' : 'bg-on-surface-variant/10 text-on-surface-variant border-on-surface-variant/20'}`}>
+                      Today: {attendanceOverview?.today?.status ?? 'NO RECORD'}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
+                    {[
+                      ['Present', employeeAttendance?.present ?? 0, '#059669'],
+                      ['Late', employeeAttendance?.late ?? 0, '#aa3000'],
+                      ['Half Day', employeeAttendance?.halfDay ?? 0, '#7c4dff'],
+                      ['Leave', employeeAttendance?.leave ?? 0, '#01677d'],
+                      ['Absent', employeeAttendance?.absent ?? 0, '#ba1a1a'],
+                      ['WFH', employeeAttendance?.wfh ?? 0, '#1565c0'],
+                    ].map(([label, value, color]) => (
+                      <div key={String(label)} className="rounded-xl border border-card-border p-3 text-center">
+                        <p className="text-[18px] font-black" style={{ color: String(color) }}>{String(value)}</p>
+                        <p className="text-[10.5px] text-on-surface-variant mt-0.5">{String(label)}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="overflow-x-auto rounded-xl border border-card-border">
+                    <table className="w-full min-w-[650px]">
+                      <thead className="bg-surface-container-low">
+                        <tr>
+                          {['Date', 'Status', 'Punch In', 'Punch Out', 'Hours', 'Manual'].map(label => (
+                            <th key={label} className="px-3 py-2 text-left text-[10px] font-bold text-on-surface-variant uppercase tracking-wide">{label}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-card-border">
+                        {(attendanceOverview?.records ?? []).slice(0, 15).map(record => (
+                          <tr key={record.id}>
+                            <td className="px-3 py-2.5 text-[12px] text-on-surface">{fmtDate(record.date)}</td>
+                            <td className="px-3 py-2.5"><span className="chip border bg-surface-container text-on-surface border-card-border">{record.status}</span></td>
+                            <td className="px-3 py-2.5 text-[12px] text-on-surface-variant">{record.punchInTime ? new Date(record.punchInTime).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit' }) : '-'}</td>
+                            <td className="px-3 py-2.5 text-[12px] text-on-surface-variant">{record.punchOutTime ? new Date(record.punchOutTime).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit' }) : '-'}</td>
+                            <td className="px-3 py-2.5 text-[12px] text-on-surface-variant">{record.workingHours ?? '-'}</td>
+                            <td className="px-3 py-2.5 text-[12px] text-on-surface-variant">{record.isManualPunch ? 'Yes' : 'No'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    {(attendanceOverview?.records ?? []).length === 0 && (
+                      <div className="p-5 text-center text-[12px] text-on-surface-variant">No attendance records this month.</div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="glass-card rounded-2xl p-5 space-y-4">
+                  <div className="flex items-center justify-between gap-3 flex-wrap">
+                    <div>
+                      <h2 className="text-[14px] font-bold text-on-surface">Leave Status</h2>
+                      <p className="text-[11.5px] text-on-surface-variant mt-0.5">Submitted and reviewed leave requests</p>
+                    </div>
+                    <div className="flex gap-2 text-[10.5px] font-semibold">
+                      <span className="chip border bg-primary/10 text-primary border-primary/20">{employeeLeave?.pending ?? 0} pending</span>
+                      <span className="chip border bg-success/10 text-success border-success/20">{employeeLeave?.approved ?? 0} approved</span>
+                      <span className="chip border bg-error/10 text-error border-error/20">{employeeLeave?.rejected ?? 0} rejected</span>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-2">
+                    {(leaveOverview?.requests ?? []).slice(0, 10).map(request => (
+                      <div key={request.id} className="rounded-xl border border-card-border px-4 py-3 flex items-start justify-between gap-3 flex-wrap">
+                        <div>
+                          <p className="text-[12.5px] font-semibold text-on-surface">{request.leaveType} · {request.totalDays} day{request.totalDays === 1 ? '' : 's'}</p>
+                          <p className="text-[11.5px] text-on-surface-variant mt-0.5">{fmtDate(request.fromDate)} to {fmtDate(request.toDate)} · {request.reason}</p>
+                        </div>
+                        <span className={`chip border ${request.status === 'APPROVED' ? 'bg-success/10 text-success border-success/20' : request.status === 'REJECTED' ? 'bg-error/10 text-error border-error/20' : 'bg-primary/10 text-primary border-primary/20'}`}>{request.status}</span>
+                      </div>
+                    ))}
+                    {(leaveOverview?.requests ?? []).length === 0 && (
+                      <div className="p-4 text-center text-[12px] text-on-surface-variant">No leave requests submitted.</div>
+                    )}
+                  </div>
+                </div>
               </div>
             )}
 
@@ -706,11 +844,18 @@ export default function EmployeeProfilePage() {
                   <div className="flex flex-col gap-2">
                     {[
                       { label: 'Send Message',   icon: 'forum',           href: '/messaging-chat-hub',        accent: '#01677d' },
-                      { label: 'View Attendance',icon: 'fingerprint',      href: isSelf ? '/attendance-punch-station' : null, accent: '#aa3000' },
+                      { label: 'View Attendance',icon: 'fingerprint',      href: isSelf ? '/attendance-punch-station' : isAdmin ? '#employee-attendance-status' : null, accent: '#aa3000' },
                       ...(isSelf ? [{ label: 'Apply for Leave', icon: 'event_available', href: '/leave-center', accent: '#059669' }] : []),
                     ].map(a => (
                       <button key={a.label}
-                        onClick={() => a.href && router.push(a.href)}
+                        onClick={() => {
+                          if (!a.href) return;
+                          if (a.href.startsWith('#')) {
+                            document.querySelector(a.href)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                          } else {
+                            router.push(a.href);
+                          }
+                        }}
                         disabled={!a.href}
                         className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-medium text-on-surface hover:bg-surface-container transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                         style={{ border: '1px solid rgba(226,191,181,0.3)' }}>
