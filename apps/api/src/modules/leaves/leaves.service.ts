@@ -96,55 +96,61 @@ export class LeavesService {
     if (leave.employeeId === approverId) {
       throw new ForbiddenException('You cannot approve your own leave request');
     }
+    if (leave.status !== 'PENDING') {
+      throw new BadRequestException(`Leave request is already ${leave.status.toLowerCase()}`);
+    }
+    if (action === 'reject' && !rejectionReason?.trim()) {
+      throw new BadRequestException('Rejection reason is required');
+    }
 
-    const updated = await this.prisma.leaveRequest.update({
-      where: { id },
-      data: {
-        status: action === 'approve' ? 'APPROVED' : 'REJECTED',
-        approvedBy: approverId,
-        approvedAt: new Date(),
-        rejectionReason: action === 'reject' ? rejectionReason : null,
-      },
-    });
-
-    if (action === 'approve') {
-      const year = leave.fromDate.getFullYear();
-      await this.prisma.leaveBalance.upsert({
-        where: {
-          employeeId_leaveType_year: {
+    return this.prisma.$transaction(async (tx) => {
+      if (action === 'approve') {
+        const year = leave.fromDate.getFullYear();
+        await tx.leaveBalance.upsert({
+          where: {
+            employeeId_leaveType_year: {
+              employeeId: leave.employeeId,
+              leaveType: leave.leaveType,
+              year,
+            },
+          },
+          update: { usedDays: { increment: leave.totalDays } },
+          create: {
             employeeId: leave.employeeId,
             leaveType: leave.leaveType,
             year,
+            totalDays: 0,
+            usedDays: leave.totalDays,
           },
-        },
-        update: { usedDays: { increment: leave.totalDays } },
-        create: {
-          employeeId: leave.employeeId,
-          leaveType: leave.leaveType,
-          year,
-          totalDays: 0,
-          usedDays: leave.totalDays,
-        },
-      });
+        });
 
-      const dates: Date[] = [];
-      const cur = new Date(leave.fromDate);
-      while (cur <= leave.toDate) {
-        dates.push(new Date(cur));
-        cur.setDate(cur.getDate() + 1);
+        const dates: Date[] = [];
+        const cur = new Date(leave.fromDate);
+        while (cur <= leave.toDate) {
+          dates.push(new Date(cur));
+          cur.setUTCDate(cur.getUTCDate() + 1);
+        }
+
+        await tx.attendanceRecord.createMany({
+          data: dates.map((date) => ({
+            employeeId: leave.employeeId,
+            date,
+            status: 'LEAVE' as const,
+          })),
+          skipDuplicates: true,
+        });
       }
 
-      await this.prisma.attendanceRecord.createMany({
-        data: dates.map((d) => ({
-          employeeId: leave.employeeId,
-          date: d,
-          status: 'LEAVE' as const,
-        })),
-        skipDuplicates: true,
+      return tx.leaveRequest.update({
+        where: { id },
+        data: {
+          status: action === 'approve' ? 'APPROVED' : 'REJECTED',
+          approvedBy: approverId,
+          approvedAt: new Date(),
+          rejectionReason: action === 'reject' ? rejectionReason!.trim() : null,
+        },
       });
-    }
-
-    return updated;
+    });
   }
 
   // Refills every active employee's leave balance for the new year with the
