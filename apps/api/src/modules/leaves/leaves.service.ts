@@ -69,6 +69,37 @@ export class LeavesService {
     });
   }
 
+  async findByEmployee(employeeId: string) {
+    const year = new Date().getFullYear();
+    const [requests, balances] = await Promise.all([
+      this.prisma.leaveRequest.findMany({
+        where: { employeeId },
+        include: {
+          approver: { select: { id: true, firstName: true, lastName: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.leaveBalance.findMany({
+        where: { employeeId, year },
+        orderBy: { leaveType: 'asc' },
+      }),
+    ]);
+
+    return {
+      requests,
+      balances,
+      summary: {
+        submitted: requests.length,
+        pending: requests.filter(request => request.status === 'PENDING').length,
+        approved: requests.filter(request => request.status === 'APPROVED').length,
+        rejected: requests.filter(request => request.status === 'REJECTED').length,
+        approvedDays: requests
+          .filter(request => request.status === 'APPROVED')
+          .reduce((sum, request) => sum + Number(request.totalDays), 0),
+      },
+    };
+  }
+
   async findAll(status?: string) {
     if (status && !VALID_LEAVE_STATUSES.has(status)) {
       throw new BadRequestException(`Invalid status value: ${status}`);

@@ -109,6 +109,12 @@ export class AttendanceController {
     return this.service.getByEmployee(id, from, to);
   }
 
+  @Get('employee/:id/overview')
+  @Roles('ADMIN', 'SUPER_ADMIN')
+  getEmployeeOverview(@Param('id') id: string) {
+    return this.service.getEmployeeOverview(id);
+  }
+
   @Get()
   @Roles('ADMIN', 'SUPER_ADMIN')
   getAll(

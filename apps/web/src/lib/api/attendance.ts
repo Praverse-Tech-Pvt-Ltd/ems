@@ -28,6 +28,9 @@ export const attendanceService = {
   forEmployee: (id: string, params?: { from?: string; to?: string }) =>
     apiClient.get(`/attendance/employee/${id}`, { params }).then(r => r.data),
 
+  employeeOverview: (id: string) =>
+    apiClient.get(`/attendance/employee/${id}/overview`).then(r => r.data),
+
   all: (params?: { from?: string; to?: string; status?: string }) =>
     apiClient.get('/attendance', { params }).then(r => r.data),
 

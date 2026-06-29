@@ -43,6 +43,12 @@ export class LeavesController {
     return this.service.getBalance(user.id);
   }
 
+  @Get('employee/:id')
+  @Roles('ADMIN', 'SUPER_ADMIN')
+  findByEmployee(@Param('id', ParseUUIDPipe) id: string) {
+    return this.service.findByEmployee(id);
+  }
+
   @Get()
   @Roles('MANAGER', 'ADMIN', 'SUPER_ADMIN')
   findAll(@Query('status') status?: string) {
