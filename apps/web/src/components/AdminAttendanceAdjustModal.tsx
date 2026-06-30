@@ -12,6 +12,47 @@ interface Employee {
   employeeCode: string;
 }
 
+interface AttendanceRecord {
+  id: string;
+  date: string;
+  punchInTime?: string | null;
+  punchOutTime?: string | null;
+  status: string;
+  workingHours?: number | string | null;
+}
+
+function toISTTimeInput(value?: string | null) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleTimeString('en-GB', {
+    timeZone: 'Asia/Kolkata',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+}
+
+function formatIST(value?: string | null) {
+  if (!value) return 'Not set';
+  return new Date(value).toLocaleTimeString('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function todayISTDateInput() {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date());
+  const value = Object.fromEntries(parts.map(part => [part.type, part.value]));
+  return `${value.year}-${value.month}-${value.day}`;
+}
+
 export function AdminAttendanceAdjustModal({
   onClose,
   onSuccess,
@@ -21,16 +62,15 @@ export function AdminAttendanceAdjustModal({
 }) {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loadingEmployees, setLoadingEmployees] = useState(true);
+  const [loadingRecord, setLoadingRecord] = useState(false);
+  const [existingRecord, setExistingRecord] = useState<AttendanceRecord | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
   // Form states
   const [selectedEmployeeId, setSelectedEmployeeId] = useState('');
-  const [selectedDate, setSelectedDate] = useState<string>(() => {
-    const today = new Date();
-    return today.toISOString().split('T')[0] || '';
-  });
+  const [selectedDate, setSelectedDate] = useState<string>(() => todayISTDateInput());
   const [punchInTime, setPunchInTime] = useState('');
   const [punchOutTime, setPunchOutTime] = useState('');
   const [status, setStatus] = useState('PRESENT');
@@ -53,6 +93,41 @@ export function AdminAttendanceAdjustModal({
         setLoadingEmployees(false);
       });
   }, []);
+
+  useEffect(() => {
+    if (!selectedEmployeeId || !selectedDate) return;
+
+    let ignore = false;
+    setLoadingRecord(true);
+    setErrorMsg('');
+
+    attendanceService.forEmployee(selectedEmployeeId, { from: selectedDate, to: selectedDate })
+      .then(res => {
+        if (ignore) return;
+        const list = Array.isArray(res) ? res : res?.data ?? [];
+        const record = list.find((item: AttendanceRecord) => String(item.date).slice(0, 10) === selectedDate) ?? list[0] ?? null;
+        setExistingRecord(record);
+        setPunchInTime(toISTTimeInput(record?.punchInTime));
+        setPunchOutTime(toISTTimeInput(record?.punchOutTime));
+        setStatus(record?.status ?? 'PRESENT');
+        setReason(record ? 'Admin correction for selected attendance record' : 'Admin created attendance record for selected date');
+      })
+      .catch(() => {
+        if (ignore) return;
+        setExistingRecord(null);
+        setPunchInTime('');
+        setPunchOutTime('');
+        setStatus('PRESENT');
+        setErrorMsg('Could not load the selected date record. You can still create/update it manually.');
+      })
+      .finally(() => {
+        if (!ignore) setLoadingRecord(false);
+      });
+
+    return () => {
+      ignore = true;
+    };
+  }, [selectedEmployeeId, selectedDate]);
 
   const handleSubmit = useCallback(async (event: React.FormEvent) => {
     event.preventDefault();
@@ -79,7 +154,7 @@ export function AdminAttendanceAdjustModal({
         reason,
       });
 
-      setSuccessMsg('Attendance record adjusted successfully!');
+      setSuccessMsg(existingRecord ? 'Attendance record updated successfully!' : 'Attendance record created successfully!');
       setTimeout(() => {
         onSuccess();
         onClose();
@@ -90,7 +165,7 @@ export function AdminAttendanceAdjustModal({
     } finally {
       setSubmitting(false);
     }
-  }, [selectedEmployeeId, selectedDate, punchInTime, punchOutTime, status, reason, onClose, onSuccess]);
+  }, [selectedEmployeeId, selectedDate, punchInTime, punchOutTime, status, reason, existingRecord, onClose, onSuccess]);
 
   return (
     <div
@@ -231,6 +306,27 @@ export function AdminAttendanceAdjustModal({
                   <Clock size={14} className="absolute left-3 top-3 text-on-surface-variant/60" />
                 </div>
               </div>
+            </div>
+
+            <div className="rounded-xl border border-outline-variant/30 bg-surface-container-low p-sm">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-[11px] font-bold text-on-surface-variant/80 tracking-wider font-label-caps uppercase">
+                  Selected Day Record
+                </p>
+                {loadingRecord && <Loader2 size={13} className="animate-spin text-primary" />}
+              </div>
+              {existingRecord ? (
+                <div className="grid grid-cols-2 gap-2 mt-2 text-xs text-on-surface-variant">
+                  <span>Current status: <strong className="text-on-surface">{existingRecord.status}</strong></span>
+                  <span>Hours: <strong className="text-on-surface">{existingRecord.workingHours ?? 'Not set'}</strong></span>
+                  <span>Punch in: <strong className="text-on-surface">{formatIST(existingRecord.punchInTime)}</strong></span>
+                  <span>Punch out: <strong className="text-on-surface">{formatIST(existingRecord.punchOutTime)}</strong></span>
+                </div>
+              ) : (
+                <p className="mt-2 text-xs text-on-surface-variant">
+                  No attendance exists for this employee on this date. Saving will create a new record for the chosen day.
+                </p>
+              )}
             </div>
 
             {/* Status Selection */}
