@@ -40,19 +40,21 @@ const SPLIT_WFH_HALFDAY_STYLE: React.CSSProperties = {
 
 type CalendarLegendKey = AttendanceStatus | 'OD' | 'WEEKEND_OFF' | 'WFH_HALF_DAY';
 
+const OD_MARK = 'bg-[#0f766e] text-white border-[#0f766e]';
+
 const CALENDAR_MARK: Record<AttendanceStatus, string> = {
   PRESENT: 'bg-success text-white border-success',
   LATE: 'bg-primary text-on-primary border-primary',
   ABSENT: 'bg-error text-on-error border-error',
   HALF_DAY: 'bg-secondary text-on-secondary border-secondary',
   WFH: 'bg-[#7c3aed] text-white border-[#7c3aed]',
+  OD: OD_MARK,
   LEAVE: 'bg-on-surface-variant text-inverse-on-surface border-on-surface-variant',
   HOLIDAY: 'bg-tertiary-fixed-dim text-on-tertiary-fixed border-tertiary-fixed-dim',
   MISSING_PUNCH_OUT: 'bg-error-container/50 text-on-error-container border-error/30',
 };
 
 const WEEKEND_MARK = 'bg-surface-container-highest text-on-surface-variant border-outline-variant';
-const OD_MARK = 'bg-[#0f766e] text-white border-[#0f766e]';
 
 const CALENDAR_MARK_BY_LEGEND: Record<CalendarLegendKey, string> = {
   ...CALENDAR_MARK,
@@ -138,7 +140,6 @@ function getCalendarLegendKey({
 }): CalendarLegendKey | null {
   if (!inMonth) return null;
   if (record?.notes === 'HALF_DAY_WFH') return 'WFH_HALF_DAY';
-  if (record?.notes === 'OD') return 'OD';
   if (record?.status) return record.status;
   if (holiday) return 'HOLIDAY';
   if (isWeekendOff(date, saturdayOff)) return 'WEEKEND_OFF';
@@ -310,7 +311,6 @@ export default function AttendancePunchStation() {
   };
 
   const statusLabel = (rec: any) => {
-    if (rec?.notes === 'OD') return 'OD';
     if (rec?.status === 'MISSING_PUNCH_OUT') return 'Missing punch';
     return rec?.status?.replaceAll('_', ' ') ?? 'NOT MARKED';
   };
@@ -503,7 +503,7 @@ export default function AttendancePunchStation() {
                     <div key={item.label} className="bg-surface-container-low rounded-xl p-sm">
                       <p className="text-[10px] text-on-surface-variant font-label-caps tracking-widest">{item.label}</p>
                       {item.badge && today?.status ? (
-                        <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-xs font-bold ${today.notes === 'OD' ? STATUS_COLOR.OD : STATUS_COLOR[today.status] ?? 'bg-surface-container-high text-on-surface'}`}>
+                        <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-xs font-bold ${STATUS_COLOR[today.status] ?? 'bg-surface-container-high text-on-surface'}`}>
                           {statusLabel(today)}
                         </span>
                       ) : (
@@ -738,7 +738,7 @@ export default function AttendancePunchStation() {
                       <span className="inline-flex px-3 py-1 rounded-full text-xs font-bold bg-secondary text-on-secondary">HALF DAY</span>
                     </div>
                   ) : (
-                    <span className={`inline-flex px-3 py-1 rounded-full text-xs font-bold ${selectedRecord.notes === 'OD' ? STATUS_COLOR.OD : STATUS_COLOR[selectedRecord.status] ?? 'bg-surface-container-high text-on-surface'}`}>
+                    <span className={`inline-flex px-3 py-1 rounded-full text-xs font-bold ${STATUS_COLOR[selectedRecord.status] ?? 'bg-surface-container-high text-on-surface'}`}>
                       {statusLabel(selectedRecord)}
                     </span>
                   )}
@@ -828,7 +828,7 @@ export default function AttendancePunchStation() {
                     <p className="font-semibold text-on-surface text-sm">{rec.employee?.firstName} {rec.employee?.lastName}</p>
                     <p className="text-[10px] text-on-surface-variant">{rec.employee?.designation ?? rec.employee?.role}</p>
                   </div>
-                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${rec.notes === 'OD' ? STATUS_COLOR.OD : STATUS_COLOR[rec.status] ?? 'bg-surface-container-high text-on-surface-variant'}`}>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${STATUS_COLOR[rec.status] ?? 'bg-surface-container-high text-on-surface-variant'}`}>
                     {statusLabel(rec)}
                   </span>
                   <p className="text-body-sm text-on-surface-variant hidden md:block">{fmtTime(rec.punchInTime)} → {fmtTime(rec.punchOutTime)}</p>

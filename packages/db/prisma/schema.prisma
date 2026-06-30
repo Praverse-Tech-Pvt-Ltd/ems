@@ -31,6 +31,7 @@ enum AttendanceStatus {
   LATE
   HALF_DAY
   WFH
+  OD
   LEAVE
   HOLIDAY
   MISSING_PUNCH_OUT

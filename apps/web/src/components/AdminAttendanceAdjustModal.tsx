@@ -248,6 +248,7 @@ export function AdminAttendanceAdjustModal({
                   <option value="LATE">LATE</option>
                   <option value="HALF_DAY">HALF DAY</option>
                   <option value="WFH">WFH</option>
+                  <option value="OD">OD</option>
                   <option value="ABSENT">ABSENT</option>
                   <option value="LEAVE">LEAVE</option>
                   <option value="HOLIDAY">HOLIDAY</option>

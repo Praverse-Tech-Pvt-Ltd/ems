@@ -14,7 +14,7 @@ export type Role = 'EMPLOYEE' | 'MANAGER' | 'ADMIN' | 'SUPER_ADMIN';
 export type EmployeeStatus = 'ACTIVE' | 'INACTIVE' | 'TERMINATED';
 export type AttendanceStatus =
   | 'PRESENT' | 'ABSENT' | 'LATE' | 'HALF_DAY'
-  | 'WFH' | 'LEAVE' | 'HOLIDAY' | 'MISSING_PUNCH_OUT';
+  | 'WFH' | 'OD' | 'LEAVE' | 'HOLIDAY' | 'MISSING_PUNCH_OUT';
 export type ExpenseCategory =
   | 'TRAVEL' | 'FOOD' | 'OFFICE' | 'CLIENT_VISIT'
   | 'HOTEL' | 'STATIONERY' | 'MISC';

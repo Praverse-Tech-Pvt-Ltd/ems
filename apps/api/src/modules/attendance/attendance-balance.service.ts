@@ -146,7 +146,7 @@ export class AttendanceBalanceService {
           counts.lateConvertedToHalfDay += 1;
           counts.paidDays += 0.5;
         }
-      } else if (status === 'WFH') {
+      } else if (status === 'WFH' || status === 'OD') {
         counts.wfhDays += 1;
         counts.paidDays += 1;
       } else if (status === 'HALF_DAY') {

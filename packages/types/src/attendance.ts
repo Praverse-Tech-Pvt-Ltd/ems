@@ -20,7 +20,7 @@ export const RegularizeAttendanceSchema = z.object({
   punchInTime: z.string().datetime().optional(),
   punchOutTime: z.string().datetime().optional(),
   status: z
-    .enum(['PRESENT', 'ABSENT', 'LATE', 'HALF_DAY', 'WFH', 'LEAVE', 'HOLIDAY'])
+    .enum(['PRESENT', 'ABSENT', 'LATE', 'HALF_DAY', 'WFH', 'OD', 'LEAVE', 'HOLIDAY'])
     .optional(),
   reason: z.string().min(1),
 });

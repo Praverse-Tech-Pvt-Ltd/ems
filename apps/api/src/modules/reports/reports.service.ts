@@ -59,7 +59,7 @@ export class ReportsService {
       missingPunchOuts,
     ] = await Promise.all([
       this.prisma.employee.count({ where: { status: 'ACTIVE' } }),
-      this.prisma.attendanceRecord.count({ where: { date: today, status: { in: ['PRESENT', 'LATE', 'WFH'] } } }),
+      this.prisma.attendanceRecord.count({ where: { date: today, status: { in: ['PRESENT', 'LATE', 'WFH', 'OD'] } } }),
       this.prisma.expense.count({ where: { status: { in: ['SUBMITTED', 'L1_REVIEW', 'FINANCE_REVIEW'] } } }),
       this.prisma.leaveRequest.count({ where: { status: 'PENDING' } }),
       this.prisma.invoice.count({ where: { status: 'OVERDUE' } }),

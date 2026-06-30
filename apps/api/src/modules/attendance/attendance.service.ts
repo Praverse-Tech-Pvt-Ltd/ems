@@ -362,8 +362,8 @@ export class AttendanceService {
     // ── Determine final status ───────────────────────────────────────────────
     let finalStatus: string = record.status;     // inherit punch-in status
 
-    if (record.status === 'WFH') {
-      finalStatus = 'WFH';
+    if (record.status === 'WFH' || record.status === 'OD') {
+      finalStatus = record.status;
     } else if (workingHours < HALF_DAY_HOURS) {
       finalStatus = 'HALF_DAY';
     } else if (punchOutMins < EARLY_OUT_CUTOFF) {
@@ -424,7 +424,7 @@ export class AttendanceService {
     return this.prisma.attendanceRecord.findFirst({
       where: {
         employeeId,
-        notes: 'OD',
+        OR: [{ status: 'OD' }, { notes: 'OD' }],
         punchInTime: { not: null },
         punchOutTime: null,
       },
@@ -460,18 +460,16 @@ export class AttendanceService {
         employeeId,
         date,
         punchInTime,
-        status: 'WFH',
+        status: 'OD',
         isManualPunch: true,
         manualPunchReason: reason,
-        notes: 'OD',
         deviceInfo: {},
       },
       update: {
         punchInTime,
-        status: 'WFH',
+        status: 'OD',
         isManualPunch: true,
         manualPunchReason: reason,
-        notes: 'OD',
       },
     });
 
@@ -513,10 +511,9 @@ export class AttendanceService {
       data: {
         punchOutTime,
         workingHours,
-        status: 'WFH',
+        status: 'OD',
         isManualPunch: true,
         manualPunchReason: reason,
-        notes: 'OD',
       },
     });
 
@@ -588,9 +585,10 @@ export class AttendanceService {
     const leave = count('LEAVE');
     const absent = count('ABSENT');
     const wfh = count('WFH');
-    const attended = present + late + halfDay + wfh;
+    const od = count('OD');
+    const attended = present + late + halfDay + wfh + od;
     const lateFrequency = attended > 0 ? Math.round((late / attended) * 100) : 0;
-    const punctuality = attended > 0 ? Math.round(((present + wfh) / attended) * 100) : 0;
+    const punctuality = attended > 0 ? Math.round(((present + wfh + od) / attended) * 100) : 0;
     const totalHours = records.reduce((sum, record) => sum + Number(record.workingHours ?? 0), 0);
     const todayRecord = records.find(record => record.date.getTime() === today.getTime()) ?? null;
 
@@ -609,6 +607,7 @@ export class AttendanceService {
         leave,
         absent,
         wfh,
+        od,
         attended,
         lateFrequency,
         punctuality,
@@ -703,7 +702,7 @@ export class AttendanceService {
 
     let daysPresent = 0, daysHalfDay = 0, daysOnLeave = 0, daysAbsent = 0, daysLate = 0;
     for (const r of records) {
-      if      (r.status === 'PRESENT' || r.status === 'WFH') daysPresent++;
+      if      (r.status === 'PRESENT' || r.status === 'WFH' || r.status === 'OD') daysPresent++;
       else if (r.status === 'LATE')     daysLate++;
       else if (r.status === 'HALF_DAY') daysHalfDay++;
       else if (r.status === 'LEAVE')    daysOnLeave++;
