@@ -36,6 +36,7 @@ import { FollowUpTasksModule } from './modules/follow-up-tasks/follow-up-tasks.m
 import { AIChatModule } from './modules/ai-chat/ai-chat.module';
 import { AIProposalsModule } from './modules/ai-proposals/ai-proposals.module';
 import { ZohoSyncModule } from './modules/zoho-sync/zoho-sync.module';
+import { CompanyTrackerModule } from './modules/company-tracker/company-tracker.module';
 
 @Module({
   imports: [
@@ -100,6 +101,7 @@ import { ZohoSyncModule } from './modules/zoho-sync/zoho-sync.module';
     AIProposalsModule,
     AIChatModule,
     ZohoSyncModule,
+    CompanyTrackerModule,
   ],
   // Apply ThrottlerGuard globally so every route is rate-limited by default.
   // Individual routes/controllers can override limits with @Throttle().

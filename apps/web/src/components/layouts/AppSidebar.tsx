@@ -38,6 +38,11 @@ const navGroups: NavGroup[] = [
     label: 'Intelligence',
     items: [
       { href: '/client-companies-overview',  label: 'Companies',    icon: 'domain'         },
+      { href: '/company-tracker',            label: 'Company Tracker', icon: 'track_changes' },
+      { href: '/my-tasks',                   label: 'My Tasks', icon: 'task_alt' },
+      { href: '/follow-ups',                 label: 'Follow-ups', icon: 'event_repeat' },
+      { href: '/delayed-items',              label: 'Delayed Items', icon: 'running_with_errors' },
+      { href: '/tracker-reports',            label: 'Tracker Reports', icon: 'download_for_offline', roles: ['ADMIN', 'SUPER_ADMIN'] },
       { href: '/client-detail-gap-analysis', label: 'Gap Analysis', icon: 'rule_settings' },
       { href: '/calendar-meeting-notes',     label: 'Calendar',     icon: 'calendar_month' },
       { href: '/ai-work-intelligence',       label: 'Work Updates', icon: 'neurology'      },

@@ -316,6 +316,15 @@ model Employee {
   auditItemsResponsible       AuditReadinessItem[]  @relation("AuditItemResponsible")
   aiChatMessages              AIChatMessage[]
   followUpTasksAssigned       FollowUpTask[]        @relation("FollowUpAssignee")
+  trackerProjectsOwned        CompanyTrackerProject[]       @relation("TrackerProjectOwner")
+  trackerProjectsCreated      CompanyTrackerProject[]       @relation("TrackerProjectCreator")
+  trackerProjectsUpdated      CompanyTrackerProject[]       @relation("TrackerProjectUpdater")
+  trackerProjectAssignments   CompanyTrackerAssignment[]
+  trackerRequirementsAssigned ProjectRequirement[]          @relation("TrackerRequirementAssignee")
+  trackerRequirementsReviewed ProjectRequirement[]          @relation("TrackerRequirementReviewer")
+  trackerDocumentsUploaded    TrackerDocument[]             @relation("TrackerDocumentUploader")
+  trackerFollowUpsResponsible TrackerFollowUp[]             @relation("TrackerFollowUpResponsible")
+  trackerActivityLogs         TrackerActivityLog[]          @relation("TrackerActivityActor")
   companyDocumentsUploaded    CompanyDocument[]     @relation("DocUploader")
   clientCommunicationsCreated ClientCommunication[] @relation("CommAuthor")
 
@@ -1008,6 +1017,10 @@ model ClientCompany {
   followUpTasks       FollowUpTask[]
   documents           CompanyDocument[]
   communications      ClientCommunication[]
+  trackerProjects     CompanyTrackerProject[]
+  trackerDocuments    TrackerDocument[]
+  trackerFollowUps    TrackerFollowUp[]
+  trackerActivityLogs TrackerActivityLog[]
 
   @@index([businessStatus])
   @@index([criticality])
@@ -1050,8 +1063,180 @@ model CompanyProject {
   company             ClientCompany        @relation(fields: [companyId], references: [id], onDelete: Cascade)
   leadEmployee        Employee?            @relation("ProjectLead", fields: [leadEmployeeId], references: [id])
   auditReadinessItems AuditReadinessItem[]
+  trackerRequirements ProjectRequirement[]
+  trackerProjects      CompanyTrackerProject[] @relation("TrackerSourceProject")
 
   @@map("company_projects")
+}
+
+model CompanyTrackerProject {
+  id                     String    @id @default(uuid())
+  trackingId             String    @unique @map("tracking_id")
+  companyId              String    @map("company_id")
+  clientType             String    @map("client_type")
+  projectType            String    @map("project_type")
+  regulatoryGoal         String    @map("regulatory_goal")
+  currentStage           String    @default("Not Started") @map("current_stage")
+  priority               String    @default("Medium")
+  ownerId                String?   @map("owner_id")
+  startDate              DateTime? @map("start_date") @db.Date
+  targetCompletionDate   DateTime? @map("target_completion_date") @db.Date
+  revisedTargetDate      DateTime? @map("revised_target_date") @db.Date
+  actualCompletionDate   DateTime? @map("actual_completion_date") @db.Date
+  currentStatusSummary   String?   @map("current_status_summary")
+  lastFollowUpDate       DateTime? @map("last_follow_up_date") @db.Date
+  nextFollowUpDate       DateTime? @map("next_follow_up_date") @db.Date
+  delayReason            String?   @map("delay_reason")
+  internalRemarks        String?   @map("internal_remarks")
+  clientRemarks          String?   @map("client_remarks")
+  sourceCompanyProjectId String?   @map("source_company_project_id")
+  createdBy              String    @map("created_by")
+  updatedBy              String?   @map("updated_by")
+  createdAt              DateTime  @default(now()) @map("created_at")
+  updatedAt              DateTime  @updatedAt @map("updated_at")
+
+  company              ClientCompany              @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  owner                Employee?                  @relation("TrackerProjectOwner", fields: [ownerId], references: [id])
+  creator              Employee                   @relation("TrackerProjectCreator", fields: [createdBy], references: [id])
+  updater              Employee?                  @relation("TrackerProjectUpdater", fields: [updatedBy], references: [id])
+  sourceCompanyProject CompanyProject?            @relation("TrackerSourceProject", fields: [sourceCompanyProjectId], references: [id])
+  assignments          CompanyTrackerAssignment[]
+  requirements         ProjectRequirement[]
+  documents            TrackerDocument[]
+  followUps            TrackerFollowUp[]
+  activityLogs         TrackerActivityLog[]
+
+  @@index([companyId])
+  @@index([ownerId])
+  @@index([currentStage])
+  @@index([priority])
+  @@index([nextFollowUpDate])
+  @@map("company_tracker_projects")
+}
+
+model CompanyTrackerAssignment {
+  id        String   @id @default(uuid())
+  projectId String   @map("project_id")
+  employeeId String  @map("employee_id")
+  role      String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  project  CompanyTrackerProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  employee Employee              @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, employeeId])
+  @@index([employeeId])
+  @@map("company_tracker_assignments")
+}
+
+model ProjectRequirement {
+  id                  String    @id @default(uuid())
+  requirementCode     String    @unique @map("requirement_code")
+  trackerProjectId    String    @map("tracker_project_id")
+  companyProjectId    String?   @map("company_project_id")
+  category            String
+  description         String
+  expectedOutput      String?   @map("expected_output")
+  assignedTo          String?   @map("assigned_to")
+  reviewerId          String?   @map("reviewer_id")
+  dueDate             DateTime? @map("due_date") @db.Date
+  status              String    @default("Not Started")
+  completionPercent   Int       @default(0) @map("completion_percent")
+  documentRequired    Boolean   @default(false) @map("document_required")
+  documentUploaded    Boolean   @default(false) @map("document_uploaded")
+  remarks             String?
+  reviewComments      String?   @map("review_comments")
+  delayReason         String?   @map("delay_reason")
+  lastUpdatedBy       String?   @map("last_updated_by")
+  lastUpdatedAt       DateTime  @default(now()) @updatedAt @map("last_updated_at")
+  createdAt           DateTime  @default(now()) @map("created_at")
+
+  trackerProject CompanyTrackerProject @relation(fields: [trackerProjectId], references: [id], onDelete: Cascade)
+  companyProject CompanyProject?       @relation(fields: [companyProjectId], references: [id])
+  assignee       Employee?             @relation("TrackerRequirementAssignee", fields: [assignedTo], references: [id])
+  reviewer       Employee?             @relation("TrackerRequirementReviewer", fields: [reviewerId], references: [id])
+  documents      TrackerDocument[]
+  followUps      TrackerFollowUp[]
+  activityLogs   TrackerActivityLog[]
+
+  @@index([trackerProjectId])
+  @@index([assignedTo])
+  @@index([status])
+  @@index([dueDate])
+  @@map("project_requirements")
+}
+
+model TrackerFollowUp {
+  id               String    @id @default(uuid())
+  companyId        String    @map("company_id")
+  trackerProjectId String?   @map("tracker_project_id")
+  requirementId    String?   @map("requirement_id")
+  description      String
+  responsibleId    String?   @map("responsible_id")
+  lastFollowUpDate DateTime? @map("last_follow_up_date") @db.Date
+  nextFollowUpDate DateTime? @map("next_follow_up_date") @db.Date
+  status           String    @default("Open")
+  remarks          String?
+  completedAt      DateTime? @map("completed_at") @db.Timestamptz
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  company        ClientCompany          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  trackerProject CompanyTrackerProject? @relation(fields: [trackerProjectId], references: [id], onDelete: Cascade)
+  requirement    ProjectRequirement?    @relation(fields: [requirementId], references: [id], onDelete: Cascade)
+  responsible    Employee?              @relation("TrackerFollowUpResponsible", fields: [responsibleId], references: [id])
+
+  @@index([nextFollowUpDate, status])
+  @@index([responsibleId])
+  @@map("tracker_follow_ups")
+}
+
+model TrackerDocument {
+  id               String   @id @default(uuid())
+  companyId        String   @map("company_id")
+  trackerProjectId String?  @map("tracker_project_id")
+  requirementId    String?  @map("requirement_id")
+  followUpId       String?  @map("follow_up_id")
+  title            String
+  documentType     String   @map("document_type")
+  versionNo        String?  @map("version_no")
+  remarks          String?
+  fileLink         String?  @map("file_link")
+  uploadedBy       String   @map("uploaded_by")
+  uploadedAt       DateTime @default(now()) @map("uploaded_at")
+
+  company        ClientCompany          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  trackerProject CompanyTrackerProject? @relation(fields: [trackerProjectId], references: [id], onDelete: Cascade)
+  requirement    ProjectRequirement?    @relation(fields: [requirementId], references: [id], onDelete: Cascade)
+  uploader       Employee               @relation("TrackerDocumentUploader", fields: [uploadedBy], references: [id])
+
+  @@index([companyId])
+  @@index([requirementId])
+  @@map("tracker_documents")
+}
+
+model TrackerActivityLog {
+  id               String   @id @default(uuid())
+  companyId        String?  @map("company_id")
+  trackerProjectId String?  @map("tracker_project_id")
+  requirementId    String?  @map("requirement_id")
+  actorId          String   @map("actor_id")
+  action           String
+  oldValue         Json?    @map("old_value")
+  newValue         Json?    @map("new_value")
+  remarks          String?
+  fileReference    String?  @map("file_reference")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  company        ClientCompany?         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  trackerProject CompanyTrackerProject? @relation(fields: [trackerProjectId], references: [id], onDelete: Cascade)
+  requirement    ProjectRequirement?    @relation(fields: [requirementId], references: [id], onDelete: Cascade)
+  actor          Employee               @relation("TrackerActivityActor", fields: [actorId], references: [id])
+
+  @@index([trackerProjectId])
+  @@index([requirementId])
+  @@index([actorId])
+  @@map("tracker_activity_logs")
 }
 
 model CompanyStatusHistory {
