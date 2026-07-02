@@ -16,6 +16,7 @@ import { ATTENDANCE_BLOCKED_MESSAGE, isAttendanceBlockedIdentity } from './atten
 
 // ── Attendance Policy Constants ────────────────────────────────────────────────
 const HALF_DAY_HOURS = 4;           // < 4 h worked → auto HALF_DAY at punch-out
+const HALF_DAY_PUNCH_IN_CUTOFF = 12 * 60;
 
 // Allowance constants per month
 const MAX_LATE_PM      = 2;             // late punch-in allowances per month
@@ -266,8 +267,11 @@ export class AttendanceService {
     } else if (punchMins <= LATE_CUTOFF) {
       // Punched in within the allowed grace window.
       punchInStatus = 'PRESENT';
+    } else if (punchMins <= HALF_DAY_PUNCH_IN_CUTOFF) {
+      // After the grace window but no later than noon.
+      punchInStatus = 'LATE';
     } else {
-      // Punched in after the allowed grace window.
+      // Punched in after noon.
       punchInStatus = 'HALF_DAY';
     }
 
