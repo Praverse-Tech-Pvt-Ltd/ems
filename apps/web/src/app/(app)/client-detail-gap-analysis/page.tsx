@@ -162,7 +162,7 @@ export default function ClientDetailGapAnalysisPage() {
             <h2 className="font-headline-lg-mobile text-headline-lg-mobile text-on-surface md:hidden">Gap Analysis</h2>
             <p className="text-on-surface-variant mt-xs">Live gap scoring from company activity, follow-ups, alerts, visits, and AI summaries.</p>
           </div>
-          <select value={selectedCompany?.id ?? ''} onChange={e => setSelected(e.target.value)} className="rounded-full border border-outline-variant/50 bg-surface-container-lowest px-3 py-2 text-body-sm text-on-surface">
+          <select value={selectedCompany?.id ?? ''} onChange={e => setSelected(e.target.value)} className="min-h-11 w-full sm:w-auto rounded-full border border-outline-variant/50 bg-surface-container-lowest px-3 py-2 text-body-sm text-on-surface">
             {companies.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
         </div>
@@ -194,7 +194,7 @@ export default function ClientDetailGapAnalysisPage() {
         </div>
       ) : (
         <>
-          <div className={`rounded-2xl p-lg flex items-center gap-lg border ${overallGapScore >= 80 ? 'bg-tertiary/5 border-tertiary/20' : overallGapScore >= 60 ? 'bg-primary/5 border-primary/20' : 'bg-error/5 border-error/20'}`}>
+          <div className={`rounded-2xl p-lg flex flex-col sm:flex-row items-center sm:items-center gap-lg border ${overallGapScore >= 80 ? 'bg-tertiary/5 border-tertiary/20' : overallGapScore >= 60 ? 'bg-primary/5 border-primary/20' : 'bg-error/5 border-error/20'}`}>
             <div className="relative w-24 h-24 shrink-0">
               <svg viewBox="0 0 80 80" className="w-full h-full -rotate-90">
                 <circle cx="40" cy="40" r="32" fill="none" strokeWidth="6" stroke="currentColor" className="text-surface-container-highest" />
@@ -207,13 +207,13 @@ export default function ClientDetailGapAnalysisPage() {
                 <span className="text-[9px] text-on-surface-variant">/ 100</span>
               </div>
             </div>
-            <div className="flex-1">
+            <div className="flex-1 text-center sm:text-left">
               <p className="font-title-lg text-on-surface font-bold">{selectedCompany.name} Health Score</p>
               <p className="text-body-sm text-on-surface-variant mt-xs">
                 {totalGaps} live gap signals across {categories.filter(c => c.gaps.length > 0).length} categories.
                 {highestRisk ? ` Highest risk: ${highestRisk.label}.` : ''}
               </p>
-              <div className="flex gap-sm mt-sm">
+              <div className="flex gap-sm mt-sm flex-wrap justify-center sm:justify-start">
                 <button onClick={generateActionPlan} disabled={generatingPlan} className="flex items-center gap-xs text-label-caps font-label-caps bg-primary text-on-primary px-3 py-1.5 rounded-full text-[11px] hover:opacity-90 disabled:opacity-50">
                   <span className="material-symbols-outlined text-[14px]">auto_awesome</span>{generatingPlan ? 'Generating...' : 'AI Action Plan'}
                 </button>

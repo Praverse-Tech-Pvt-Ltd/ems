@@ -122,14 +122,7 @@ function BrandPanel() {
           style={{ fontSize: 'clamp(1.8rem,2.6vw,2.3rem)', color: '#ffffff', letterSpacing: '-0.02em' }}
         >
           Manage your<br />workforce,<br />
-          <span
-            style={{
-              background: 'linear-gradient(135deg, #ffb59f 0%, #ffd4c2 60%, #ff9d7d 100%)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              backgroundClip: 'text',
-            }}
-          >
+          <span style={{ color: '#ffb59f' }}>
             effortlessly.
           </span>
         </h2>
@@ -179,7 +172,7 @@ function SubmitBtn({ label, loadingLabel, loading }: { label: string; loadingLab
     <button
       type="submit"
       disabled={loading}
-      className="w-full py-[11px] rounded-xl text-white text-[13.5px] font-bold tracking-wide
+      className="w-full py-[11px] min-h-[44px] rounded-xl text-white text-[13.5px] font-bold tracking-wide
         hover:-translate-y-px hover:shadow-[0_8px_24px_rgba(170,48,0,0.38)]
         active:translate-y-0 active:scale-[0.98]
         transition-all duration-150
@@ -255,13 +248,13 @@ export default function LoginPage() {
   /* ── Forgot password ─────────────────────────────────────────── */
   if (view === 'forgot') {
     return (
-      <div className="min-h-screen flex bg-surface">
+      <div className="min-h-[100dvh] flex bg-surface">
         <BrandPanel />
         <div className="flex-1 flex items-center justify-center px-8 py-12 bg-surface">
           <div className="w-full max-w-[400px] fade-up">
             <button
               onClick={() => { setView('login'); setError(''); setResetDone(false); forgotForm.reset(); }}
-              className="flex items-center gap-1.5 text-[13px] font-medium text-on-surface-variant hover:text-secondary mb-10 transition-colors cursor-pointer"
+              className="flex items-center gap-1.5 text-[13px] font-medium text-on-surface-variant hover:text-secondary mb-10 py-2 -my-2 transition-colors cursor-pointer"
             >
               <ArrowLeft size={15} /> Back to sign in
             </button>
@@ -319,7 +312,7 @@ export default function LoginPage() {
 
   /* ── Login ─────────────────────────────────────────────────────── */
   return (
-    <div className="min-h-screen flex bg-surface">
+    <div className="min-h-[100dvh] flex bg-surface">
       <BrandPanel />
 
       <div className="flex-1 flex items-center justify-center px-8 py-12 bg-surface">
@@ -367,7 +360,7 @@ export default function LoginPage() {
                   <button
                     type="button"
                     onClick={() => { setView('forgot'); setError(''); }}
-                    className="text-[12px] font-semibold text-secondary hover:text-on-surface transition-colors cursor-pointer"
+                    className="min-h-11 px-1 text-[12px] font-semibold text-secondary hover:text-on-surface transition-colors cursor-pointer"
                   >
                     Forgot password?
                   </button>
@@ -383,7 +376,8 @@ export default function LoginPage() {
                   <button
                     type="button"
                     onClick={() => setShowPass(v => !v)}
-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-secondary transition-colors cursor-pointer"
+                    className="absolute right-0 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center text-on-surface-variant hover:text-secondary transition-colors cursor-pointer"
+                    aria-label={showPass ? 'Hide password' : 'Show password'}
                   >
                     {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>

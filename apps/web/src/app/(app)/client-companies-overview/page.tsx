@@ -198,7 +198,7 @@ export default function ClientCompaniesOverviewPage() {
             value={search} 
             onChange={e => setSearch(e.target.value)} 
             placeholder="Search companies by name or sector..."
-            className="w-full pl-10 pr-4 py-2 border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-[#0f172a] rounded-full text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500" 
+            className="min-h-11 w-full pl-10 pr-4 py-2 border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-[#0f172a] rounded-full text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500" 
           />
         </div>
         {statusFilter && (
@@ -335,7 +335,7 @@ export default function ClientCompaniesOverviewPage() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Industry</label>
                   <input
@@ -371,7 +371,7 @@ export default function ClientCompaniesOverviewPage() {
                 </select>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Contact Email</label>
                   <input
@@ -445,7 +445,7 @@ export default function ClientCompaniesOverviewPage() {
               </button>
             </div>
 
-            <div className="grid grid-cols-2 gap-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-sm">
               <div className="bg-slate-50 dark:bg-[#0f172a] rounded-2xl p-4 border border-slate-100 dark:border-slate-800">
                 <p className="text-[9px] text-slate-400 uppercase tracking-widest font-bold">Risk Score</p>
                 <p className="font-extrabold text-lg text-slate-800 dark:text-white mt-1 font-mono">{detailCompany.riskScore ?? '—'}</p>

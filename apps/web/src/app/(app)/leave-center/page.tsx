@@ -153,7 +153,7 @@ export default function LeaveCenterPage() {
           </div>
           <button
             onClick={() => { setShowForm(true); setMsg({ text: '', ok: true }); }}
-            className="flex items-center gap-xs text-xs font-bold bg-primary hover:bg-primary/90 text-on-primary px-5 py-2.5 rounded-full shadow-lg shadow-primary/15 hover:shadow-primary/25 transition-all shrink-0"
+            className="flex min-h-11 items-center gap-xs text-xs font-bold bg-primary hover:bg-primary/90 text-on-primary px-5 py-2.5 rounded-full shadow-lg shadow-primary/15 hover:shadow-primary/25 transition-all shrink-0"
           >
             <span className="material-symbols-outlined text-[16px]">add</span>
             Apply Leave
@@ -164,7 +164,7 @@ export default function LeaveCenterPage() {
       {/* Apply Leave Modal Overlay */}
       {showForm && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
-          <div className="bg-card border border-card-border rounded-3xl w-full max-w-md p-6 relative overflow-hidden transition-all shadow-2xl">
+          <div className="bg-card border border-card-border rounded-3xl w-full max-w-md p-6 relative overflow-hidden transition-all shadow-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center pb-3 border-b border-card-border mb-4">
               <span className="font-extrabold text-base text-on-surface">Submit Leave Request</span>
               <button
@@ -195,7 +195,7 @@ export default function LeaveCenterPage() {
                 </select>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-[10px] font-bold text-on-surface-variant uppercase tracking-wider mb-1">Start Date</label>
                   <input

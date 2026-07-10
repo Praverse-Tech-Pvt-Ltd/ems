@@ -103,16 +103,16 @@ export default function EmployeeDirectoryPage() {
           <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-[18px]">search</span>
           <input value={search} onChange={e => setSearch(e.target.value)}
             placeholder="Search by name, email, or code..."
-            className="w-full pl-9 pr-sm py-2.5 border border-outline-variant/50 rounded-xl text-body-sm bg-surface-container-lowest focus:border-primary focus:outline-none" />
+            className="min-h-11 w-full pl-9 pr-sm py-2.5 border border-outline-variant/50 rounded-xl text-body-sm bg-surface-container-lowest focus:border-primary focus:outline-none" />
         </div>
         <div className="flex gap-xs flex-wrap">
           <button onClick={() => setDeptFilter('')}
-            className={`px-3 py-1.5 rounded-full text-[11px] font-label-caps border transition-all ${!deptFilter ? 'bg-primary text-on-primary border-primary' : 'border-outline-variant/50 text-on-surface-variant hover:border-primary/40'}`}>
+            className={`min-h-11 px-3 py-2 rounded-full text-[11px] font-label-caps border transition-all ${!deptFilter ? 'bg-primary text-on-primary border-primary' : 'border-outline-variant/50 text-on-surface-variant hover:border-primary/40'}`}>
             All
           </button>
           {departments.map(d => (
             <button key={d.id} onClick={() => setDeptFilter(d.id === deptFilter ? '' : d.id)}
-              className={`px-3 py-1.5 rounded-full text-[11px] font-label-caps border transition-all ${deptFilter === d.id ? 'bg-primary text-on-primary border-primary' : 'border-outline-variant/50 text-on-surface-variant hover:border-primary/40'}`}>
+              className={`min-h-11 px-3 py-2 rounded-full text-[11px] font-label-caps border transition-all ${deptFilter === d.id ? 'bg-primary text-on-primary border-primary' : 'border-outline-variant/50 text-on-surface-variant hover:border-primary/40'}`}>
               {d.name}
             </button>
           ))}

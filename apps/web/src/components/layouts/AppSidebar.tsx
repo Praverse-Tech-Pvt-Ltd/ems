@@ -246,7 +246,7 @@ export function AppSidebar({ className = '', onNavigate }: { className?: string;
           <button
             onClick={handleLogout}
             title="Sign out"
-            className="w-7 h-7 rounded-lg flex items-center justify-center text-on-surface-variant/60 hover:bg-error/10 hover:text-error transition-all duration-150"
+            className="w-11 h-11 rounded-lg flex items-center justify-center text-on-surface-variant/60 hover:bg-error/10 hover:text-error transition-all duration-150"
           >
             <LogOut size={13} />
           </button>

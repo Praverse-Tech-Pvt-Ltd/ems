@@ -232,7 +232,7 @@ export default function AiWorkIntelligencePage() {
                       <span className="material-symbols-outlined text-[14px]" style={{ fontVariationSettings: "'FILL' 1" }}>psychology</span>
                       AI PARSING LIVE
                     </div>
-                    <div className="grid grid-cols-4 gap-xs">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-xs">
                       {[
                         { label: 'Sentiment', value: parsed.sentiment.label, color: parsed.sentiment.color },
                         { label: 'Score', value: `${parsed.score}/100`, color: 'text-on-surface' },
@@ -253,26 +253,26 @@ export default function AiWorkIntelligencePage() {
                   </div>
                 )}
 
-                <div className="grid grid-cols-2 gap-sm">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-sm">
                   <div className="flex flex-col gap-xs">
                     <label className="font-label-caps text-[10px] text-on-surface-variant tracking-widest">BLOCKERS</label>
                     <input value={blockerText} onChange={e => setBlockerText(e.target.value)}
                       placeholder="What's slowing you down?"
-                      className="border border-outline-variant/50 rounded-xl px-sm py-2 text-body-sm bg-surface-container-lowest focus:border-primary focus:outline-none" />
+                      className="min-h-11 border border-outline-variant/50 rounded-xl px-sm py-2 text-body-sm bg-surface-container-lowest focus:border-primary focus:outline-none" />
                   </div>
                   <div className="flex flex-col gap-xs">
                     <label className="font-label-caps text-[10px] text-on-surface-variant tracking-widest">NEXT STEPS</label>
                     <input value={nextSteps} onChange={e => setNextSteps(e.target.value)}
                       placeholder="What's on deck tomorrow?"
-                      className="border border-outline-variant/50 rounded-xl px-sm py-2 text-body-sm bg-surface-container-lowest focus:border-primary focus:outline-none" />
+                      className="min-h-11 border border-outline-variant/50 rounded-xl px-sm py-2 text-body-sm bg-surface-container-lowest focus:border-primary focus:outline-none" />
                   </div>
                 </div>
 
-                <div className="flex items-center gap-sm">
+                <div className="flex items-center gap-sm flex-wrap">
                   <span className="font-label-caps text-[10px] text-on-surface-variant tracking-widest">ENERGY</span>
                   {[1, 2, 3, 4, 5].map(v => (
                     <button key={v} onClick={() => setEnergy(v)}
-                      className={`w-8 h-8 rounded-full border-2 font-bold text-sm transition-all ${energy >= v ? 'bg-primary border-primary text-on-primary' : 'border-outline-variant/50 text-on-surface-variant'}`}>
+                      className={`w-11 h-11 rounded-full border-2 font-bold text-sm transition-all shrink-0 ${energy >= v ? 'bg-primary border-primary text-on-primary' : 'border-outline-variant/50 text-on-surface-variant'}`}>
                       {v}
                     </button>
                   ))}
@@ -363,7 +363,7 @@ export default function AiWorkIntelligencePage() {
                 className="w-full border border-primary/30 rounded-xl px-sm py-2.5 text-body-sm bg-surface-container-lowest focus:border-primary focus:outline-none pr-12"
                 placeholder="Ask about any employee, client, or pattern..." />
               <button onClick={handleAskAI} disabled={aiAsking || !aiInput.trim()}
-                className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-primary text-on-primary rounded-full flex items-center justify-center disabled:opacity-50">
+                className="absolute right-1 top-1/2 -translate-y-1/2 w-11 h-11 bg-primary text-on-primary rounded-full flex items-center justify-center disabled:opacity-50">
                 <span className="material-symbols-outlined text-[16px]">{aiAsking ? 'hourglass_empty' : 'send'}</span>
               </button>
             </div>
@@ -375,7 +375,7 @@ export default function AiWorkIntelligencePage() {
             <div className="flex flex-wrap gap-xs">
               {['Who is at burnout risk?', 'My productivity this week', 'Unresolved blockers', 'Top performers'].map(q => (
                 <button key={q} onClick={() => setAiInput(q)}
-                  className="text-[10px] bg-primary/5 text-primary border border-primary/20 px-3 py-1.5 rounded-full hover:bg-primary/10 transition-colors">
+                  className="min-h-11 text-[10px] bg-primary/5 text-primary border border-primary/20 px-3 py-2 rounded-full hover:bg-primary/10 transition-colors">
                   {q}
                 </button>
               ))}

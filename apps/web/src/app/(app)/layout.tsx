@@ -50,18 +50,18 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   if (!authReady) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="min-h-[100dvh] flex items-center justify-center bg-background">
         <span className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-background">
-      {/* Mobile sidebar overlay */}
+    <div className="flex h-[100dvh] w-full overflow-hidden bg-background">
+      {/* Mobile + tablet sidebar overlay (drawer) */}
       {navOpen && (
         <div
-          className="md:hidden fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
+          className="lg:hidden fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
           onClick={() => setNavOpen(false)}
         >
           <div className="absolute left-0 top-0 h-full" onClick={(e) => e.stopPropagation()}>
@@ -70,8 +70,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
       )}
 
-      {/* Desktop sidebar — always visible */}
-      <AppSidebar className="hidden md:flex" />
+      {/* Desktop/laptop sidebar — always visible from lg: up only */}
+      <AppSidebar className="hidden lg:flex" />
 
       {/* Right column: top nav + scrollable content */}
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">

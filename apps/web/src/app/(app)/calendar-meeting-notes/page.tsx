@@ -142,7 +142,7 @@ export default function CalendarMeetingNotesPage() {
               </button>
             )}
             <button onClick={() => { setShowAddNote(!showAddNote); setShowAssign(false); }}
-              className="flex items-center gap-xs text-label-caps font-label-caps bg-primary text-on-primary px-4 py-2 rounded-full hover:opacity-90">
+              className="flex min-h-11 items-center gap-xs text-label-caps font-label-caps bg-primary text-on-primary px-4 py-2 rounded-full hover:opacity-90">
               <span className="material-symbols-outlined text-[16px]">{showAddNote ? 'close' : 'add'}</span>
               {showAddNote ? 'Cancel' : 'Add Note'}
             </button>
@@ -255,10 +255,10 @@ export default function CalendarMeetingNotesPage() {
             {today.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })} — WEEK VIEW
           </p>
         </div>
-        <div className="grid grid-cols-7 gap-sm">
+        <div className="grid grid-cols-7 gap-1 sm:gap-sm">
           {weekDays.map(w => (
             <button key={`${w.day}-${w.date}`} onClick={() => setSelectedDay(w.date)}
-              className={`glass-card rounded-xl p-sm flex flex-col items-center gap-xs border transition-all ${selectedDay === w.date ? 'border-primary bg-primary/5' : 'border-outline-variant/30 hover:border-primary/30'}`}>
+              className={`glass-card rounded-xl p-1 sm:p-sm min-h-[44px] min-w-11 flex flex-col items-center justify-center gap-xs border transition-all ${selectedDay === w.date ? 'border-primary bg-primary/5' : 'border-outline-variant/30 hover:border-primary/30'}`}>
               <span className="font-label-caps text-[10px] text-on-surface-variant">{w.day}</span>
               <span className={`font-black text-lg ${selectedDay === w.date ? 'text-primary' : 'text-on-surface'}`}>{w.date}</span>
               {w.events > 0 ? (

@@ -104,7 +104,11 @@ function NewRequestDrawer({ open, onClose }: { open: boolean; onClose: () => voi
         <div className="flex items-center justify-between px-6 py-4 flex-shrink-0" style={{ borderBottom: '1px solid rgba(226,191,181,0.4)' }}>
           <div className="flex items-center gap-3">
             {step === 'form' && !done && (
-              <button onClick={() => setStep('type')} className="w-7 h-7 rounded-lg flex items-center justify-center text-on-surface-variant hover:bg-surface-container transition-colors">
+              <button
+                onClick={() => setStep('type')}
+                className="w-11 h-11 rounded-lg flex items-center justify-center text-on-surface-variant hover:bg-surface-container transition-colors"
+                aria-label="Back to request types"
+              >
                 <ChevronRight size={14} className="rotate-180" />
               </button>
             )}
@@ -117,7 +121,11 @@ function NewRequestDrawer({ open, onClose }: { open: boolean; onClose: () => voi
               </div>
             </div>
           </div>
-          <button onClick={handleClose} className="w-8 h-8 rounded-lg flex items-center justify-center text-on-surface-variant hover:bg-surface-container transition-colors">
+          <button
+            onClick={handleClose}
+            className="w-11 h-11 rounded-lg flex items-center justify-center text-on-surface-variant hover:bg-surface-container transition-colors"
+            aria-label="Close request drawer"
+          >
             <X size={16} />
           </button>
         </div>
@@ -451,7 +459,7 @@ export default function RequestsPage() {
                 <button
                   key={rt.key}
                   onClick={() => setDrawerOpen(true)}
-                  className="flex flex-col items-start gap-2 sm:gap-3 p-3 sm:p-4 rounded-2xl text-left transition-all duration-150 active:scale-[0.97] hover:shadow-md"
+                  className="flex min-h-11 flex-col items-start gap-2 sm:gap-3 p-3 sm:p-4 rounded-2xl text-left transition-all duration-150 active:scale-[0.97] hover:shadow-md"
                   style={{ background: 'rgba(255,255,255,0.85)', border: '1px solid rgba(226,191,181,0.4)', boxShadow: '0 2px 8px rgba(19,27,46,0.04)' }}
                 >
                   <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center" style={{ background: rt.bg }}>
@@ -497,7 +505,7 @@ export default function RequestsPage() {
               <button
                 key={s}
                 onClick={() => setFilterStatus(s)}
-                className={`flex-shrink-0 px-3 py-1.5 rounded-full text-[11px] font-bold border transition-all ${filterStatus === s ? 'bg-primary text-on-primary border-primary shadow-sm' : 'bg-card text-on-surface-variant border-card-border hover:border-primary/30 hover:text-on-surface'}`}
+                className={`flex-shrink-0 min-h-11 px-3 py-2 rounded-full text-[11px] font-bold border transition-all ${filterStatus === s ? 'bg-primary text-on-primary border-primary shadow-sm' : 'bg-card text-on-surface-variant border-card-border hover:border-primary/30 hover:text-on-surface'}`}
               >
                 {s === 'ALL' ? 'All' : STATUS_CONFIG[s]?.label ?? s}
               </button>

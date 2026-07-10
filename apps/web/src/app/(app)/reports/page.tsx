@@ -216,7 +216,7 @@ export default function ReportsPage() {
   return (
     <div className="flex flex-col h-full overflow-hidden">
       <div className="flex-1 overflow-y-auto">
-        <div className="p-6 max-w-[1400px] mx-auto space-y-6">
+        <div className="p-4 sm:p-6 max-w-[1400px] mx-auto space-y-6">
 
           {/* Header */}
           <div className="flex items-start justify-between gap-4 flex-wrap">
@@ -231,17 +231,17 @@ export default function ReportsPage() {
                 Attendance, payroll, and expense insights across your organisation
               </p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
               {/* Period toggle */}
               <div
-                className="flex items-center gap-0.5 p-1 rounded-xl"
+                className="flex w-full items-center gap-0.5 p-1 rounded-xl overflow-x-auto sm:w-auto"
                 style={{ background: 'rgba(19,27,46,0.04)', border: '1px solid rgba(226,191,181,0.3)' }}
               >
                 {(['monthly', 'quarterly', 'yearly'] as const).map(p => (
                   <button
                     key={p}
                     onClick={() => setPeriod(p)}
-                    className={`px-3 py-1.5 rounded-lg text-[12px] font-semibold capitalize transition-all duration-150 ${
+                    className={`min-h-11 flex-1 px-3 py-2 rounded-lg text-[12px] font-semibold capitalize transition-all duration-150 whitespace-nowrap sm:flex-none sm:min-h-0 sm:py-1.5 ${
                       period === p
                         ? 'bg-primary text-on-primary shadow-sm'
                         : 'text-on-surface-variant hover:text-on-surface'
@@ -252,7 +252,7 @@ export default function ReportsPage() {
                 ))}
               </div>
               <button
-                className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-[13px] font-semibold text-on-primary"
+                className="flex min-h-11 items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-[13px] font-semibold text-on-primary whitespace-nowrap sm:min-h-0"
                 style={{
                   background: 'linear-gradient(135deg, #aa3000 0%, #c53800 100%)',
                   boxShadow: '0 2px 12px rgba(170,48,0,0.28)',
@@ -265,7 +265,7 @@ export default function ReportsPage() {
           </div>
 
           {/* Summary strip */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
             {[
               { label: 'Avg Attendance', value: '93.2%', icon: <Users size={16} style={{ color: '#01677d' }} />, accent: '#01677d', up: true, delta: '+1.4%' },
               { label: 'Total Expenses', value: '₹11.0L', icon: <DollarSign size={16} style={{ color: '#aa3000' }} />, accent: '#aa3000', up: false, delta: '-3.2%' },
@@ -274,26 +274,28 @@ export default function ReportsPage() {
             ].map(s => (
               <div
                 key={s.label}
-                className="glass-card rounded-2xl px-5 py-4 flex items-center gap-3 card-hover"
-                style={{ borderLeft: `3px solid ${s.accent}` }}
+                className="glass-card rounded-2xl px-3.5 py-3.5 sm:px-5 sm:py-4 flex min-h-[116px] flex-col items-start gap-3 sm:min-h-0 sm:flex-row sm:items-center card-hover"
+                style={{ borderColor: `${s.accent}40` }}
               >
-                <div
-                  className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-                  style={{ background: `${s.accent}12` }}
-                >
-                  {s.icon}
+                <div className="flex w-full items-start justify-between gap-2 sm:w-auto sm:contents">
+                  <div
+                    className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 sm:order-1"
+                    style={{ background: `${s.accent}12` }}
+                  >
+                    {s.icon}
+                  </div>
+                  <div
+                    className={`flex items-center gap-0.5 text-[10px] sm:text-[10.5px] font-semibold px-1.5 sm:px-2 py-0.5 rounded-full flex-shrink-0 sm:order-3 sm:ml-auto ${
+                      s.up ? 'bg-success/10 text-success' : 'bg-error/10 text-error'
+                    }`}
+                  >
+                    {s.up ? <TrendingUp size={9} /> : <TrendingDown size={9} />}
+                    <span className="whitespace-nowrap">{s.delta}</span>
+                  </div>
                 </div>
-                <div className="min-w-0">
-                  <div className="text-[18px] font-bold text-on-surface leading-tight">{s.value}</div>
-                  <div className="text-[11px] text-on-surface-variant mt-0.5">{s.label}</div>
-                </div>
-                <div
-                  className={`ml-auto flex items-center gap-0.5 text-[10.5px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0 ${
-                    s.up ? 'bg-success/10 text-success' : 'bg-error/10 text-error'
-                  }`}
-                >
-                  {s.up ? <TrendingUp size={9} /> : <TrendingDown size={9} />}
-                  {s.delta}
+                <div className="min-w-0 sm:order-2">
+                  <div className="text-[16px] min-[380px]:text-[17px] sm:text-[18px] font-bold text-on-surface leading-tight whitespace-nowrap tracking-tight">{s.value}</div>
+                  <div className="text-[10.5px] sm:text-[11px] text-on-surface-variant mt-1 leading-tight">{s.label}</div>
                 </div>
               </div>
             ))}
@@ -378,7 +380,7 @@ export default function ReportsPage() {
                       {exp.type} · {exp.size} · {exp.date}
                     </div>
                   </div>
-                  <button className="w-8 h-8 rounded-lg flex items-center justify-center text-on-surface-variant hover:text-secondary hover:bg-secondary/10 opacity-0 group-hover:opacity-100 transition-all">
+                  <button className="w-10 h-10 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center text-on-surface-variant hover:text-secondary hover:bg-secondary/10 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all flex-shrink-0">
                     <Download size={14} />
                   </button>
                 </div>

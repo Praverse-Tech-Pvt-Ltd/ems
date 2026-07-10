@@ -107,7 +107,7 @@ export default function ExpenseTrackerPage() {
             <p className="text-on-surface-variant mt-xs">Submit, track, and manage expense claims.</p>
           </div>
           <button onClick={() => setShowForm(!showForm)}
-            className="flex items-center gap-xs text-label-caps font-label-caps bg-primary text-on-primary px-4 py-2 rounded-full hover:opacity-90 shrink-0">
+            className="flex min-h-11 items-center gap-xs text-label-caps font-label-caps bg-primary text-on-primary px-4 py-2 rounded-full hover:opacity-90 shrink-0">
             <span className="material-symbols-outlined text-[16px]">{showForm ? 'close' : 'add'}</span>
             {showForm ? 'Cancel' : 'New Claim'}
           </button>

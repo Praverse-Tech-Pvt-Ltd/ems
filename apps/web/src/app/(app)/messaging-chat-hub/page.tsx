@@ -110,11 +110,11 @@ export default function MessagingChatHubPage() {
       <div className="glass-card rounded-2xl border border-outline-variant/30 overflow-hidden" style={{ height: '70vh', minHeight: '520px' }}>
         <div className="flex h-full">
           {/* Sidebar */}
-          <aside className="w-64 border-r border-outline-variant/20 flex-col shrink-0 hidden md:flex">
+          <aside className={`w-full md:w-64 border-r border-outline-variant/20 flex-col shrink-0 ${activeChannel ? 'hidden md:flex' : 'flex'}`}>
             <div className="p-sm border-b border-outline-variant/20">
               <div className="relative">
                 <span className="material-symbols-outlined absolute left-sm top-1/2 -translate-y-1/2 text-on-surface-variant text-[16px]">search</span>
-                <input className="w-full pl-8 pr-sm py-2 bg-surface-container-lowest rounded-lg text-body-sm border border-outline-variant/30 focus:border-primary focus:ring-0 focus:outline-none" placeholder="Search..." />
+                <input className="min-h-11 w-full pl-8 pr-sm py-2 bg-surface-container-lowest rounded-lg text-body-sm border border-outline-variant/30 focus:border-primary focus:ring-0 focus:outline-none" placeholder="Search..." />
               </div>
             </div>
 
@@ -178,7 +178,7 @@ export default function MessagingChatHubPage() {
           </aside>
 
           {/* Main chat area */}
-          <div className="flex-1 flex flex-col overflow-hidden">
+          <div className={`flex-1 flex-col overflow-hidden ${activeChannel ? 'flex' : 'hidden md:flex'}`}>
             {!activeChannel ? (
               <div className="flex-1 flex items-center justify-center text-on-surface-variant">
                 <div className="text-center">
@@ -190,6 +190,9 @@ export default function MessagingChatHubPage() {
               <>
                 {/* Channel header */}
                 <div className="p-sm border-b border-outline-variant/20 flex items-center gap-sm">
+                  <button onClick={() => setActiveChannel(null)} className="md:hidden w-10 h-10 -ml-1 flex items-center justify-center text-on-surface-variant hover:text-primary shrink-0">
+                    <span className="material-symbols-outlined text-[22px]">arrow_back</span>
+                  </button>
                   <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold">
                     {getChannelInitials(activeChannel)}
                   </div>

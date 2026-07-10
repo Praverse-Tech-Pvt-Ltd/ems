@@ -51,7 +51,7 @@ function LiveClock() {
 
   return (
     <div
-      className="hidden md:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg"
+      className="hidden lg:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg"
       style={{
         background: 'rgba(1,103,125,0.07)',
         border: '1px solid rgba(1,103,125,0.15)',
@@ -101,7 +101,7 @@ export function AppTopNav({
 
   return (
     <header
-      className="h-14 flex items-center px-2 md:px-4 gap-2 md:gap-3 flex-shrink-0 z-30"
+      className="h-14 flex items-center px-2 lg:px-4 gap-2 lg:gap-3 flex-shrink-0 z-30"
       style={{
         background: 'rgba(250,248,255,0.92)',
         backdropFilter: 'blur(20px) saturate(1.4)',
@@ -110,25 +110,25 @@ export function AppTopNav({
         boxShadow: '0 1px 0 rgba(255,255,255,0.7) inset, 0 1px 8px rgba(19,27,46,0.04)',
       }}
     >
-      {/* Hamburger — mobile only */}
+      {/* Hamburger — mobile + tablet only (persistent sidebar starts at lg:) */}
       <button
         onClick={onMenuOpen}
-        className="md:hidden p-2 rounded-lg text-on-surface-variant hover:bg-surface-container transition-colors"
+        className="lg:hidden w-11 h-11 rounded-lg text-on-surface-variant hover:bg-surface-container transition-colors flex items-center justify-center"
         aria-label="Open menu"
       >
         <span className="material-symbols-outlined text-[20px] leading-none">menu</span>
       </button>
 
-      {/* Mobile: logo + title */}
-      <div className="md:hidden flex items-center gap-2 flex-1 min-w-0">
+      {/* Mobile + tablet: logo + title */}
+      <div className="lg:hidden flex items-center gap-2 flex-1 min-w-0">
         <div className="w-7 h-7 rounded-lg overflow-hidden flex-shrink-0 shadow-sm">
           <Image src="/brand/nexgen-logo-mark.png" alt="NexGen" width={28} height={28} className="w-full h-full object-cover" priority />
         </div>
-        <span className="font-bold text-[17px] tracking-tight gradient-text-primary truncate">NexGen EMS</span>
+        <span className="font-bold text-[17px] tracking-tight text-primary truncate">NexGen EMS</span>
       </div>
 
-      {/* Desktop: logo + breadcrumb */}
-      <nav className="hidden md:flex items-center gap-2 text-[13px]" aria-label="breadcrumb">
+      {/* Desktop/laptop: logo + breadcrumb */}
+      <nav className="hidden lg:flex items-center gap-2 text-[13px]" aria-label="breadcrumb">
         <div className="w-6 h-6 rounded-md overflow-hidden flex-shrink-0 shadow-sm">
           <Image src="/brand/nexgen-logo-mark.png" alt="NexGen" width={24} height={24} className="w-full h-full object-cover" />
         </div>
@@ -140,9 +140,9 @@ export function AppTopNav({
       {/* Spacer */}
       <div className="flex-1" />
 
-      {/* Desktop: search bar */}
+      {/* Desktop/laptop: search bar */}
       <div
-        className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full transition-all duration-200"
+        className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-full transition-all duration-200"
         style={{
           width: focused ? 320 : 260,
           background: focused ? 'rgba(1,103,125,0.04)' : 'rgba(242,243,255,0.9)',
@@ -163,7 +163,7 @@ export function AppTopNav({
       {/* Bell button */}
       <button
         onClick={onNotifOpen}
-        className="relative p-2 rounded-lg text-on-surface-variant transition-all duration-150 hover:bg-primary-container/40 hover:text-primary"
+        className="relative w-11 h-11 rounded-lg text-on-surface-variant transition-all duration-150 hover:bg-primary-container/40 hover:text-primary flex items-center justify-center"
         aria-label="Notifications"
       >
         <Bell size={17} />
@@ -180,8 +180,11 @@ export function AppTopNav({
       {/* Live clock */}
       <LiveClock />
 
-      {/* Mobile: search icon */}
-      <button className="md:hidden p-2 rounded-lg text-on-surface-variant hover:bg-surface-container transition-colors">
+      {/* Mobile + tablet: search icon */}
+      <button
+        className="lg:hidden w-11 h-11 rounded-lg text-on-surface-variant hover:bg-surface-container transition-colors flex items-center justify-center"
+        aria-label="Search"
+      >
         <Search size={18} />
       </button>
     </header>

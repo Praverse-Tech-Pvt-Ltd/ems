@@ -138,7 +138,7 @@ export default function SalaryPayslipsPage() {
           <button
             key={m}
             onClick={() => setSelectedMonth(i + 1)}
-            className={`px-4 py-2 rounded-full text-[10px] font-bold border whitespace-nowrap transition-all ${selectedMonth === i + 1 ? 'bg-primary border-primary text-on-primary shadow-sm' : 'border-card-border text-on-surface-variant hover:bg-surface-container-low'}`}
+            className={`min-h-11 px-4 py-2 rounded-full text-[10px] font-bold border whitespace-nowrap transition-all ${selectedMonth === i + 1 ? 'bg-primary border-primary text-on-primary shadow-sm' : 'border-card-border text-on-surface-variant hover:bg-surface-container-low'}`}
           >
             {m} {selectedYear}
           </button>
@@ -174,7 +174,7 @@ export default function SalaryPayslipsPage() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
+              <table className="w-full min-w-[1400px] text-left text-xs">
                 <thead className="bg-surface-container-low text-on-surface-variant uppercase tracking-wider text-[9px]">
                   <tr>
                     <th className="px-4 py-3 font-bold">Employee</th>
@@ -450,7 +450,7 @@ export default function SalaryPayslipsPage() {
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-6">
+                      <div className="flex items-center flex-wrap gap-3 sm:gap-6">
                         <div className="hidden sm:block text-right">
                           <span className="text-[9px] text-on-surface-variant font-bold uppercase tracking-wider block">Gross</span>
                           <span className="font-bold text-xs text-on-surface font-mono">₹{Number(slip.grossSalary).toLocaleString('en-IN')}</span>

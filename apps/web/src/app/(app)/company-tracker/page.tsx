@@ -68,12 +68,12 @@ function TaskUpdate({ task, onSaved }: { task: any; onSaved: () => void }) {
 
   return (
     <div className="flex flex-wrap gap-2 items-center">
-      <select value={status} onChange={e => setStatus(e.target.value)} className="rounded-lg border border-card-border bg-surface-container-low px-2 py-1 text-xs">
+      <select value={status} onChange={e => setStatus(e.target.value)} className="min-h-11 rounded-lg border border-card-border bg-surface-container-low px-3 py-2 text-xs">
         {REQUIREMENT_STATUS.map(item => <option key={item} value={item}>{item}</option>)}
       </select>
-      <input type="number" min={0} max={100} value={completion} onChange={e => setCompletion(Number(e.target.value))} className="w-16 rounded-lg border border-card-border bg-surface-container-low px-2 py-1 text-xs" />
-      <input value={remarks} onChange={e => setRemarks(e.target.value)} placeholder="Remarks" className="min-w-[160px] flex-1 rounded-lg border border-card-border bg-surface-container-low px-2 py-1 text-xs" />
-      <button onClick={save} disabled={saving} className="inline-flex items-center gap-1 rounded-lg bg-primary px-2.5 py-1 text-xs font-bold text-on-primary disabled:opacity-50">
+      <input type="number" min={0} max={100} value={completion} onChange={e => setCompletion(Number(e.target.value))} className="min-h-11 w-20 rounded-lg border border-card-border bg-surface-container-low px-3 py-2 text-xs" />
+      <input value={remarks} onChange={e => setRemarks(e.target.value)} placeholder="Remarks" className="min-h-11 min-w-[160px] flex-1 rounded-lg border border-card-border bg-surface-container-low px-3 py-2 text-xs" />
+      <button onClick={save} disabled={saving} className="inline-flex min-h-11 items-center gap-1 rounded-lg bg-primary px-3 py-2 text-xs font-bold text-on-primary disabled:opacity-50">
         <Save size={12} /> Save
       </button>
     </div>
@@ -119,42 +119,42 @@ export default function CompanyTrackerPage() {
   const visibleTasks = isAdmin ? tasks : tasks.filter((task: any) => task.assignedTo === user?.id);
 
   return (
-    <div className="p-6 space-y-5">
+    <div className="p-4 md:p-6 space-y-5">
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-[26px] font-black text-on-surface">Company Tracker</h1>
           <p className="text-sm text-on-surface-variant mt-1">Client project tracking for audits, QMS, SOPs, validation, BMR review, gap assessment, and follow-ups.</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           {isAdmin && (
-            <button onClick={downloadReport} className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-card-border text-sm font-semibold">
+            <button onClick={downloadReport} className="inline-flex min-h-11 items-center gap-2 px-3 py-2 rounded-xl border border-card-border text-sm font-semibold">
               <Download size={14} /> Export CSV
             </button>
           )}
-          <button onClick={load} className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-primary text-on-primary text-sm font-semibold">
+          <button onClick={load} className="inline-flex min-h-11 items-center gap-2 px-3 py-2 rounded-xl bg-primary text-on-primary text-sm font-semibold">
             <RefreshCw size={14} /> Refresh
           </button>
         </div>
       </div>
 
       <div className="glass-card rounded-xl p-3 grid grid-cols-1 md:grid-cols-4 gap-2">
-        <input value={filters.search} onChange={e => setFilters({ ...filters, search: e.target.value })} placeholder="Search company..." className="rounded-lg border border-card-border bg-surface-container-low px-3 py-2 text-sm" />
-        <select value={filters.priority} onChange={e => setFilters({ ...filters, priority: e.target.value })} className="rounded-lg border border-card-border bg-surface-container-low px-3 py-2 text-sm">
+        <input value={filters.search} onChange={e => setFilters({ ...filters, search: e.target.value })} placeholder="Search company..." className="min-h-11 rounded-lg border border-card-border bg-surface-container-low px-3 py-2 text-sm" />
+        <select value={filters.priority} onChange={e => setFilters({ ...filters, priority: e.target.value })} className="min-h-11 rounded-lg border border-card-border bg-surface-container-low px-3 py-2 text-sm">
           <option value="">All priorities</option>
           {['Critical', 'High', 'Medium', 'Low'].map(item => <option key={item} value={item}>{item}</option>)}
         </select>
-        <select value={filters.status} onChange={e => setFilters({ ...filters, status: e.target.value })} className="rounded-lg border border-card-border bg-surface-container-low px-3 py-2 text-sm">
+        <select value={filters.status} onChange={e => setFilters({ ...filters, status: e.target.value })} className="min-h-11 rounded-lg border border-card-border bg-surface-container-low px-3 py-2 text-sm">
           <option value="">All stages</option>
           {STAGE_OPTIONS.map(item => <option key={item} value={item}>{item}</option>)}
         </select>
-        <button onClick={load} className="rounded-lg bg-surface-container text-sm font-bold text-on-surface">Apply Filters</button>
+        <button onClick={load} className="min-h-11 rounded-lg bg-surface-container px-3 py-2 text-sm font-bold text-on-surface">Apply Filters</button>
       </div>
 
       {loading ? (
         <div className="glass-card rounded-xl p-8 text-center text-on-surface-variant">Loading tracker...</div>
       ) : (
         <>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             <Card label={isAdmin ? 'Total Active Companies' : 'My Companies'} value={data?.cards?.totalActiveCompanies ?? 0} />
             <Card label={isAdmin ? 'Total Projects' : 'My Pending Tasks'} value={isAdmin ? data?.cards?.totalProjects ?? 0 : data?.cards?.pendingTasks ?? 0} />
             <Card label="Completed" value={isAdmin ? data?.cards?.projectsCompleted ?? 0 : data?.cards?.completedTasks ?? 0} />
