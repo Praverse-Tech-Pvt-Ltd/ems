@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { attendanceService } from '@/lib/api/attendance';
+import { employeesService } from '@/lib/api/employees';
 import { useAuthStore } from '@/store/auth.store';
 import type { AttendanceRecord, AttendanceStatus } from '@/types';
 import { isAttendanceBlockedUser } from '@/lib/attendance-access';
@@ -160,6 +161,7 @@ export default function AttendancePunchStation() {
   const [selectedDate, setSelectedDate] = useState(() => dateKey(new Date()));
   const [stats, setStats] = useState<any>(null);
   const [allRecords, setAllRecords] = useState<any[]>([]);
+  const [employees, setEmployees] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [holidays, setHolidays] = useState<any[]>([]);
   const [punching, setPunching] = useState(false);
@@ -172,6 +174,12 @@ export default function AttendancePunchStation() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [adminModalOpen, setAdminModalOpen] = useState(false);
+  const [quickAdjust, setQuickAdjust] = useState<{ employeeId: string; date: string; status: string } | null>(null);
+  const [teamDate, setTeamDate] = useState(() => dateKey(new Date()));
+  const [teamSearch, setTeamSearch] = useState('');
+  const [teamStatusFilter, setTeamStatusFilter] = useState<string>('ALL');
+  const [teamLoading, setTeamLoading] = useState(false);
+  const [quickActionId, setQuickActionId] = useState<string | null>(null);
 
   const load = async () => {
     const isPowerUser = ['ADMIN', 'SUPER_ADMIN'].includes(user?.role ?? '');
@@ -205,10 +213,6 @@ export default function AttendancePunchStation() {
         setOdReason(openOdData.manualPunchReason === 'OD' ? '' : openOdData.manualPunchReason ?? '');
       }
 
-      if (isAdmin) {
-        const all = await queryClient.fetchQuery({ queryKey: ['attendance-all'], queryFn: () => attendanceService.all() }).catch(() => []);
-        setAllRecords(Array.isArray(all) ? all.slice(0, 10) : all?.data?.slice(0, 10) ?? []);
-      }
     } catch {
       // show empty state
     } finally {
@@ -217,6 +221,97 @@ export default function AttendancePunchStation() {
   };
 
   useEffect(() => { load(); }, [calendarMonth, attendanceBlocked]);
+
+  const loadTeam = async () => {
+    if (!isAdmin) return;
+    setTeamLoading(true);
+    try {
+      const [all, emps] = await Promise.all([
+        queryClient.fetchQuery({
+          queryKey: ['attendance-all', teamDate],
+          queryFn: () => attendanceService.all({ from: teamDate, to: teamDate }),
+        }).catch(() => []),
+        queryClient.fetchQuery({ queryKey: ['employees-list'], queryFn: () => employeesService.list() }).catch(() => []),
+      ]);
+      setAllRecords(Array.isArray(all) ? all : all?.data ?? []);
+      setEmployees(Array.isArray(emps) ? emps : emps?.data ?? []);
+    } finally {
+      setTeamLoading(false);
+    }
+  };
+
+  useEffect(() => { loadTeam(); }, [teamDate, isAdmin]);
+
+  const quickMark = async (employeeId: string, status: string) => {
+    setQuickActionId(employeeId + status);
+    try {
+      await attendanceService.adminUpsert({
+        employeeId,
+        date: new Date(teamDate).toISOString(),
+        status,
+        reason: `Marked ${status} by admin via Team Attendance quick action`,
+      });
+      await loadTeam();
+    } catch (e: any) {
+      setError(e?.response?.data?.message ?? 'Could not update attendance.');
+    } finally {
+      setQuickActionId(null);
+    }
+  };
+
+  const teamRecordsByEmployee = useMemo(() => {
+    return allRecords.reduce<Record<string, any>>((acc, rec) => {
+      if (rec.employee?.id) acc[rec.employee.id] = rec;
+      return acc;
+    }, {});
+  }, [allRecords]);
+
+  const teamRows = useMemo(() => {
+    const rows = employees.map(emp => ({
+      employee: emp,
+      record: teamRecordsByEmployee[emp.id] ?? null,
+    }));
+    return rows
+      .filter(r => {
+        const name = `${r.employee.firstName ?? ''} ${r.employee.lastName ?? ''} ${r.employee.employeeCode ?? ''}`.toLowerCase();
+        const matchesSearch = !teamSearch || name.includes(teamSearch.toLowerCase());
+        const recStatus = r.record?.status ?? 'NOT_MARKED';
+        const matchesStatus = teamStatusFilter === 'ALL' || recStatus === teamStatusFilter;
+        return matchesSearch && matchesStatus;
+      })
+      .sort((a, b) => `${a.employee.firstName}`.localeCompare(`${b.employee.firstName}`));
+  }, [employees, teamRecordsByEmployee, teamSearch, teamStatusFilter]);
+
+  const teamSnapshot = useMemo(() => {
+    const counts: Record<string, number> = { PRESENT: 0, LATE: 0, ABSENT: 0, HALF_DAY: 0, WFH: 0, LEAVE: 0, OD: 0, NOT_MARKED: 0 };
+    employees.forEach(emp => {
+      const rec = teamRecordsByEmployee[emp.id];
+      const key = rec?.notes === 'OD' ? 'OD' : (rec?.status ?? 'NOT_MARKED');
+      counts[key] = (counts[key] ?? 0) + 1;
+    });
+    return counts;
+  }, [employees, teamRecordsByEmployee]);
+
+  const exportTeamCsv = () => {
+    const header = ['Employee', 'Employee Code', 'Date', 'Status', 'Punch In', 'Punch Out', 'Hours'];
+    const lines = teamRows.map(({ employee: emp, record: rec }) => [
+      `${emp.firstName} ${emp.lastName}`,
+      emp.employeeCode ?? '',
+      teamDate,
+      rec?.notes === 'OD' ? 'OD' : (rec?.status ?? 'NOT MARKED'),
+      rec?.punchInTime ? new Date(rec.punchInTime).toLocaleTimeString('en-IN') : '',
+      rec?.punchOutTime ? new Date(rec.punchOutTime).toLocaleTimeString('en-IN') : '',
+      rec?.workingHours != null ? String(rec.workingHours) : '',
+    ]);
+    const csv = [header, ...lines].map(row => row.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `team-attendance-${teamDate}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   const isPunchedIn = today?.punchInTime && !today?.punchOutTime;
   const isPunchedOut = today?.punchInTime && today?.punchOutTime;
@@ -813,29 +908,117 @@ export default function AttendancePunchStation() {
         </div>
       )}
 
-      {/* Admin view: all team records */}
-      {isAdmin && allRecords.length > 0 && (
+      {/* Admin view: full team attendance — see everyone, mark present/absent any day */}
+      {isAdmin && (
         <div>
-          <p className="font-label-caps text-label-caps text-on-surface-variant tracking-widest mb-sm">TEAM TODAY</p>
-          <div className="glass-card rounded-xl overflow-hidden border border-outline-variant/30">
-            <div className="divide-y divide-outline-variant/20">
-              {allRecords.map(rec => (
-                <div key={rec.id} className="flex items-center gap-md p-sm hover:bg-surface-container-low transition-colors">
-                  <div className="w-10 h-10 rounded-full bg-secondary-container text-on-secondary-container flex items-center justify-center font-bold text-xs shrink-0">
-                    {rec.employee?.firstName?.[0]}{rec.employee?.lastName?.[0]}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-on-surface text-sm">{rec.employee?.firstName} {rec.employee?.lastName}</p>
-                    <p className="text-[10px] text-on-surface-variant">{rec.employee?.designation ?? rec.employee?.role}</p>
-                  </div>
-                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${STATUS_COLOR[rec.status] ?? 'bg-surface-container-high text-on-surface-variant'}`}>
-                    {statusLabel(rec)}
-                  </span>
-                  <p className="text-body-sm text-on-surface-variant hidden md:block">{fmtTime(rec.punchInTime)} → {fmtTime(rec.punchOutTime)}</p>
-                  <p className="font-semibold text-on-surface text-sm hidden md:block">{fmtHrs(rec.workingHours)}</p>
-                </div>
-              ))}
+          <div className="flex items-end justify-between gap-md flex-wrap mb-sm">
+            <p className="font-label-caps text-label-caps text-on-surface-variant tracking-widest">TEAM ATTENDANCE</p>
+            <div className="flex items-center gap-xs flex-wrap">
+              <input
+                type="date"
+                value={teamDate}
+                onChange={e => setTeamDate(e.target.value)}
+                className="px-3 py-1.5 rounded-full text-xs border border-outline-variant/40 bg-surface-container-low text-on-surface focus:outline-none focus:border-primary"
+              />
+              <input
+                type="text"
+                value={teamSearch}
+                onChange={e => setTeamSearch(e.target.value)}
+                placeholder="Search employee..."
+                className="px-3 py-1.5 rounded-full text-xs border border-outline-variant/40 bg-surface-container-low text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:border-primary w-44"
+              />
+              <button
+                type="button"
+                onClick={exportTeamCsv}
+                className="px-3 py-1.5 rounded-full text-xs font-bold border border-outline-variant/40 bg-surface-container-low text-on-surface hover:bg-surface-container-high transition-colors"
+              >
+                Export CSV
+              </button>
             </div>
+          </div>
+
+          {/* Snapshot stat strip */}
+          <div className="grid grid-cols-4 sm:grid-cols-8 gap-xs mb-sm">
+            {[
+              { key: 'PRESENT', label: 'Present' },
+              { key: 'LATE', label: 'Late' },
+              { key: 'ABSENT', label: 'Absent' },
+              { key: 'HALF_DAY', label: 'Half day' },
+              { key: 'WFH', label: 'WFH' },
+              { key: 'OD', label: 'OD' },
+              { key: 'LEAVE', label: 'Leave' },
+              { key: 'NOT_MARKED', label: 'Not marked' },
+            ].map(s => (
+              <div key={s.key} className="rounded-xl bg-surface-container-low border border-outline-variant/20 p-sm text-center">
+                <p className="font-black text-lg text-on-surface">{teamSnapshot[s.key] ?? 0}</p>
+                <p className="text-[9px] text-on-surface-variant font-label-caps tracking-wider">{s.label}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Status filter chips */}
+          <div className="flex items-center gap-xs flex-wrap mb-sm">
+            {['ALL', 'PRESENT', 'LATE', 'ABSENT', 'HALF_DAY', 'WFH', 'LEAVE', 'NOT_MARKED'].map(s => (
+              <button
+                key={s}
+                onClick={() => setTeamStatusFilter(s)}
+                className={`px-3 py-1 rounded-full text-[11px] font-bold border transition-all ${teamStatusFilter === s ? 'bg-primary text-on-primary border-primary' : 'bg-card text-on-surface-variant border-card-border hover:border-primary/30'}`}
+              >
+                {s.replaceAll('_', ' ')}
+              </button>
+            ))}
+          </div>
+
+          <div className="glass-card rounded-xl overflow-hidden border border-outline-variant/30">
+            {teamLoading ? (
+              <div className="p-lg text-center text-on-surface-variant text-sm">Loading team attendance...</div>
+            ) : teamRows.length === 0 ? (
+              <div className="p-lg text-center text-on-surface-variant text-sm">No employees match this filter.</div>
+            ) : (
+              <div className="divide-y divide-outline-variant/20">
+                {teamRows.map(({ employee: emp, record: rec }) => (
+                  <div key={emp.id} className="flex items-center gap-md p-sm hover:bg-surface-container-low transition-colors flex-wrap">
+                    <div className="w-10 h-10 rounded-full bg-secondary-container text-on-secondary-container flex items-center justify-center font-bold text-xs shrink-0">
+                      {emp.firstName?.[0]}{emp.lastName?.[0]}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-on-surface text-sm">{emp.firstName} {emp.lastName}</p>
+                      <p className="text-[10px] text-on-surface-variant">{emp.designation ?? emp.role}</p>
+                    </div>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${rec ? (rec.notes === 'OD' ? STATUS_COLOR.OD : STATUS_COLOR[rec.status] ?? 'bg-surface-container-high text-on-surface-variant') : 'bg-surface-container-high text-on-surface-variant'}`}>
+                      {rec ? statusLabel(rec) : 'NOT MARKED'}
+                    </span>
+                    <p className="text-body-sm text-on-surface-variant hidden md:block">{fmtTime(rec?.punchInTime ?? null)} → {fmtTime(rec?.punchOutTime ?? null)}</p>
+                    <p className="font-semibold text-on-surface text-sm hidden md:block w-16 text-right">{fmtHrs(rec?.workingHours ?? null)}</p>
+                    <div className="flex items-center gap-xs shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => quickMark(emp.id, 'PRESENT')}
+                        disabled={quickActionId === emp.id + 'PRESENT'}
+                        className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-success/10 text-success border border-success/20 hover:bg-success/20 transition-colors disabled:opacity-50"
+                      >
+                        {quickActionId === emp.id + 'PRESENT' ? '...' : 'Present'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => quickMark(emp.id, 'ABSENT')}
+                        disabled={quickActionId === emp.id + 'ABSENT'}
+                        className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-error/10 text-error border border-error/20 hover:bg-error/20 transition-colors disabled:opacity-50"
+                      >
+                        {quickActionId === emp.id + 'ABSENT' ? '...' : 'Absent'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setQuickAdjust({ employeeId: emp.id, date: teamDate, status: rec?.status ?? 'PRESENT' })}
+                        className="px-2.5 py-1 rounded-full text-[10px] font-bold border border-outline-variant/40 text-on-surface-variant hover:bg-surface-container-high transition-colors"
+                      >
+                        More
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -844,6 +1027,16 @@ export default function AttendancePunchStation() {
         <AdminAttendanceAdjustModal
           onClose={() => setAdminModalOpen(false)}
           onSuccess={load}
+        />
+      )}
+
+      {quickAdjust && (
+        <AdminAttendanceAdjustModal
+          defaultEmployeeId={quickAdjust.employeeId}
+          defaultDate={quickAdjust.date}
+          defaultStatus={quickAdjust.status}
+          onClose={() => setQuickAdjust(null)}
+          onSuccess={loadTeam}
         />
       )}
     </div>

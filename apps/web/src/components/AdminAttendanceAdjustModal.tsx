@@ -56,9 +56,15 @@ function todayISTDateInput() {
 export function AdminAttendanceAdjustModal({
   onClose,
   onSuccess,
+  defaultEmployeeId,
+  defaultDate,
+  defaultStatus,
 }: {
   onClose: () => void;
   onSuccess: () => void;
+  defaultEmployeeId?: string;
+  defaultDate?: string;
+  defaultStatus?: string;
 }) {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loadingEmployees, setLoadingEmployees] = useState(true);
@@ -69,11 +75,11 @@ export function AdminAttendanceAdjustModal({
   const [successMsg, setSuccessMsg] = useState('');
 
   // Form states
-  const [selectedEmployeeId, setSelectedEmployeeId] = useState('');
-  const [selectedDate, setSelectedDate] = useState<string>(() => todayISTDateInput());
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState(defaultEmployeeId ?? '');
+  const [selectedDate, setSelectedDate] = useState<string>(() => defaultDate ?? todayISTDateInput());
   const [punchInTime, setPunchInTime] = useState('');
   const [punchOutTime, setPunchOutTime] = useState('');
-  const [status, setStatus] = useState('PRESENT');
+  const [status, setStatus] = useState(defaultStatus ?? 'PRESENT');
   const [reason, setReason] = useState('');
 
   // Fetch employees on mount
@@ -82,7 +88,7 @@ export function AdminAttendanceAdjustModal({
       .then(res => {
         const list = Array.isArray(res) ? res : res?.data ?? [];
         setEmployees(list);
-        if (list.length > 0) {
+        if (list.length > 0 && !defaultEmployeeId) {
           setSelectedEmployeeId(list[0].id);
         }
       })
@@ -92,7 +98,7 @@ export function AdminAttendanceAdjustModal({
       .finally(() => {
         setLoadingEmployees(false);
       });
-  }, []);
+  }, [defaultEmployeeId]);
 
   useEffect(() => {
     if (!selectedEmployeeId || !selectedDate) return;
