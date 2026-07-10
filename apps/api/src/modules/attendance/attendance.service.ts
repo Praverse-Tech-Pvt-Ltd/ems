@@ -622,58 +622,6 @@ export class AttendanceService {
     };
   }
 
-  async getEmployeeOverview(employeeId: string) {
-    const employee = await this.prisma.employee.findUnique({
-      where: { id: employeeId },
-      select: { id: true, firstName: true, lastName: true, status: true },
-    });
-    if (!employee) throw new BadRequestException('Employee not found');
-
-    const today = this.getISTToday();
-    const monthStart = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1));
-    const records = await this.prisma.attendanceRecord.findMany({
-      where: { employeeId, date: { gte: monthStart, lte: today } },
-      orderBy: { date: 'desc' },
-    });
-
-    const count = (status: string) => records.filter(record => record.status === status).length;
-    const present = count('PRESENT');
-    const late = count('LATE');
-    const halfDay = count('HALF_DAY');
-    const leave = count('LEAVE');
-    const absent = count('ABSENT');
-    const wfh = count('WFH');
-    const attended = present + late + halfDay + wfh;
-    const lateFrequency = attended > 0 ? Math.round((late / attended) * 100) : 0;
-    const punctuality = attended > 0 ? Math.round(((present + wfh) / attended) * 100) : 0;
-    const totalHours = records.reduce((sum, record) => sum + Number(record.workingHours ?? 0), 0);
-    const todayRecord = records.find(record => record.date.getTime() === today.getTime()) ?? null;
-
-    return {
-      employee,
-      period: {
-        from: monthStart,
-        to: today,
-        month: today.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', month: 'long', year: 'numeric' }),
-      },
-      summary: {
-        totalRecords: records.length,
-        present,
-        late,
-        halfDay,
-        leave,
-        absent,
-        wfh,
-        attended,
-        lateFrequency,
-        punctuality,
-        totalHours: Math.round(totalHours * 100) / 100,
-      },
-      today: todayRecord,
-      records,
-    };
-  }
-
   async getAll(from?: string, to?: string, status?: string) {
     const where: Record<string, unknown> = {};
     if (from || to) {
