@@ -29,10 +29,17 @@ export class LeavesService {
   async create(employeeId: string, data: CreateLeaveData) {
     const from = new Date(data.fromDate);
     const to = new Date(data.toDate);
-    const totalDays =
-      Math.ceil((to.getTime() - from.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime()) || to < from) {
+      throw new BadRequestException('Invalid leave date range');
+    }
 
-    const currentYear = new Date().getFullYear();
+    const leaveDates = await this.getChargeableLeaveDates(employeeId, from, to);
+    const totalDays = leaveDates.length;
+    if (totalDays === 0) {
+      throw new BadRequestException('Selected dates are weekly offs and cannot be applied as leave');
+    }
+
+    const currentYear = from.getFullYear();
     const balance = await this.prisma.leaveBalance.findUnique({
       where: {
         employeeId_leaveType_year: {
@@ -145,8 +152,22 @@ export class LeavesService {
     }
 
     return this.prisma.$transaction(async (tx) => {
+      let approvedTotalDays: number | undefined;
+
       if (action === 'approve') {
         const year = leave.fromDate.getFullYear();
+        const leaveDates = await this.getChargeableLeaveDates(
+          leave.employeeId,
+          leave.fromDate,
+          leave.toDate,
+          tx,
+        );
+        const totalDays = leaveDates.length;
+        if (totalDays === 0) {
+          throw new BadRequestException('Selected dates are weekly offs and cannot be approved as leave');
+        }
+        approvedTotalDays = totalDays;
+
         await tx.leaveBalance.upsert({
           where: {
             employeeId_leaveType_year: {
@@ -155,37 +176,52 @@ export class LeavesService {
               year,
             },
           },
-          update: { usedDays: { increment: leave.totalDays } },
+          update: { usedDays: { increment: totalDays } },
           create: {
             employeeId: leave.employeeId,
             leaveType: leave.leaveType,
             year,
             totalDays: 0,
-            usedDays: leave.totalDays,
+            usedDays: totalDays,
           },
         });
 
-        const dates: Date[] = [];
-        const cur = new Date(leave.fromDate);
-        while (cur <= leave.toDate) {
-          dates.push(new Date(cur));
-          cur.setUTCDate(cur.getUTCDate() + 1);
+        for (const date of leaveDates) {
+          await tx.attendanceRecord.upsert({
+            where: {
+              employeeId_date: {
+                employeeId: leave.employeeId,
+                date,
+              },
+            },
+            update: {
+              status: 'LEAVE',
+              punchInTime: null,
+              punchOutTime: null,
+              workingHours: null,
+              isManualPunch: true,
+              manualPunchReason: 'Marked leave after approval.',
+              isRegularized: true,
+              regularizationReason: 'Marked leave after approval.',
+            },
+            create: {
+              employeeId: leave.employeeId,
+              date,
+              status: 'LEAVE',
+              isManualPunch: true,
+              manualPunchReason: 'Marked leave after approval.',
+              isRegularized: true,
+              regularizationReason: 'Marked leave after approval.',
+            },
+          });
         }
-
-        await tx.attendanceRecord.createMany({
-          data: dates.map((date) => ({
-            employeeId: leave.employeeId,
-            date,
-            status: 'LEAVE' as const,
-          })),
-          skipDuplicates: true,
-        });
       }
 
       return tx.leaveRequest.update({
         where: { id },
         data: {
           status: action === 'approve' ? 'APPROVED' : 'REJECTED',
+          ...(approvedTotalDays !== undefined ? { totalDays: approvedTotalDays } : {}),
           approvedBy: approverId,
           approvedAt: new Date(),
           rejectionReason: action === 'reject' ? rejectionReason!.trim() : null,
@@ -232,5 +268,34 @@ export class LeavesService {
     }
 
     return { year, refilled };
+  }
+
+  private async getChargeableLeaveDates(
+    employeeId: string,
+    from: Date,
+    to: Date,
+    client: Pick<PrismaService, 'employee'> = this.prisma,
+  ) {
+    const employee = await client.employee.findUnique({
+      where: { id: employeeId },
+      select: { department: { select: { name: true } } },
+    });
+    if (!employee) throw new NotFoundException('Employee not found');
+
+    const softwareWeekOff = employee.department?.name?.toLowerCase().includes('software') ?? false;
+    const dates: Date[] = [];
+    const cur = new Date(from);
+    cur.setUTCHours(0, 0, 0, 0);
+    const end = new Date(to);
+    end.setUTCHours(0, 0, 0, 0);
+
+    while (cur <= end) {
+      const day = cur.getUTCDay();
+      const isWeekOff = day === 0 || (softwareWeekOff && day === 6);
+      if (!isWeekOff) dates.push(new Date(cur));
+      cur.setUTCDate(cur.getUTCDate() + 1);
+    }
+
+    return dates;
   }
 }

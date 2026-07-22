@@ -62,6 +62,6 @@ export class LeavesController {
     @CurrentUser() user: { id: string; role: string },
     @Body() dto: ApproveLeaveDto,
   ) {
-    return this.service.approve(id, user.id, user.role, dto.action, dto.rejectionReason);
+    return this.service.approve(id, user.id, user.role, dto.action.toLowerCase() as 'approve' | 'reject', dto.rejectionReason);
   }
 }
