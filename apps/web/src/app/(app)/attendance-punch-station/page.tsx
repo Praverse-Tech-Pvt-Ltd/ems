@@ -184,12 +184,12 @@ export default function AttendancePunchStation() {
       const { from, to } = monthBounds(calendarMonth);
       const [todayData, statsData, recordsData, calendarData, holidaysData, openOdData] = !attendanceBlocked
         ? await Promise.all([
-            queryClient.fetchQuery({ queryKey: ['attendance-today', user?.id], queryFn: () => attendanceService.today() }).catch(() => null),
+            queryClient.fetchQuery({ queryKey: ['attendance-today', user?.id], queryFn: () => attendanceService.today(), staleTime: 0 }).catch(() => null),
             queryClient.fetchQuery({ queryKey: ['attendance-stats', user?.id], queryFn: () => attendanceService.myStats() }).catch(() => null),
             queryClient.fetchQuery({ queryKey: ['attendance-records', user?.id], queryFn: () => attendanceService.my({ limit: 14 }) }).catch(() => []),
             queryClient.fetchQuery({ queryKey: ['attendance-calendar', user?.id, from, to], queryFn: () => attendanceService.my({ from, to }) }).catch(() => []),
             queryClient.fetchQuery({ queryKey: ['holidays'], queryFn: () => attendanceService.holidays() }).catch(() => []),
-            queryClient.fetchQuery({ queryKey: ['attendance-od-open', user?.id], queryFn: () => attendanceService.openOd() }).catch(() => null),
+            queryClient.fetchQuery({ queryKey: ['attendance-od-open', user?.id], queryFn: () => attendanceService.openOd(), staleTime: 0 }).catch(() => null),
           ])
         : [null, null, [], [], [], null];
 
