@@ -12,6 +12,7 @@ import { PunchInDto } from './dto/punch-in.dto';
 import { RegularizeDto } from './dto/regularize.dto';
 import { OdPunchInDto, OdPunchOutDto } from './dto/od-punch.dto';
 import { AdminUpsertAttendanceDto } from './dto/admin-upsert.dto';
+import { EditTimeDto } from './dto/edit-time.dto';
 import { ATTENDANCE_BLOCKED_MESSAGE, isAttendanceBlockedIdentity } from './attendance-blocklist';
 
 // ── Attendance Policy Constants ────────────────────────────────────────────────
@@ -766,7 +767,7 @@ export class AttendanceService {
   async editAttendanceTime(
     id: string,
     adminId: string,
-    dto: { punchInTime?: string; punchOutTime?: string; reason: string },
+    dto: EditTimeDto,
   ) {
     const record = await this.assertAttendanceRecordAllowed(id);
 

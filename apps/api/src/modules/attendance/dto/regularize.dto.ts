@@ -1,10 +1,11 @@
-import { IsString, IsOptional, IsEnum, IsDateString } from 'class-validator';
+import { IsString, IsOptional, IsEnum, IsDateString, IsNotEmpty } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { AttendanceStatus } from '@prisma/client';
 
 export class RegularizeDto {
   @ApiProperty()
   @IsString()
+  @IsNotEmpty()
   reason: string;
 
   @ApiPropertyOptional()

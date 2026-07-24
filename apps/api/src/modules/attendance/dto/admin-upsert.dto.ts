@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsEnum, IsDateString, IsUUID } from 'class-validator';
+import { IsString, IsOptional, IsEnum, IsDateString, IsUUID, IsNotEmpty } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { AttendanceStatus } from '@prisma/client';
 
@@ -27,5 +27,6 @@ export class AdminUpsertAttendanceDto {
 
   @ApiProperty()
   @IsString()
+  @IsNotEmpty()
   reason: string;
 }

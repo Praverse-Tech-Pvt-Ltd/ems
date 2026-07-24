@@ -7,6 +7,7 @@ import { PunchInDto } from './dto/punch-in.dto';
 import { RegularizeDto } from './dto/regularize.dto';
 import { OdPunchInDto, OdPunchOutDto } from './dto/od-punch.dto';
 import { AdminUpsertAttendanceDto } from './dto/admin-upsert.dto';
+import { EditTimeDto } from './dto/edit-time.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -159,7 +160,7 @@ export class AttendanceController {
   editTime(
     @Param('id') id: string,
     @CurrentUser() user: { id: string },
-    @Body() dto: { punchInTime?: string; punchOutTime?: string; reason: string },
+    @Body() dto: EditTimeDto,
   ) {
     return this.service.editAttendanceTime(id, user.id, dto);
   }
