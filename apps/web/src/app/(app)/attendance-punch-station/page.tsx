@@ -7,6 +7,7 @@ import type { AttendanceRecord, AttendanceStatus } from '@/types';
 import { isAttendanceBlockedUser } from '@/lib/attendance-access';
 import { AdminAttendanceAdjustModal } from '@/components/AdminAttendanceAdjustModal';
 import { useQueryClient } from '@tanstack/react-query';
+import { useAttendanceLive } from '@/hooks/useAttendanceLive';
 
 function Clock() {
   const [time, setTime] = useState('');
@@ -217,6 +218,18 @@ export default function AttendancePunchStation() {
   };
 
   useEffect(() => { load(); }, [calendarMonth, attendanceBlocked]);
+
+  // Live-refresh whenever the backend pushes an attendance change for this
+  // employee — self punch in/out, or an admin regularize/edit/upsert — so
+  // the punch button and status reflect reality without a manual reload.
+  useAttendanceLive(() => {
+    queryClient.invalidateQueries({ queryKey: ['attendance-today', user?.id] });
+    queryClient.invalidateQueries({ queryKey: ['attendance-stats', user?.id] });
+    queryClient.invalidateQueries({ queryKey: ['attendance-records', user?.id] });
+    queryClient.invalidateQueries({ queryKey: ['attendance-calendar', user?.id] });
+    queryClient.invalidateQueries({ queryKey: ['attendance-od-open', user?.id] });
+    load();
+  });
 
   const isPunchedIn = today?.punchInTime && !today?.punchOutTime;
   const isPunchedOut = today?.punchInTime && today?.punchOutTime;

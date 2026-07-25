@@ -13,6 +13,7 @@ import { RegularizeDto } from './dto/regularize.dto';
 import { OdPunchInDto, OdPunchOutDto } from './dto/od-punch.dto';
 import { AdminUpsertAttendanceDto } from './dto/admin-upsert.dto';
 import { EditTimeDto } from './dto/edit-time.dto';
+import { NotificationsGateway } from '../notifications/notifications.gateway';
 import { ATTENDANCE_BLOCKED_MESSAGE, isAttendanceBlockedIdentity } from './attendance-blocklist';
 
 // ── Attendance Policy Constants ────────────────────────────────────────────────
@@ -20,8 +21,8 @@ const HALF_DAY_HOURS = 4;           // < 4 h worked → auto HALF_DAY at punch-o
 const HALF_DAY_PUNCH_IN_CUTOFF = 12 * 60;
 
 // Allowance constants per month
-const MAX_LATE_PM      = 2;             // late punch-in allowances per month
-const MAX_EARLY_PM     = 4;             // early punch-out allowances per month
+const MAX_LATE_PM      = 2;             // late punch-in allowances per month — beyond this, LATE escalates to HALF_DAY
+const MAX_EARLY_PM     = 2;             // early punch-out allowances per month — beyond this, an early punch-out escalates to HALF_DAY
 const MAX_HALFDAY_PM   = 4;             // > 4 half-days in a month → LEAVE
 const ATTENDANCE_TIME_ZONE = 'Asia/Kolkata';
 
@@ -34,6 +35,7 @@ export class AttendanceService {
   constructor(
     private prisma: PrismaService,
     private geoFence: GeoFenceService,
+    private notifications: NotificationsGateway,
   ) {}
 
 
@@ -221,6 +223,17 @@ export class AttendanceService {
     return count >= MAX_HALFDAY_PM ? 'LEAVE' : 'HALF_DAY';
   }
 
+  /**
+   * If the punch-in falls in the LATE window, check whether the employee
+   * has already used up their monthly late-arrival allowance; if so,
+   * escalate to 'HALF_DAY' instead (which may itself escalate to 'LEAVE'
+   * via resolveHalfDay once its own monthly cap is hit).
+   */
+  private async resolveLate(employeeId: string): Promise<'LATE' | 'HALF_DAY'> {
+    const count = await this.countLateThisMonth(employeeId);
+    return count >= MAX_LATE_PM ? 'HALF_DAY' : 'LATE';
+  }
+
   // ── Punch-in ───────────────────────────────────────────────────────────────
 
   async punchIn(employeeId: string, dto: PunchInDto, ip?: string, userAgent?: string) {
@@ -269,8 +282,9 @@ export class AttendanceService {
       // Punched in within the allowed grace window.
       punchInStatus = 'PRESENT';
     } else if (punchMins <= HALF_DAY_PUNCH_IN_CUTOFF) {
-      // After the grace window but no later than noon.
-      punchInStatus = 'LATE';
+      // After the grace window but no later than noon — subject to the
+      // monthly late-arrival allowance (MAX_LATE_PM).
+      punchInStatus = await this.resolveLate(employeeId);
     } else {
       // Punched in after noon.
       punchInStatus = 'HALF_DAY';
@@ -332,6 +346,13 @@ export class AttendanceService {
       },
     });
 
+    this.notifications.sendToEmployee(employeeId, 'attendance:updated', {
+      date: today.toISOString(),
+      status: record.status,
+      punchInTime: record.punchInTime,
+      punchOutTime: record.punchOutTime,
+    });
+
     return record;
   }
 
@@ -372,7 +393,13 @@ export class AttendanceService {
     } else if (workingHours < HALF_DAY_HOURS) {
       finalStatus = 'HALF_DAY';
     } else if (punchOutMins < EARLY_OUT_CUTOFF) {
-      finalStatus = 'HALF_DAY';
+      // Early punch-out — subject to the monthly early-out allowance
+      // (MAX_EARLY_PM). Within the allowance, keep the inherited status;
+      // once it's used up, further early punch-outs escalate to HALF_DAY.
+      const earlyCount = await this.countEarlyPunchOutsThisMonth(employeeId);
+      if (earlyCount >= MAX_EARLY_PM) {
+        finalStatus = 'HALF_DAY';
+      }
     }
     // else: punched out at or after the allowed early punch-out limit.
 
@@ -417,6 +444,13 @@ export class AttendanceService {
           longitude: dto.longitude,
         },
       },
+    });
+
+    this.notifications.sendToEmployee(employeeId, 'attendance:updated', {
+      date: today.toISOString(),
+      status: updated.status,
+      punchInTime: updated.punchInTime,
+      punchOutTime: updated.punchOutTime,
     });
 
     return updated;
@@ -490,6 +524,13 @@ export class AttendanceService {
       },
     });
 
+    this.notifications.sendToEmployee(employeeId, 'attendance:updated', {
+      date: record.date.toISOString(),
+      status: record.status,
+      punchInTime: record.punchInTime,
+      punchOutTime: record.punchOutTime,
+    });
+
     return record;
   }
 
@@ -533,6 +574,13 @@ export class AttendanceService {
         oldValue: record as object,
         newValue: updated as object,
       },
+    });
+
+    this.notifications.sendToEmployee(employeeId, 'attendance:updated', {
+      date: updated.date.toISOString(),
+      status: updated.status,
+      punchInTime: updated.punchInTime,
+      punchOutTime: updated.punchOutTime,
     });
 
     return updated;
@@ -677,6 +725,13 @@ export class AttendanceService {
       },
     });
 
+    this.notifications.sendToEmployee(record.employeeId, 'attendance:updated', {
+      date: updated.date.toISOString(),
+      status: updated.status,
+      punchInTime: updated.punchInTime,
+      punchOutTime: updated.punchOutTime,
+    });
+
     return updated;
   }
 
@@ -815,6 +870,13 @@ export class AttendanceService {
       },
     });
 
+    this.notifications.sendToEmployee(record.employeeId, 'attendance:updated', {
+      date: updated.date.toISOString(),
+      status: updated.status,
+      punchInTime: updated.punchInTime,
+      punchOutTime: updated.punchOutTime,
+    });
+
     return updated;
   }
 
@@ -928,6 +990,13 @@ export class AttendanceService {
           reason: dto.reason,
         }
       }
+    });
+
+    this.notifications.sendToEmployee(dto.employeeId, 'attendance:updated', {
+      date: record.date.toISOString(),
+      status: record.status,
+      punchInTime: record.punchInTime,
+      punchOutTime: record.punchOutTime,
     });
 
     return record;
