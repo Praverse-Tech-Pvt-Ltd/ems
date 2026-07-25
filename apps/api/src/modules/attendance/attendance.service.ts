@@ -57,13 +57,21 @@ export class AttendanceService {
    * Pushes a live attendance change both to the affected employee's own
    * room and to the shared 'admins' room, so an admin watching a team-wide
    * view (e.g. "Team Today") sees it without a manual reload too.
+   *
+   * Best-effort only: a notification failure must never surface as a
+   * failure of the attendance action itself, which has already been
+   * committed to the database by the time this runs.
    */
   private emitAttendanceUpdated(
     employeeId: string,
     payload: { date: string; status: string; punchInTime: Date | null; punchOutTime: Date | null },
   ): void {
-    this.notifications.sendToEmployee(employeeId, 'attendance:updated', payload);
-    this.notifications.broadcastToAdmins('attendance:updated', { employeeId, ...payload });
+    try {
+      this.notifications.sendToEmployee(employeeId, 'attendance:updated', payload);
+      this.notifications.broadcastToAdmins('attendance:updated', { employeeId, ...payload });
+    } catch (err) {
+      this.logger.warn(`Failed to push attendance:updated for employee ${employeeId}: ${err}`);
+    }
   }
 
   private calculateWorkingHours(punchInTime: Date, punchOutTime: Date): number {

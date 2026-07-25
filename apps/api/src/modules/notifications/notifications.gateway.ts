@@ -5,6 +5,7 @@ import {
   SubscribeMessage,
   ConnectedSocket,
 } from '@nestjs/websockets';
+import { Logger } from '@nestjs/common';
 import { Server, Socket } from 'socket.io';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
@@ -30,6 +31,8 @@ const socketOrigins = [
   namespace: '/notifications',
 })
 export class NotificationsGateway implements OnGatewayConnection {
+  private readonly logger = new Logger(NotificationsGateway.name);
+
   @WebSocketServer()
   server: Server;
 
@@ -92,10 +95,18 @@ export class NotificationsGateway implements OnGatewayConnection {
   }
 
   sendToEmployee(employeeId: string, event: string, payload: unknown): void {
+    if (!this.server) {
+      this.logger.warn(`WebSocket server not ready — dropped '${event}' for employee:${employeeId}`);
+      return;
+    }
     this.server.to(`employee:${employeeId}`).emit(event, payload);
   }
 
   broadcastToAdmins(event: string, payload: unknown): void {
+    if (!this.server) {
+      this.logger.warn(`WebSocket server not ready — dropped admin broadcast '${event}'`);
+      return;
+    }
     this.server.to('admins').emit(event, payload);
   }
 }
