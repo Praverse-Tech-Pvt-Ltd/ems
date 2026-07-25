@@ -11,6 +11,9 @@ export interface AttendanceUpdatedEvent {
   status: string;
   punchInTime: string | null;
   punchOutTime: string | null;
+  /** Present on the admin broadcast (any employee); absent on the
+   *  employee-scoped event, where it's always the current user. */
+  employeeId?: string;
 }
 
 /**

@@ -56,7 +56,7 @@ export class NotificationsGateway implements OnGatewayConnection {
         return;
       }
 
-      const payload = this.jwtService.verify<{ sub: string }>(token, {
+      const payload = this.jwtService.verify<{ sub: string; role?: string }>(token, {
         secret: this.config.getOrThrow<string>('JWT_SECRET'),
       });
 
@@ -66,6 +66,15 @@ export class NotificationsGateway implements OnGatewayConnection {
       // Join the employee-scoped room using the identity from the JWT, not
       // from any client-provided message body.
       void client.join(`employee:${payload.sub}`);
+
+      // Admins/super-admins also join a shared broadcast room so
+      // team-wide views (e.g. the admin "Team Today" list) can live-update.
+      // The role claim here is trusted only for notification *delivery*,
+      // not for authorizing any action — actual authorization is always
+      // re-checked server-side via RolesGuard against the current DB role.
+      if (payload.role === 'ADMIN' || payload.role === 'SUPER_ADMIN') {
+        void client.join('admins');
+      }
     } catch {
       // Invalid / expired token — terminate the connection immediately.
       client.disconnect(true);
@@ -84,5 +93,9 @@ export class NotificationsGateway implements OnGatewayConnection {
 
   sendToEmployee(employeeId: string, event: string, payload: unknown): void {
     this.server.to(`employee:${employeeId}`).emit(event, payload);
+  }
+
+  broadcastToAdmins(event: string, payload: unknown): void {
+    this.server.to('admins').emit(event, payload);
   }
 }

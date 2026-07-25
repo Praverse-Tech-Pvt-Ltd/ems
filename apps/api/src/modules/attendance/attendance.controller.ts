@@ -8,6 +8,7 @@ import { RegularizeDto } from './dto/regularize.dto';
 import { OdPunchInDto, OdPunchOutDto } from './dto/od-punch.dto';
 import { AdminUpsertAttendanceDto } from './dto/admin-upsert.dto';
 import { EditTimeDto } from './dto/edit-time.dto';
+import { UpdateAttendancePolicyDto } from './dto/update-attendance-policy.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -134,6 +135,21 @@ export class AttendanceController {
     @Query('employeeId') employeeId?: string,
   ) {
     return this.balances.list(Number(month), Number(year), employeeId);
+  }
+
+  @Get('admin/policy')
+  @Roles('ADMIN', 'SUPER_ADMIN')
+  getAttendancePolicy() {
+    return this.service.getAttendancePolicy();
+  }
+
+  @Patch('admin/policy')
+  @Roles('ADMIN', 'SUPER_ADMIN')
+  updateAttendancePolicy(
+    @CurrentUser() user: { id: string },
+    @Body() dto: UpdateAttendancePolicyDto,
+  ) {
+    return this.service.updateAttendancePolicy(user.id, dto);
   }
 
   @Post('admin/monthly-balances/recalculate')

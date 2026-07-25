@@ -251,6 +251,10 @@ model Employee {
   status           EmployeeStatus @default(ACTIVE)
   address          String?
   emergencyContact String?        @map("emergency_contact")
+  /// Shift start, in minutes since midnight IST. Null → use the company-default shift.
+  shiftStartMinutes Int?          @map("shift_start_minutes")
+  /// Shift end, in minutes since midnight IST. Null → use the company-default shift.
+  shiftEndMinutes   Int?          @map("shift_end_minutes")
   createdAt        DateTime       @default(now()) @map("created_at")
   updatedAt        DateTime       @updatedAt @map("updated_at")
 
@@ -443,6 +447,19 @@ model LeaveBalance {
 
   @@unique([employeeId, leaveType, year])
   @@map("leave_balances")
+}
+
+/// Single-row table holding company-wide monthly attendance allowances.
+/// Always read/written through the fixed id "default".
+model AttendancePolicy {
+  id                  String   @id @default("default")
+  maxLatePerMonth     Int      @default(2) @map("max_late_per_month")
+  maxEarlyOutPerMonth Int      @default(2) @map("max_early_out_per_month")
+  maxHalfDaysPerMonth Int      @default(4) @map("max_half_days_per_month")
+  updatedBy           String?  @map("updated_by")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  @@map("attendance_policy")
 }
 
 model LeaveRequest {

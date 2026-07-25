@@ -219,15 +219,22 @@ export default function AttendancePunchStation() {
 
   useEffect(() => { load(); }, [calendarMonth, attendanceBlocked]);
 
-  // Live-refresh whenever the backend pushes an attendance change for this
-  // employee — self punch in/out, or an admin regularize/edit/upsert — so
-  // the punch button and status reflect reality without a manual reload.
-  useAttendanceLive(() => {
-    queryClient.invalidateQueries({ queryKey: ['attendance-today', user?.id] });
-    queryClient.invalidateQueries({ queryKey: ['attendance-stats', user?.id] });
-    queryClient.invalidateQueries({ queryKey: ['attendance-records', user?.id] });
-    queryClient.invalidateQueries({ queryKey: ['attendance-calendar', user?.id] });
-    queryClient.invalidateQueries({ queryKey: ['attendance-od-open', user?.id] });
+  // Live-refresh whenever the backend pushes an attendance change — self
+  // punch in/out, or an admin regularize/edit/upsert — so the punch button
+  // and status reflect reality without a manual reload. Admins also get
+  // team-wide events (any employee), used to refresh the "Team Today" list.
+  useAttendanceLive((event) => {
+    const isOwnEvent = !event.employeeId || event.employeeId === user?.id;
+    if (isOwnEvent) {
+      queryClient.invalidateQueries({ queryKey: ['attendance-today', user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['attendance-stats', user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['attendance-records', user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['attendance-calendar', user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['attendance-od-open', user?.id] });
+    }
+    if (isAdmin) {
+      queryClient.invalidateQueries({ queryKey: ['attendance-all'] });
+    }
     load();
   });
 

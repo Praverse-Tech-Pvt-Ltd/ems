@@ -29,6 +29,8 @@ const EMPLOYEE_SELECT = {
   joiningDate: true,
   profilePhotoUrl: true,
   status: true,
+  shiftStartMinutes: true,
+  shiftEndMinutes: true,
   createdAt: true,
 } as const;
 

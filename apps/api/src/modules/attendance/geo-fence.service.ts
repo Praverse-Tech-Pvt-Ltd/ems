@@ -12,8 +12,13 @@ export class GeoFenceService {
       where: { isActive: true },
     });
 
-    // No office locations configured → treat as valid (geo-fence not set up)
-    if (locations.length === 0) return true;
+    // No office locations configured → fail closed (treat as outside any
+    // office, so punch-ins are marked WFH rather than silently disabling
+    // geo-fencing entirely).
+    if (locations.length === 0) {
+      this.logger.warn('Geo-fence: no active office locations configured — treating all punches as outside office.');
+      return false;
+    }
 
     let closest = Infinity;
     const result = locations.some((loc) => {

@@ -13,6 +13,7 @@ import { RegularizeDto } from './dto/regularize.dto';
 import { OdPunchInDto, OdPunchOutDto } from './dto/od-punch.dto';
 import { AdminUpsertAttendanceDto } from './dto/admin-upsert.dto';
 import { EditTimeDto } from './dto/edit-time.dto';
+import { UpdateAttendancePolicyDto } from './dto/update-attendance-policy.dto';
 import { NotificationsGateway } from '../notifications/notifications.gateway';
 import { ATTENDANCE_BLOCKED_MESSAGE, isAttendanceBlockedIdentity } from './attendance-blocklist';
 
@@ -20,10 +21,9 @@ import { ATTENDANCE_BLOCKED_MESSAGE, isAttendanceBlockedIdentity } from './atten
 const HALF_DAY_HOURS = 4;           // < 4 h worked → auto HALF_DAY at punch-out
 const HALF_DAY_PUNCH_IN_CUTOFF = 12 * 60;
 
-// Allowance constants per month
-const MAX_LATE_PM      = 2;             // late punch-in allowances per month — beyond this, LATE escalates to HALF_DAY
-const MAX_EARLY_PM     = 2;             // early punch-out allowances per month — beyond this, an early punch-out escalates to HALF_DAY
-const MAX_HALFDAY_PM   = 4;             // > 4 half-days in a month → LEAVE
+// Monthly allowance caps (late arrivals, early punch-outs, half-days) live in
+// the AttendancePolicy table — see getPolicyLimits() — and are admin
+// configurable via GET/PATCH /attendance/admin/policy.
 const ATTENDANCE_TIME_ZONE = 'Asia/Kolkata';
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -51,6 +51,19 @@ export class AttendanceService {
     const utc = date.getTime() + date.getTimezoneOffset() * 60000;
     const ist = new Date(utc + (3600000 * 5.5));
     return new Date(Date.UTC(ist.getFullYear(), ist.getMonth(), ist.getDate()));
+  }
+
+  /**
+   * Pushes a live attendance change both to the affected employee's own
+   * room and to the shared 'admins' room, so an admin watching a team-wide
+   * view (e.g. "Team Today") sees it without a manual reload too.
+   */
+  private emitAttendanceUpdated(
+    employeeId: string,
+    payload: { date: string; status: string; punchInTime: Date | null; punchOutTime: Date | null },
+  ): void {
+    this.notifications.sendToEmployee(employeeId, 'attendance:updated', payload);
+    this.notifications.broadcastToAdmins('attendance:updated', { employeeId, ...payload });
   }
 
   private calculateWorkingHours(punchInTime: Date, punchOutTime: Date): number {
@@ -99,58 +112,42 @@ export class AttendanceService {
     return emp?.department?.name?.toLowerCase().includes('software') ?? false;
   }
 
+  private formatMinutes(mins: number): string {
+    const h = Math.floor(mins / 60).toString().padStart(2, '0');
+    const m = (mins % 60).toString().padStart(2, '0');
+    return `${h}:${m}`;
+  }
+
+  /**
+   * Shift timing is per-employee, stored on Employee.shiftStartMinutes /
+   * shiftEndMinutes. An employee without an individually configured shift
+   * falls back to the company-default shift (09:30-18:00).
+   */
   private async getEmployeeTimeConstraints(employeeId: string) {
     const employee = await this.prisma.employee.findUnique({
       where: { id: employeeId },
-      select: { firstName: true }
+      select: { shiftStartMinutes: true, shiftEndMinutes: true },
     });
-    const name = employee?.firstName.toLowerCase() || '';
 
-    let designatedStart = 9 * 60; // 09:00 AM
-    let designatedEnd = 17 * 60 + 30; // 05:30 PM
-    let text = {
-      presentCutoff:  '09:00',
-      lateCutoff:     '09:30',
-      earlyOutCutoff: '17:00',
-      regularPunchOut:'17:30',
-    };
+    const DEFAULT_SHIFT_START = 9 * 60 + 30; // 09:30
+    const DEFAULT_SHIFT_END = 18 * 60;       // 18:00
 
-    if (name.includes('shifa') || name.includes('chandni') || name.includes('dilip')) {
-      designatedStart = 9 * 60;
-      designatedEnd = 17 * 60 + 30;
-      text = {
-        presentCutoff:  '09:00',
-        lateCutoff:     '09:30',
-        earlyOutCutoff: '17:00',
-        regularPunchOut:'17:30',
-      };
-    } else if (name.includes('maanav') || name.includes('dev')) {
-      designatedStart = 10 * 60;
-      designatedEnd = 18 * 60 + 30;
-      text = {
-        presentCutoff:  '10:00',
-        lateCutoff:     '10:30',
-        earlyOutCutoff: '18:00',
-        regularPunchOut:'18:30',
-      };
-    } else {
-      // Default shift 09:30-18:00
-      designatedStart = 9 * 60 + 30;
-      designatedEnd = 18 * 60;
-      text = {
-        presentCutoff:  '09:30',
-        lateCutoff:     '10:00',
-        earlyOutCutoff: '17:30',
-        regularPunchOut:'18:00',
-      };
-    }
+    const designatedStart = employee?.shiftStartMinutes ?? DEFAULT_SHIFT_START;
+    const designatedEnd   = employee?.shiftEndMinutes   ?? DEFAULT_SHIFT_END;
+    const lateCutoff = designatedStart + 30;
+    const earlyOutCutoff = designatedEnd - 30;
 
     return {
       DESIGNATED_START: designatedStart,
       DESIGNATED_END: designatedEnd,
-      LATE_CUTOFF: designatedStart + 30,
-      EARLY_OUT_CUTOFF: designatedEnd - 30,
-      policyText: text,
+      LATE_CUTOFF: lateCutoff,
+      EARLY_OUT_CUTOFF: earlyOutCutoff,
+      policyText: {
+        presentCutoff:   this.formatMinutes(designatedStart),
+        lateCutoff:      this.formatMinutes(lateCutoff),
+        earlyOutCutoff:  this.formatMinutes(earlyOutCutoff),
+        regularPunchOut: this.formatMinutes(designatedEnd),
+      },
     };
   }
 
@@ -212,15 +209,34 @@ export class AttendanceService {
   }
 
   /**
+   * Company-wide monthly attendance allowances. Stored as a single row in
+   * AttendancePolicy (id 'default'); upserted on first read so the service
+   * works even before a seed/migration has inserted the row.
+   */
+  private async getPolicyLimits() {
+    const policy = await this.prisma.attendancePolicy.upsert({
+      where: { id: 'default' },
+      update: {},
+      create: { id: 'default' },
+    });
+    return {
+      maxLatePerMonth: policy.maxLatePerMonth,
+      maxEarlyOutPerMonth: policy.maxEarlyOutPerMonth,
+      maxHalfDaysPerMonth: policy.maxHalfDaysPerMonth,
+    };
+  }
+
+  /**
    * If the computed status is HALF_DAY, check whether the employee has
    * already hit the monthly cap; if so, return 'LEAVE' instead.
    */
   private async resolveHalfDay(
     employeeId: string,
+    maxHalfDaysPerMonth: number,
     excludeId?: string,
   ): Promise<'HALF_DAY' | 'LEAVE'> {
     const count = await this.countHalfDaysThisMonth(employeeId, excludeId);
-    return count >= MAX_HALFDAY_PM ? 'LEAVE' : 'HALF_DAY';
+    return count >= maxHalfDaysPerMonth ? 'LEAVE' : 'HALF_DAY';
   }
 
   /**
@@ -229,9 +245,9 @@ export class AttendanceService {
    * escalate to 'HALF_DAY' instead (which may itself escalate to 'LEAVE'
    * via resolveHalfDay once its own monthly cap is hit).
    */
-  private async resolveLate(employeeId: string): Promise<'LATE' | 'HALF_DAY'> {
+  private async resolveLate(employeeId: string, maxLatePerMonth: number): Promise<'LATE' | 'HALF_DAY'> {
     const count = await this.countLateThisMonth(employeeId);
-    return count >= MAX_LATE_PM ? 'HALF_DAY' : 'LATE';
+    return count >= maxLatePerMonth ? 'HALF_DAY' : 'LATE';
   }
 
   // ── Punch-in ───────────────────────────────────────────────────────────────
@@ -249,6 +265,18 @@ export class AttendanceService {
     if (weekOff) {
       const day = today.getDay();
       throw new BadRequestException(day === 0 ? 'Sunday is a holiday — no punch-in required.' : 'Saturday is a weekly off for your department.');
+    }
+
+    const approvedLeave = await this.prisma.leaveRequest.findFirst({
+      where: {
+        employeeId,
+        status: 'APPROVED',
+        fromDate: { lte: today },
+        toDate: { gte: today },
+      },
+    });
+    if (approvedLeave) {
+      throw new BadRequestException('You are on approved leave today. Contact admin if this is incorrect.');
     }
 
     const existing = await this.prisma.attendanceRecord.findUnique({
@@ -271,6 +299,7 @@ export class AttendanceService {
     const now        = new Date();
     const punchMins  = this.minutesSinceMidnight(now);
     const { LATE_CUTOFF } = await this.getEmployeeTimeConstraints(employeeId);
+    const policy = await this.getPolicyLimits();
 
     // ── Determine punch-in status ────────────────────────────────────────────
     let punchInStatus: 'PRESENT' | 'LATE' | 'HALF_DAY' | 'WFH' | 'LEAVE';
@@ -283,8 +312,8 @@ export class AttendanceService {
       punchInStatus = 'PRESENT';
     } else if (punchMins <= HALF_DAY_PUNCH_IN_CUTOFF) {
       // After the grace window but no later than noon — subject to the
-      // monthly late-arrival allowance (MAX_LATE_PM).
-      punchInStatus = await this.resolveLate(employeeId);
+      // monthly late-arrival allowance.
+      punchInStatus = await this.resolveLate(employeeId, policy.maxLatePerMonth);
     } else {
       // Punched in after noon.
       punchInStatus = 'HALF_DAY';
@@ -292,7 +321,7 @@ export class AttendanceService {
 
     // If HALF_DAY, check monthly cap
     if (punchInStatus === 'HALF_DAY') {
-      punchInStatus = await this.resolveHalfDay(employeeId);
+      punchInStatus = await this.resolveHalfDay(employeeId, policy.maxHalfDaysPerMonth);
     }
 
     // ── Persist record ───────────────────────────────────────────────────────
@@ -346,7 +375,7 @@ export class AttendanceService {
       },
     });
 
-    this.notifications.sendToEmployee(employeeId, 'attendance:updated', {
+    this.emitAttendanceUpdated(employeeId, {
       date: today.toISOString(),
       status: record.status,
       punchInTime: record.punchInTime,
@@ -384,6 +413,7 @@ export class AttendanceService {
     const workingHours  = (now.getTime() - record.punchInTime.getTime()) / (1000 * 60 * 60);
     const timeStr       = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
     const { EARLY_OUT_CUTOFF } = await this.getEmployeeTimeConstraints(employeeId);
+    const policy = await this.getPolicyLimits();
 
     // ── Determine final status ───────────────────────────────────────────────
     let finalStatus: string = record.status;     // inherit punch-in status
@@ -393,11 +423,11 @@ export class AttendanceService {
     } else if (workingHours < HALF_DAY_HOURS) {
       finalStatus = 'HALF_DAY';
     } else if (punchOutMins < EARLY_OUT_CUTOFF) {
-      // Early punch-out — subject to the monthly early-out allowance
-      // (MAX_EARLY_PM). Within the allowance, keep the inherited status;
-      // once it's used up, further early punch-outs escalate to HALF_DAY.
+      // Early punch-out — subject to the monthly early-out allowance.
+      // Within the allowance, keep the inherited status; once it's used
+      // up, further early punch-outs escalate to HALF_DAY.
       const earlyCount = await this.countEarlyPunchOutsThisMonth(employeeId);
-      if (earlyCount >= MAX_EARLY_PM) {
+      if (earlyCount >= policy.maxEarlyOutPerMonth) {
         finalStatus = 'HALF_DAY';
       }
     }
@@ -405,7 +435,7 @@ export class AttendanceService {
 
     // If HALF_DAY, check monthly cap
     if (finalStatus === 'HALF_DAY') {
-      finalStatus = await this.resolveHalfDay(employeeId, record.id);
+      finalStatus = await this.resolveHalfDay(employeeId, policy.maxHalfDaysPerMonth, record.id);
     }
 
     // ── Persist ──────────────────────────────────────────────────────────────
@@ -446,7 +476,7 @@ export class AttendanceService {
       },
     });
 
-    this.notifications.sendToEmployee(employeeId, 'attendance:updated', {
+    this.emitAttendanceUpdated(employeeId, {
       date: today.toISOString(),
       status: updated.status,
       punchInTime: updated.punchInTime,
@@ -524,7 +554,7 @@ export class AttendanceService {
       },
     });
 
-    this.notifications.sendToEmployee(employeeId, 'attendance:updated', {
+    this.emitAttendanceUpdated(employeeId, {
       date: record.date.toISOString(),
       status: record.status,
       punchInTime: record.punchInTime,
@@ -576,7 +606,7 @@ export class AttendanceService {
       },
     });
 
-    this.notifications.sendToEmployee(employeeId, 'attendance:updated', {
+    this.emitAttendanceUpdated(employeeId, {
       date: updated.date.toISOString(),
       status: updated.status,
       punchInTime: updated.punchInTime,
@@ -725,7 +755,7 @@ export class AttendanceService {
       },
     });
 
-    this.notifications.sendToEmployee(record.employeeId, 'attendance:updated', {
+    this.emitAttendanceUpdated(record.employeeId, {
       date: updated.date.toISOString(),
       status: updated.status,
       punchInTime: updated.punchInTime,
@@ -791,18 +821,60 @@ export class AttendanceService {
   /** Returns a summary of the employee's monthly policy usage. */
   async getPolicyUsage(employeeId: string) {
     await this.assertAttendanceAllowed(employeeId);
-    const [lateCount, earlyCount, halfDayCount, constraints] = await Promise.all([
+    const [lateCount, earlyCount, halfDayCount, constraints, limits] = await Promise.all([
       this.countLateThisMonth(employeeId),
       this.countEarlyPunchOutsThisMonth(employeeId),
       this.countHalfDaysThisMonth(employeeId),
       this.getEmployeeTimeConstraints(employeeId),
+      this.getPolicyLimits(),
     ]);
     return {
-      latePunchIns:          { used: lateCount,    allowed: MAX_LATE_PM,     remaining: Math.max(0, MAX_LATE_PM - lateCount) },
-      earlyPunchOuts:        { used: earlyCount,   allowed: MAX_EARLY_PM,    remaining: Math.max(0, MAX_EARLY_PM - earlyCount) },
-      halfDays:              { used: halfDayCount, allowed: MAX_HALFDAY_PM,  remaining: Math.max(0, MAX_HALFDAY_PM - halfDayCount) },
+      latePunchIns:          { used: lateCount,    allowed: limits.maxLatePerMonth,     remaining: Math.max(0, limits.maxLatePerMonth - lateCount) },
+      earlyPunchOuts:        { used: earlyCount,   allowed: limits.maxEarlyOutPerMonth, remaining: Math.max(0, limits.maxEarlyOutPerMonth - earlyCount) },
+      halfDays:              { used: halfDayCount, allowed: limits.maxHalfDaysPerMonth, remaining: Math.max(0, limits.maxHalfDaysPerMonth - halfDayCount) },
       policy: constraints.policyText,
     };
+  }
+
+  /** Returns the current company-wide attendance policy (admin view). */
+  async getAttendancePolicy() {
+    return this.prisma.attendancePolicy.upsert({
+      where: { id: 'default' },
+      update: {},
+      create: { id: 'default' },
+    });
+  }
+
+  /** Updates the company-wide attendance policy. */
+  async updateAttendancePolicy(adminId: string, dto: UpdateAttendancePolicyDto) {
+    const updated = await this.prisma.attendancePolicy.upsert({
+      where: { id: 'default' },
+      update: {
+        ...(dto.maxLatePerMonth     !== undefined ? { maxLatePerMonth: dto.maxLatePerMonth } : {}),
+        ...(dto.maxEarlyOutPerMonth !== undefined ? { maxEarlyOutPerMonth: dto.maxEarlyOutPerMonth } : {}),
+        ...(dto.maxHalfDaysPerMonth !== undefined ? { maxHalfDaysPerMonth: dto.maxHalfDaysPerMonth } : {}),
+        updatedBy: adminId,
+      },
+      create: {
+        id: 'default',
+        maxLatePerMonth: dto.maxLatePerMonth ?? 2,
+        maxEarlyOutPerMonth: dto.maxEarlyOutPerMonth ?? 2,
+        maxHalfDaysPerMonth: dto.maxHalfDaysPerMonth ?? 4,
+        updatedBy: adminId,
+      },
+    });
+
+    await this.prisma.auditLog.create({
+      data: {
+        actorId: adminId,
+        action: 'UPDATE_ATTENDANCE_POLICY',
+        resourceType: 'attendance_policy',
+        resourceId: updated.id,
+        newValue: updated as object,
+      },
+    });
+
+    return updated;
   }
 
 
@@ -870,7 +942,7 @@ export class AttendanceService {
       },
     });
 
-    this.notifications.sendToEmployee(record.employeeId, 'attendance:updated', {
+    this.emitAttendanceUpdated(record.employeeId, {
       date: updated.date.toISOString(),
       status: updated.status,
       punchInTime: updated.punchInTime,
@@ -992,7 +1064,7 @@ export class AttendanceService {
       }
     });
 
-    this.notifications.sendToEmployee(dto.employeeId, 'attendance:updated', {
+    this.emitAttendanceUpdated(dto.employeeId, {
       date: record.date.toISOString(),
       status: record.status,
       punchInTime: record.punchInTime,
