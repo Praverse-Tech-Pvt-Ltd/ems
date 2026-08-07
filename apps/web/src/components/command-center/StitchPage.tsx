@@ -265,6 +265,12 @@ export function StitchPage({ config }: { config: StitchPageConfig }) {
     queryFn: () => apiClient.get('/attendance/today').then(r => r.data),
     enabled: config.layout === 'workday' && !attendanceBlocked && !!user?.id,
     retry: false,
+    // This key is also cached (and persisted to localStorage) by the
+    // Punch Station page. Without these, the global staleTime:Infinity +
+    // refetchOnMount:false defaults mean this widget can show a prior
+    // day's completed punch record instead of today's real status.
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
   const todayData = todayQuery.data as { punchInTime?: string | null; punchOutTime?: string | null } | undefined;
   const isPunchedIn  = !!(todayData?.punchInTime && !todayData?.punchOutTime);
@@ -274,6 +280,8 @@ export function StitchPage({ config }: { config: StitchPageConfig }) {
     queryFn: () => apiClient.get('/attendance/od/open').then(r => r.data),
     enabled: config.layout === 'workday' && !attendanceBlocked && !!user?.id,
     retry: false,
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
   const openOd = openOdQuery.data as { id?: string; punchInTime?: string | null; manualPunchReason?: string | null } | null | undefined;
   const visibleActions = (config.actions ?? []).filter(action => {
