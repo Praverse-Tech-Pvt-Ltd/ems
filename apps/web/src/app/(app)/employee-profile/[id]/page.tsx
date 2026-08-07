@@ -480,7 +480,7 @@ export default function EmployeeProfilePage() {
 
         if (isSelf && !attendanceBlockedSelf) {
           const [s, b] = await Promise.allSettled([
-            queryClient.fetchQuery({ queryKey: ['attendance-stats', me?.id], queryFn: () => attendanceService.myStats() }),
+            queryClient.fetchQuery({ queryKey: ['attendance-stats', me?.id], queryFn: () => attendanceService.myStats(), staleTime: 0 }),
             queryClient.fetchQuery({ queryKey: ['leaves-balance', me?.id], queryFn: () => leavesService.balance() }),
           ]);
           if (s.status === 'fulfilled') setStats(s.value);

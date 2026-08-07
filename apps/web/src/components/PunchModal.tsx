@@ -60,8 +60,9 @@ export function PunchModal({
       setPhase('success');
       await Promise.all([
         qc.invalidateQueries({ queryKey: ['attendance-today'] }),
-        qc.invalidateQueries({ queryKey: ['attendance-recent'] }),
-        qc.invalidateQueries({ queryKey: ['attendance-all-year'] }),
+        qc.invalidateQueries({ queryKey: ['attendance-stats'] }),
+        qc.invalidateQueries({ queryKey: ['attendance-records'] }),
+        qc.invalidateQueries({ queryKey: ['attendance-calendar'] }),
         qc.invalidateQueries({ queryKey: ['attendance-od-open'] }),
       ]);
       setTimeout(onClose, 2000);
